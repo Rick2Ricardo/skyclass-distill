@@ -17,10 +17,18 @@ function timeLabel(iso) { try { return new Date(iso).toLocaleTimeString("zh-CN",
 async function checkHealth(){
   try{
     const health=await api("/api/health");
-    const ok=health.runtime.ffmpeg && health.runtime.yt_dlp && health.runtime.bilibili_api;
+    const ok=health.runtime.ffmpeg && health.runtime.yt_dlp;
     $("#runtimeDot").classList.toggle("ok",ok);
-    $("#runtimeText").textContent=ok ? (health.api_configured?"运行就绪 · API 已接入":"运行就绪 · 待接 API") : "依赖未就绪";
+    const bili=health.runtime.bilibili_api?" · B站增强":"";
+    $("#runtimeText").textContent=ok ? (health.api_configured?`通用下载就绪${bili} · API 已接入`:`通用下载就绪${bili} · 待接 API`) : "依赖未就绪";
   }catch{$("#runtimeText").textContent="服务未连接";}
+}
+
+async function loadSupportedSources(){
+  try{
+    const data=await api("/api/sources");
+    $("#sourceSites").innerHTML=`<b>公开页面适配：</b>${data.sites.map(site=>`<span>${escapeHtml(site.name)}</span>`).join("")}<small>${escapeHtml(data.notice)}</small>`;
+  }catch{$("#sourceSites").textContent="通用下载器将自动识别视频来源。";}
 }
 
 function renderCourses(items=[], artifacts={}){
@@ -29,9 +37,9 @@ function renderCourses(items=[], artifacts={}){
     const record=artifacts[item.id]||{};
     const state=record.transcript_txt?"已转写":record.video?"已下载":"待处理";
     const mins=item.duration?`${Math.round(item.duration/60)} 分钟`:"时长待解析";
-    const teacher=item.metadata?.teacher?`${item.metadata.teacher} · `:"";
+    const teacher=item.metadata?.teacher||item.metadata?.uploader;
     const source=item.source==="local-upload"?"本地视频":item.source;
-    return `<article class="course-item"><span class="index">${String(i+1).padStart(2,"0")}</span><div><strong title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</strong><small>${escapeHtml(teacher+source)} · ${mins}</small></div><span class="state">${state}</span></article>`;
+    return `<article class="course-item"><span class="index">${String(i+1).padStart(2,"0")}</span><div><strong title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</strong><small>${escapeHtml((teacher?`${teacher} · `:"")+source)} · ${mins}</small></div><span class="state">${state}</span></article>`;
   }).join(""):'<div class="empty">没有发现课程。</div>';
 }
 
@@ -78,7 +86,7 @@ function setSourceMode(mode){
   $("#pipelineForm").classList.toggle("local-mode",local);
   $("#previewBtn").textContent=local?"预览已选视频":"先预览课程列表";
   document.querySelectorAll("[data-source-mode]").forEach(button=>{const active=button.dataset.sourceMode===mode;button.classList.toggle("active",active);button.setAttribute("aria-selected",String(active));});
-  if(local)showLocalSelection();else $("#previewStatus").textContent="当前推荐：物理云学习逸迭Eddie · 免费系统复习课";
+  if(local)showLocalSelection();else $("#previewStatus").textContent="粘贴公开课程网址；不支持登录、付费或 DRM 内容。";
 }
 
 async function uploadLocalVideos(files){
@@ -155,5 +163,5 @@ function settingsPayload(){return {llm_base_url:$("#baseUrl").value.trim(),llm_a
 $("#saveSettings").addEventListener("click",async()=>{try{await api("/api/settings",{method:"PUT",body:JSON.stringify(settingsPayload())});$("#settingsMessage").textContent="设置已安全保存到本机。";$("#apiKey").value="";checkHealth();}catch(e){$("#settingsMessage").textContent=`保存失败：${e.message}`;}});
 $("#testApi").addEventListener("click",async()=>{const b=$("#testApi");b.disabled=true;$("#settingsMessage").textContent="正在测试…";try{const r=await api("/api/settings/test",{method:"POST",body:JSON.stringify(settingsPayload())});$("#settingsMessage").textContent=r.message||"连接成功。";}catch(e){$("#settingsMessage").textContent=`连接失败：${e.message}`;}finally{b.disabled=false;}});
 
-async function boot(){checkHealth();try{const jobs=await api("/api/jobs");if(jobs.length){renderJob(jobs[0]);if(["queued","running"].includes(jobs[0].status))pollTimer=setInterval(refreshJob,1500);}}catch(e){console.warn(e);}}
+async function boot(){checkHealth();loadSupportedSources();try{const jobs=await api("/api/jobs");if(jobs.length){renderJob(jobs[0]);if(["queued","running"].includes(jobs[0].status))pollTimer=setInterval(refreshJob,1500);}}catch(e){console.warn(e);}}
 boot();

@@ -10,7 +10,7 @@ from .pipeline import PipelineManager
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="skyclass", description="B 站教师课程教学技能蒸馏")
+    parser = argparse.ArgumentParser(prog="skyclass", description="在线视频与本地课程教学技能蒸馏")
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="运行完整流水线")
     run.add_argument("--url", required=True)

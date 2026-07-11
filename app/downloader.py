@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -40,7 +41,8 @@ def check_runtime() -> dict[str, bool]:
 
 def download_item(item: CourseItem, directory: Path, max_height: int = 720, log: LogFn | None = None) -> dict[str, str]:
     directory.mkdir(parents=True, exist_ok=True)
-    stem = f"{item.index:03d}-{item.id}"
+    safe_id = re.sub(r"[^0-9A-Za-z._-]+", "-", item.id).strip("-.")[:80] or "video"
+    stem = f"{item.index:03d}-{safe_id}"
     if item.metadata.get("local_path"):
         return import_local_item(item, directory, stem, log)
     existing = next(directory.glob(f"{stem}.mp4"), None)
@@ -55,7 +57,12 @@ def download_item(item: CourseItem, directory: Path, max_height: int = 720, log:
     if audio_target.exists():
         audio_target.unlink()
     if item.metadata.get("bvid"):
-        video = download_bilibili(item, directory / f"{stem}.mp4", log)
+        try:
+            video = download_bilibili(item, directory / f"{stem}.mp4", log)
+        except Exception as exc:
+            if log:
+                log(f"B 站专用下载失败，自动切换 yt-dlp：{str(exc)[-200:]}")
+            video = download_with_ytdlp(item, directory, stem, max_height, log)
     else:
         video = download_with_ytdlp(item, directory, stem, max_height, log)
     audio = extract_audio(video, audio_target, log)
@@ -117,15 +124,29 @@ def download_with_ytdlp(item: CourseItem, directory: Path, stem: str, max_height
     fmt = f"bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}]/best"
     cmd = [
         sys.executable, "-m", "yt_dlp", item.source_url, "--no-playlist",
-        "--format", fmt, "--merge-output-format", "mp4", "--write-info-json",
-        "--write-thumbnail", "--no-overwrites", "--output", output, "--newline",
+        "--format", fmt, "--merge-output-format", "mp4", "--remux-video", "mp4",
+        "--write-info-json", "--no-overwrites", "--output", output, "--newline",
+        "--retries", "5", "--fragment-retries", "5", "--extractor-retries", "3",
+        "--concurrent-fragments", "4", "--socket-timeout", "30",
+        "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/131.0 Safari/537.36",
+        "--add-header", "Accept-Language:zh-CN,zh;q=0.9,en;q=0.7",
+        "--referer", item.source_url,
     ]
     if log:
         log(f"yt-dlp 下载：{item.title}")
     process = subprocess.run(cmd, capture_output=True, text=True)
     if process.returncode:
-        raise RuntimeError("yt-dlp 下载失败：" + (process.stdout + process.stderr)[-1000:])
-    video = next(directory.glob(f"{stem}.mp4"), None)
+        detail = (process.stdout + process.stderr)[-1200:]
+        raise RuntimeError(
+            "yt-dlp 下载失败：" + detail
+            + "\n请确认内容公开且无登录、付费或 DRM 限制，并尝试升级 yt-dlp。"
+        )
+    candidates = [
+        path for path in directory.glob(f"{stem}.*")
+        if path.suffix.lower() in VIDEO_SUFFIXES and not path.name.endswith(".part")
+    ]
+    video = next((path for path in candidates if path.suffix.lower() == ".mp4"), None)
+    video = video or (candidates[0] if candidates else None)
     if not video:
         raise RuntimeError(f"下载完成但未找到视频文件：{stem}")
     return video

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#102a2a">
   <title>教学蒸馏台 · SkyClass Distill</title>
   <link rel="stylesheet" href="/assets/styles.css">
-  <style>.inline-actions{display:flex;gap:18px;align-items:center}.text-button:disabled{opacity:.35;cursor:not-allowed}</style>
+  <style>.inline-actions{display:flex;gap:18px;align-items:center}.text-button:disabled{opacity:.35;cursor:not-allowed}.source-sites{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:12px;color:var(--muted);font-size:10px}.source-sites>b{color:var(--ink)}.source-sites span{padding:4px 7px;border-radius:99px;background:#edf0e9;border:1px solid #dfe2da}.source-sites small{flex-basis:100%;line-height:1.5;color:#8b9692}</style>
 </head>
 <body>
   <div class="shell">
@@ -37,7 +37,7 @@
         <div class="hero-copy">
           <div class="status-pill"><i></i> 本地 Whisper · 单一中转 API</div>
           <h2>从视频到教学 Skill，<br><em>证据始终在线。</em></h2>
-          <p>既可调用成熟 B 站接口采集公开课程，也可选择本地视频；保留时间戳转写，比较多节课的共同教学动作，并输出可验证、可追溯的 Codex Skills。</p>
+          <p>可解析国内主流视频网站的公开课程，也可选择本地视频；保留时间戳转写，比较多节课的共同教学动作，并输出可验证、可追溯的 Codex Skills。</p>
         </div>
         <div class="hero-stat">
           <span>本轮目标</span><strong>05</strong><small>高中物理样例课</small>
@@ -51,11 +51,11 @@
           <span class="legal">仅处理公开且获授权使用的内容</span>
         </div>
         <div class="source-switch" role="tablist" aria-label="视频来源">
-          <button type="button" class="active" data-source-mode="remote" role="tab" aria-selected="true">B 站课程</button>
+          <button type="button" class="active" data-source-mode="remote" role="tab" aria-selected="true">在线视频</button>
           <button type="button" data-source-mode="local" role="tab" aria-selected="false">本地视频</button>
         </div>
         <form id="pipelineForm">
-          <label class="source-field" id="remoteSourceField"><span>B 站教师课程地址</span><input id="sourceUrl" type="url" required value="https://www.bilibili.com/video/BV1Ha411r7Hk/" spellcheck="false"></label>
+          <label class="source-field" id="remoteSourceField"><span>课程、合集或单集页面地址</span><input id="sourceUrl" type="url" required value="https://www.bilibili.com/video/BV1Ha411r7Hk/" placeholder="粘贴 B 站、抖音、西瓜、优酷、腾讯视频等公开页面" spellcheck="false"></label>
           <label class="source-field local-source-field" id="localSourceField" hidden><span>本地视频（可多选）</span><input id="localFiles" type="file" accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-msvideo,video/mpeg,.m4v" multiple></label>
           <label><span>学科</span><input id="subject" value="高中物理"></label>
           <label class="small" id="limitField"><span>数量</span><input id="limit" type="number" min="1" max="50" value="5"></label>
@@ -63,8 +63,9 @@
         </form>
         <div class="preview-row">
           <button class="text-button" id="previewBtn" type="button">先预览课程列表</button>
-          <span id="previewStatus">当前推荐：物理云学习逸迭Eddie · 免费系统复习课</span>
+          <span id="previewStatus">粘贴公开课程网址；不支持登录、付费或 DRM 内容。</span>
         </div>
+        <div class="source-sites" id="sourceSites">正在读取支持的网站…</div>
       </section>
 
       <section class="pipeline-card card" id="currentJob">

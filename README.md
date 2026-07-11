@@ -1,12 +1,12 @@
 # 教学蒸馏台 SkyClass Distill
 
-将 B 站公开课程或本地教学视频转换为带时间戳的逐字稿、结构化课堂分析，以及老师可以直接参考的 Codex Teaching Skills。
+将国内主流视频网站的公开课程或本地教学视频转换为带时间戳的逐字稿、结构化课堂分析，以及老师可以直接参考的 Codex Teaching Skills。
 
 > 这里的“蒸馏”不是训练或微调模型，而是通过大模型完成结构化知识提取：`视频 → 逐字稿 → 单课分析 → 多课共性 → 教师行动指南 → Skill`。
 
 ## 主要能力
 
-- 复用 `bilibili-api-python` 获取 B 站课程元数据与公开媒体。
+- 复用 `yt-dlp` 的站点适配器解析国内主流视频网站，B 站额外使用 `bilibili-api-python` 并支持自动回退。
 - 支持选择一个或多个本地视频。
 - 使用本地 Faster Whisper 转写，不消耗云端语音 API。
 - 使用一个 OpenAI-compatible 中转 API 完成课堂分析与能力蒸馏。
@@ -24,9 +24,13 @@ discover → download → transcribe → analyze → distill → package
 
 ### 1. 获取视频
 
-- B 站课程：通过 `bilibili-api-python` 解析分集和下载公开媒体，其他来源由 `yt-dlp` 兜底。
+- 在线课程：统一通过 `yt-dlp` 解析公开的单集、合集和课程页面；B 站优先使用 `bilibili-api-python`，接口变化或失败时自动回退到 `yt-dlp`。
 - 本地课程：前端支持多选 MP4、MOV、MKV、WebM、M4V、AVI 和 MPEG 视频。
 - FFmpeg 将视频统一转换为 16kHz 单声道 WAV 音轨。
+
+当前界面会识别哔哩哔哩、抖音、西瓜视频、快手、优酷/土豆、爱奇艺、腾讯视频、芒果 TV、微博视频、小红书、AcFun、虎牙和斗鱼等来源。未列出的站点也会交给 `yt-dlp` 的通用适配器尝试解析。
+
+站点页面和反爬策略会变化，因此“已适配”不等于每条链接始终可下载。本项目只处理公开、无需登录且没有 DRM 的媒体，不读取浏览器 Cookie，也不绕过会员、付费或访问控制。
 
 ### 2. Whisper 转写
 
@@ -103,7 +107,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 在页面中可以选择：
 
-- `B 站课程`：输入课程或分集地址，设置数量后运行。
+- `在线视频`：粘贴公开课程、合集或单集页面地址，设置数量后运行。
 - `本地视频`：选择一个或多个本地文件后运行。
 
 ## API 配置
@@ -125,7 +129,7 @@ MAX_UPLOAD_SIZE_MB=4096
 
 ## CLI 使用
 
-运行一个 B 站课程任务：
+运行一个在线课程任务：
 
 ```bash
 skyclass run \

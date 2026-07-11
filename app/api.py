@@ -11,7 +11,7 @@ from .downloader import check_runtime
 from .llm import LLMClient
 from .models import DiscoverRequest, LocalPipelineRequest, PipelineRequest, SearchRequest, SettingsUpdate
 from .pipeline import PipelineManager
-from .sources import discover, search_bilibili
+from .sources import discover, search_bilibili, supported_sites
 from .upload_store import UploadError, UploadStore
 
 
@@ -68,6 +68,13 @@ def create_api_router(manager: PipelineManager, settings_loader: SettingsLoader)
             return {"items": [item.model_dump() for item in discover(payload.url, payload.limit)]}
         except Exception as exc:
             raise HTTPException(400, str(exc)) from exc
+
+    @router.get("/sources")
+    def list_supported_sources():
+        return {
+            "sites": supported_sites(),
+            "notice": "仅支持公开、无 DRM 且无需登录的页面；实际可用性取决于站点变化和 yt-dlp 版本。",
+        }
 
     @router.post("/search")
     def search_api(payload: SearchRequest):

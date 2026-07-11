@@ -1,12 +1,67 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 from .models import CourseItem
 
 
 BVID_RE = re.compile(r"(BV[0-9A-Za-z]{10})")
+
+
+@dataclass(frozen=True, slots=True)
+class VideoSite:
+    key: str
+    name: str
+    domains: tuple[str, ...]
+    engine: str = "yt-dlp"
+
+
+# These are public-page adapters, not a promise that paid, login-only or DRM media can be downloaded.
+VIDEO_SITES = (
+    VideoSite("bilibili", "哔哩哔哩", ("bilibili.com", "b23.tv"), "bilibili-api + yt-dlp"),
+    VideoSite("douyin", "抖音", ("douyin.com", "iesdouyin.com")),
+    VideoSite("ixigua", "西瓜视频", ("ixigua.com",)),
+    VideoSite("kuaishou", "快手", ("kuaishou.com", "chenzhongtech.com")),
+    VideoSite("youku", "优酷 / 土豆", ("youku.com", "tudou.com")),
+    VideoSite("iqiyi", "爱奇艺", ("iqiyi.com",)),
+    VideoSite("tencent", "腾讯视频", ("v.qq.com",)),
+    VideoSite("mgtv", "芒果 TV", ("mgtv.com",)),
+    VideoSite("weibo", "微博视频", ("weibo.com", "weibo.cn")),
+    VideoSite("xiaohongshu", "小红书", ("xiaohongshu.com", "xhslink.com")),
+    VideoSite("acfun", "AcFun", ("acfun.cn",)),
+    VideoSite("huya", "虎牙", ("huya.com",)),
+    VideoSite("douyu", "斗鱼", ("douyu.com",)),
+)
+
+
+def _host_matches(host: str, domain: str) -> bool:
+    return host == domain or host.endswith(f".{domain}")
+
+
+def validate_video_url(url: str) -> str:
+    value = url.strip()
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise RuntimeError("请输入完整的 http:// 或 https:// 视频页面地址")
+    return value
+
+
+def identify_site(url: str) -> VideoSite | None:
+    host = (urlparse(url).hostname or "").lower()
+    return next(
+        (site for site in VIDEO_SITES if any(_host_matches(host, domain) for domain in site.domains)),
+        None,
+    )
+
+
+def supported_sites() -> list[dict[str, Any]]:
+    return [
+        {"key": site.key, "name": site.name, "domains": list(site.domains), "engine": site.engine}
+        for site in VIDEO_SITES
+    ]
 
 
 def _bilibili_modules():
@@ -83,23 +138,64 @@ def discover_generic(url: str, limit: int = 5) -> list[CourseItem]:
         import yt_dlp
     except ImportError as exc:
         raise RuntimeError("通用来源解析需要安装 yt-dlp") from exc
-    options = {"quiet": True, "no_warnings": True, "extract_flat": "in_playlist", "playlistend": limit}
+    site = identify_site(url)
+    options = {
+        "quiet": True,
+        "no_warnings": True,
+        "playlistend": limit,
+        "socket_timeout": 30,
+        "retries": 3,
+        "extractor_retries": 3,
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/131.0 Safari/537.36",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.7",
+        },
+    }
     with yt_dlp.YoutubeDL(options) as ydl:
         info = ydl.extract_info(url, download=False)
-    entries = info.get("entries") or [info]
-    return [
-        CourseItem(
-            id=str(entry.get("id") or f"item-{index}"),
-            source_url=entry.get("webpage_url") or entry.get("url") or url,
-            title=str(entry.get("title") or f"第 {index} 课"), index=index,
-            duration=entry.get("duration"), cover_url=entry.get("thumbnail"),
-            source=str(entry.get("extractor_key") or "yt-dlp").lower(),
+    if not info:
+        return []
+    entries = [entry for entry in (info.get("entries") or [info]) if entry]
+    items: list[CourseItem] = []
+    for index, entry in enumerate(entries[:limit], 1):
+        extractor = str(entry.get("extractor_key") or entry.get("extractor") or "generic")
+        items.append(
+            CourseItem(
+                id=str(entry.get("id") or f"item-{index}"),
+                source_url=str(entry.get("webpage_url") or entry.get("original_url") or url),
+                title=str(entry.get("title") or f"第 {index} 课"),
+                index=index,
+                duration=entry.get("duration"),
+                cover_url=entry.get("thumbnail"),
+                source=site.name if site else extractor,
+                metadata={
+                    "provider": site.key if site else "generic",
+                    "provider_name": site.name if site else extractor,
+                    "extractor": extractor,
+                    "uploader": entry.get("uploader") or entry.get("channel"),
+                    "playlist": info.get("title") if info.get("entries") else None,
+                },
+            )
         )
-        for index, entry in enumerate(entries[:limit], 1)
-    ]
+    return items
 
 
 def discover(url: str, limit: int = 5) -> list[CourseItem]:
-    if "bilibili.com" in url or BVID_RE.search(url):
-        return discover_bilibili(url, limit)
-    return discover_generic(url, limit)
+    value = validate_video_url(url)
+    site = identify_site(value)
+    if site and site.key == "bilibili" and BVID_RE.search(value):
+        try:
+            items = discover_bilibili(value, limit)
+            if items:
+                return items
+        except Exception:
+            # WBI and Bilibili APIs change frequently; yt-dlp is the maintained fallback.
+            pass
+    try:
+        return discover_generic(value, limit)
+    except Exception as exc:
+        name = site.name if site else "该网站"
+        detail = str(exc).strip().splitlines()[-1] if str(exc).strip() else type(exc).__name__
+        raise RuntimeError(
+            f"{name}解析失败：{detail}。请确认链接公开可访问；登录、付费或 DRM 视频不受支持。"
+        ) from exc
