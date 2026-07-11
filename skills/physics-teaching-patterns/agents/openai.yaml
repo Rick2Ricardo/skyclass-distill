@@ -1,0 +1,4 @@
+interface:
+  display_name: "高中物理教学模式"
+  short_description: "从多节课堂证据中提炼可执行且可验证的高中物理教学模式"
+  default_prompt: "使用 $physics-teaching-patterns 从带时间戳的课堂转写中提炼共性教学能力。"

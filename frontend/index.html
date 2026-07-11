@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#102a2a">
+  <title>教学蒸馏台 · SkyClass Distill</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <style>.inline-actions{display:flex;gap:18px;align-items:center}.text-button:disabled{opacity:.35;cursor:not-allowed}</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="#top" aria-label="教学蒸馏台首页">
+        <span class="brand-mark">析</span>
+        <span><strong>教学蒸馏台</strong><small>SKYCLASS DISTILL</small></span>
+      </a>
+      <nav>
+        <a class="active" href="#workspace"><span>◫</span>工作台</a>
+        <a href="#courses"><span>▶</span>课程样本</a>
+        <a href="#skills"><span>✦</span>能力 Skills</a>
+        <a href="#activity"><span>⌁</span>运行日志</a>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="runtime-dot" id="runtimeDot"></div>
+        <div><small>LOCAL RUNTIME</small><strong id="runtimeText">正在检查…</strong></div>
+      </div>
+    </aside>
+
+    <main id="top">
+      <header class="topbar">
+        <div><span class="eyebrow">AI 教研工作流</span><h1>把好课堂，蒸馏成可复用能力</h1></div>
+        <button class="ghost" id="openSettings">⚙ 模型接口</button>
+      </header>
+
+      <section class="hero" id="workspace">
+        <div class="hero-copy">
+          <div class="status-pill"><i></i> 本地 Whisper · 单一中转 API</div>
+          <h2>从视频到教学 Skill，<br><em>证据始终在线。</em></h2>
+          <p>既可调用成熟 B 站接口采集公开课程，也可选择本地视频；保留时间戳转写，比较多节课的共同教学动作，并输出可验证、可追溯的 Codex Skills。</p>
+        </div>
+        <div class="hero-stat">
+          <span>本轮目标</span><strong>05</strong><small>高中物理样例课</small>
+          <div class="orbit"><b>MP4</b><b>TXT</b><b>SKILL</b></div>
+        </div>
+      </section>
+
+      <section class="launcher card">
+        <div class="section-head">
+          <div><span class="kicker">NEW PIPELINE</span><h3>创建一次教学蒸馏</h3></div>
+          <span class="legal">仅处理公开且获授权使用的内容</span>
+        </div>
+        <div class="source-switch" role="tablist" aria-label="视频来源">
+          <button type="button" class="active" data-source-mode="remote" role="tab" aria-selected="true">B 站课程</button>
+          <button type="button" data-source-mode="local" role="tab" aria-selected="false">本地视频</button>
+        </div>
+        <form id="pipelineForm">
+          <label class="source-field" id="remoteSourceField"><span>B 站教师课程地址</span><input id="sourceUrl" type="url" required value="https://www.bilibili.com/video/BV1Ha411r7Hk/" spellcheck="false"></label>
+          <label class="source-field local-source-field" id="localSourceField" hidden><span>本地视频（可多选）</span><input id="localFiles" type="file" accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-msvideo,video/mpeg,.m4v" multiple></label>
+          <label><span>学科</span><input id="subject" value="高中物理"></label>
+          <label class="small" id="limitField"><span>数量</span><input id="limit" type="number" min="1" max="50" value="5"></label>
+          <button class="primary" type="submit"><span>开始蒸馏</span><b>→</b></button>
+        </form>
+        <div class="preview-row">
+          <button class="text-button" id="previewBtn" type="button">先预览课程列表</button>
+          <span id="previewStatus">当前推荐：物理云学习逸迭Eddie · 免费系统复习课</span>
+        </div>
+      </section>
+
+      <section class="pipeline-card card" id="currentJob">
+        <div class="section-head">
+          <div><span class="kicker">LIVE PIPELINE</span><h3>当前任务</h3></div>
+          <div class="job-badge" id="jobBadge">等待任务</div>
+        </div>
+        <div class="stages" id="stages">
+          <div data-stage="discover"><b>01</b><span>发现课程<small>DISCOVER</small></span></div>
+          <i></i><div data-stage="download"><b>02</b><span>下载视频<small>DOWNLOAD</small></span></div>
+          <i></i><div data-stage="transcribe"><b>03</b><span>语音转写<small>WHISPER</small></span></div>
+          <i></i><div data-stage="analyze"><b>04</b><span>课堂分析<small>ANALYZE</small></span></div>
+          <i></i><div data-stage="distill"><b>05</b><span>能力蒸馏<small>DISTILL</small></span></div>
+          <i></i><div data-stage="package"><b>06</b><span>技能打包<small>PACKAGE</small></span></div>
+        </div>
+        <div class="progress-wrap"><div class="progress"><span id="progressBar"></span></div><strong id="progressLabel">0%</strong></div>
+      </section>
+
+      <div class="content-grid">
+        <section class="card" id="courses">
+          <div class="section-head compact"><div><span class="kicker">COURSE EVIDENCE</span><h3>课程样本</h3></div><span class="count" id="courseCount">0</span></div>
+          <div class="course-list" id="courseList"><div class="empty">预览或运行任务后，这里会显示课程与转写状态。</div></div>
+        </section>
+
+        <section class="card" id="skills">
+          <div class="section-head compact"><div><span class="kicker">DISTILLED SKILLS</span><h3>共性教学能力</h3></div><span class="count accent" id="skillCount">0</span></div>
+          <div class="skill-list" id="skillList"><div class="empty">多课证据将被压缩成少而精的教学能力。</div></div>
+        </section>
+      </div>
+
+      <section class="activity card" id="activity">
+        <div class="section-head compact"><div><span class="kicker">TRACE LOG</span><h3>证据链与运行日志</h3></div><div class="inline-actions"><button class="text-button" id="retryBtn" disabled>用当前 API 重新蒸馏</button><button class="text-button" id="cancelBtn" disabled>取消任务</button></div></div>
+        <div class="log" id="eventLog"><div class="empty">尚无运行记录。</div></div>
+      </section>
+
+      <footer><span>SkyClass Distill / 2026</span><span>公开来源 · 本地转写 · 可追溯蒸馏</span></footer>
+    </main>
+  </div>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="dialog-card" id="settingsForm">
+      <div class="dialog-head"><div><span class="kicker">ONE API ONLY</span><h3>中转模型接口</h3></div><button value="cancel" aria-label="关闭">×</button></div>
+      <p>支持 OpenAI-compatible <code>/chat/completions</code>。密钥仅保存在本机 <code>data/runtime_settings.json</code>，不会进入浏览器存储或 Git。</p>
+      <label><span>Base URL</span><input id="baseUrl" placeholder="https://relay.example.com/v1"></label>
+      <label><span>API Key</span><input id="apiKey" type="password" autocomplete="off" placeholder="sk-…（留空则保留已有密钥）"></label>
+      <label><span>Model</span><input id="modelName" placeholder="gpt-4.1-mini"></label>
+      <label><span>Whisper 模型</span><select id="whisperModel"><option>tiny</option><option>base</option><option selected>small</option><option>medium</option><option>large-v3</option></select></label>
+      <div class="dialog-actions"><button class="ghost" id="testApi" type="button">测试连接</button><button class="primary" id="saveSettings" type="button">保存设置</button></div>
+      <output id="settingsMessage"></output>
+    </form>
+  </dialog>
+  <dialog id="skillDialog" class="skill-dialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-head"><div><span class="kicker">GENERATED ARTIFACT</span><h3 id="skillDialogTitle">Skill 内容</h3></div><button value="cancel" aria-label="关闭">×</button></div>
+      <p id="skillDialogMeta">直接查看 API 蒸馏出的 Skill 与原课证据。</p>
+      <div class="document-tabs" role="tablist">
+        <button type="button" class="active" data-skill-document="skill">SKILL.md</button>
+        <button type="button" data-skill-document="pattern">模式说明</button>
+        <button type="button" data-skill-document="evidence">证据索引</button>
+      </div>
+      <pre id="skillDocument"></pre>
+    </form>
+  </dialog>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
