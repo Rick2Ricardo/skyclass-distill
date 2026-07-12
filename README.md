@@ -1,18 +1,21 @@
 # 教学蒸馏台 SkyClass Distill
 
-将国内主流视频网站的公开课程或本地教学视频转换为带时间戳的逐字稿、结构化课堂分析，以及老师可以直接参考的 Codex Teaching Skills。
+[![CI](https://github.com/Rick2Ricardo/skyclass-distill/actions/workflows/ci.yml/badge.svg)](https://github.com/Rick2Ricardo/skyclass-distill/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-2f6f63.svg)](LICENSE)
+
+从国内主流视频网站或本地教学视频出发，一条流水线完成媒体采集、Faster Whisper 转写、课堂证据分析、共性教学能力蒸馏和 Codex Teaching Skills 打包。
 
 > 这里的“蒸馏”不是训练或微调模型，而是通过大模型完成结构化知识提取：`视频 → 逐字稿 → 单课分析 → 多课共性 → 教师行动指南 → Skill`。
 
 ## 主要能力
 
-- 复用 `yt-dlp` 的站点适配器解析国内主流视频网站，并通过 `curl-cffi` 模拟 Chrome TLS；B 站额外使用 `bilibili-api-python` 并支持自动回退。
-- 支持选择一个或多个本地视频。
-- 使用本地 Faster Whisper 转写，不消耗云端语音 API。
-- 使用一个 OpenAI-compatible 中转 API 完成课堂分析与能力蒸馏。
-- 保留课程、时间戳和短摘录，方便回看原始证据。
-- 将共性教学方法打包为标准 Codex Skill。
-- 支持中断后复用已下载媒体、逐字稿和分析结果。
+- **多来源采集**：复用 `yt-dlp` 站点适配器和 `curl-cffi` Chrome TLS 模拟；B 站额外使用 `bilibili-api-python`，失败时自动回退。
+- **本地语音转写**：Faster Whisper 在本机生成 JSON、TXT 和 SRT，不消耗云端语音 API。
+- **单一模型接口**：只需一个 OpenAI-compatible Chat Completions API，即可完成单课分析和多课共性蒸馏。
+- **教师行动指南**：输出适用场景、教学步骤、建议话术、学生反应、支架、检查点和分层调整。
+- **证据可追溯**：能力结论保留来源课程、时间戳和短摘录，不把模型生成话术伪装成原课原话。
+- **工程化恢复**：支持本地多视频上传、内容指纹、版本化检查点和中断续跑。
 
 ## 蒸馏流程
 
@@ -28,11 +31,21 @@ discover → download → transcribe → analyze → distill → package
 - 本地课程：前端支持多选 MP4、MOV、MKV、WebM、M4V、AVI 和 MPEG 视频。
 - FFmpeg 将视频统一转换为 16kHz 单声道 WAV 音轨。
 
-当前界面会识别哔哩哔哩、抖音、西瓜视频、快手、优酷/土豆、爱奇艺、腾讯视频、芒果 TV、微博视频、小红书、AcFun、虎牙和斗鱼等来源。未列出的站点也会交给 `yt-dlp` 的通用适配器尝试解析。
+#### 视频站点兼容性
 
-站点页面和反爬策略会变化，因此“已适配”不等于每条链接始终可下载。本项目只处理公开且没有 DRM 的媒体，默认不读取浏览器 Cookie，也不绕过会员、付费或访问控制。
+站点页面、地区限制和反爬策略会持续变化，下表记录的是本项目实际测试结果，而不是永久可用承诺。
 
-对于抖音、西瓜等要求访客 Cookie 的公开页面，可在前端“模型接口”中选择 Chrome、Safari、Firefox 等浏览器并点击“一键检测 Cookie”。项目只保存浏览器名称；`yt-dlp` 每次解析当前网址时临时读取目标域名 Cookie，不生成 Cookie 文件、不显示明文，也不会绕过会员、付费或 DRM。首次使用可能触发 macOS 钥匙串授权，且需要先在所选浏览器访问一次目标网站。
+| 来源 | 当前状态 | 说明 |
+| --- | --- | --- |
+| 哔哩哔哩 | 已实测下载 | 专用接口优先，`yt-dlp` 自动回退 |
+| AcFun、芒果 TV、优酷、微博、腾讯视频 | 已实测下载 | 可解析公开页面并获得包含音视频的 MP4 |
+| 抖音、西瓜视频 | 条件支持 | 常要求新鲜访客 Cookie；抖音验证挑战可能使普通 Cookie 仍然失效 |
+| 爱奇艺、小红书 | 依链接而定 | 免费、公开且提取器可识别的页面才可能成功 |
+| 其他站点 | 自动尝试 | 交给 `yt-dlp` 通用适配器，失败时返回明确原因 |
+
+本项目只处理公开且没有 DRM 的媒体，默认不读取浏览器 Cookie，也不绕过会员、付费或访问控制。
+
+对于要求访客 Cookie 的公开页面，可在前端“模型接口”中选择 Chrome、Safari、Firefox 等浏览器并点击“一键检测 Cookie”。项目只保存浏览器名称；`yt-dlp` 每次解析当前网址时临时读取目标域名 Cookie，不生成 Cookie 文件、不显示明文。首次使用可能触发 macOS 钥匙串授权，且需要先在所选浏览器访问一次目标网站。
 
 ### 2. Whisper 转写
 
