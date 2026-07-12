@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skyclass-distill"
-version = "0.2.0"
-description = "B 站优质教师课程采集、Whisper 转写与教学技能蒸馏流水线"
+version = "0.3.0"
+description = "项目化教学视频管理、Whisper 转写与可追溯教学 Skills 蒸馏工作台"
 requires-python = ">=3.10,<3.14"
 dependencies = [
   "fastapi>=0.115,<1",

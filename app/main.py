@@ -12,7 +12,7 @@ from .pipeline import PipelineManager
 
 
 def create_app(settings_loader: Callable[[], Settings] = load_settings) -> FastAPI:
-    app = FastAPI(title="教学蒸馏台", version="0.2.0")
+    app = FastAPI(title="教学 Skill 工坊", version="0.3.0")
     manager = PipelineManager(settings_loader)
     app.state.pipeline_manager = manager
     app.include_router(create_api_router(manager, settings_loader))

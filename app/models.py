@@ -49,6 +49,64 @@ class LocalPipelineRequest(BaseModel):
     language: str = "zh"
 
 
+class ProjectCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    subject: str = Field("高中物理", min_length=1, max_length=80)
+    grade: str = Field("高中", min_length=1, max_length=40)
+    description: str = Field("", max_length=500)
+
+
+class Project(BaseModel):
+    id: str
+    name: str
+    subject: str
+    grade: str
+    description: str = ""
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+    deleted_at: str | None = None
+
+
+class ProjectVideoRequest(BaseModel):
+    source_url: str
+    limit: int = Field(1, ge=1, le=50)
+    whisper_model: str | None = None
+    language: str = "zh"
+
+
+class ProjectLocalVideoRequest(BaseModel):
+    upload_id: str = Field(pattern=r"^[a-f0-9]{10,32}$")
+    whisper_model: str | None = None
+    language: str = "zh"
+
+
+class DistillRequest(BaseModel):
+    video_ids: list[str] = Field(min_length=1, max_length=50)
+    mode: Literal["single", "common"] = "single"
+
+
+class VideoDeleteRequest(BaseModel):
+    video_ids: list[str] = Field(min_length=1, max_length=100)
+
+
+class VideoAsset(BaseModel):
+    id: str
+    project_id: str
+    title: str
+    source_url: str
+    source: str = "unknown"
+    duration: float | None = None
+    cover_url: str | None = None
+    status: Literal["ready", "failed"] = "ready"
+    job_id: str
+    course_item_id: str
+    artifacts: dict[str, str] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+    deleted_at: str | None = None
+
+
 class SettingsUpdate(BaseModel):
     llm_base_url: str | None = None
     llm_api_key: str | None = None
@@ -85,3 +143,7 @@ class JobState(BaseModel):
     events: list[JobEvent] = Field(default_factory=list)
     artifacts: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
+    kind: Literal["legacy", "ingest", "distill"] = "legacy"
+    project_id: str | None = None
+    video_ids: list[str] = Field(default_factory=list)
+    distill_mode: Literal["single", "common"] | None = None
