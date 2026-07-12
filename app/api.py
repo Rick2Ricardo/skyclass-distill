@@ -9,9 +9,9 @@ from fastapi import APIRouter, HTTPException, Request
 from .config import Settings
 from .downloader import check_runtime
 from .llm import LLMClient
-from .models import DiscoverRequest, LocalPipelineRequest, PipelineRequest, SearchRequest, SettingsUpdate
+from .models import BrowserCookieProbeRequest, DiscoverRequest, LocalPipelineRequest, PipelineRequest, SearchRequest, SettingsUpdate
 from .pipeline import PipelineManager
-from .sources import discover, search_bilibili, supported_sites
+from .sources import discover, probe_browser_cookies, search_bilibili, supported_sites
 from .upload_store import UploadError, UploadStore
 
 
@@ -65,8 +65,21 @@ def create_api_router(manager: PipelineManager, settings_loader: SettingsLoader)
     @router.post("/discover")
     def discover_api(payload: DiscoverRequest):
         try:
-            return {"items": [item.model_dump() for item in discover(payload.url, payload.limit)]}
+            settings = settings_loader()
+            return {
+                "items": [
+                    item.model_dump()
+                    for item in discover(payload.url, payload.limit, settings.video_cookie_browser)
+                ]
+            }
         except Exception as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @router.post("/video-cookies/test")
+    def test_video_cookies(payload: BrowserCookieProbeRequest):
+        try:
+            return probe_browser_cookies(payload.url, payload.browser)
+        except RuntimeError as exc:
             raise HTTPException(400, str(exc)) from exc
 
     @router.get("/sources")

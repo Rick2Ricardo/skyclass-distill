@@ -33,3 +33,4 @@ def test_application_factory_registers_local_upload_routes(tmp_path: Path):
     assert "/api/jobs/local" in paths
     assert "/api/jobs/{job_id}/skills/{skill_name}" in paths
     assert "/api/sources" in paths
+    assert "/api/video-cookies/test" in paths

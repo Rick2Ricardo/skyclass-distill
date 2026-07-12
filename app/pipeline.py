@@ -78,7 +78,11 @@ class PipelineManager:
             local_source = job.request.source_url.startswith("local://")
             self._stage(job, "discover", 0.02, "正在读取本地视频" if local_source else "正在解析课程列表")
             if not job.items:
-                job.items = discover(job.request.source_url, job.request.limit)
+                job.items = discover(
+                    job.request.source_url,
+                    job.request.limit,
+                    cookie_browser=settings.video_cookie_browser,
+                )
                 if not job.items:
                     raise RuntimeError("未发现课程视频")
                 self.store.event(job, f"发现 {len(job.items)} 个视频", "success")
@@ -108,6 +112,7 @@ class PipelineManager:
                         item, media_dir,
                         max_height=job.request.max_video_height or settings.max_video_height,
                         log=lambda msg: self.store.event(job, msg),
+                        cookie_browser=settings.video_cookie_browser,
                     )
                     record.update(files)
                     self.store.save(job)

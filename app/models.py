@@ -58,6 +58,12 @@ class SettingsUpdate(BaseModel):
     whisper_model: str | None = None
     max_video_height: int | None = Field(None, ge=144, le=2160)
     max_upload_size_mb: int | None = Field(None, ge=1, le=20_480)
+    video_cookie_browser: Literal["", "chrome", "safari", "firefox", "edge", "brave", "chromium"] | None = None
+
+
+class BrowserCookieProbeRequest(BaseModel):
+    url: str
+    browser: Literal["chrome", "safari", "firefox", "edge", "brave", "chromium"]
 
 
 class JobEvent(BaseModel):

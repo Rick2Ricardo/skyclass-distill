@@ -39,7 +39,13 @@ def check_runtime() -> dict[str, bool]:
     return {"ffmpeg": bool(shutil.which("ffmpeg")), "yt_dlp": ytdlp, "bilibili_api": bilibili}
 
 
-def download_item(item: CourseItem, directory: Path, max_height: int = 720, log: LogFn | None = None) -> dict[str, str]:
+def download_item(
+    item: CourseItem,
+    directory: Path,
+    max_height: int = 720,
+    log: LogFn | None = None,
+    cookie_browser: str = "",
+) -> dict[str, str]:
     directory.mkdir(parents=True, exist_ok=True)
     safe_id = re.sub(r"[^0-9A-Za-z._-]+", "-", item.id).strip("-.")[:80] or "video"
     stem = f"{item.index:03d}-{safe_id}"
@@ -62,9 +68,9 @@ def download_item(item: CourseItem, directory: Path, max_height: int = 720, log:
         except Exception as exc:
             if log:
                 log(f"B 站专用下载失败，自动切换 yt-dlp：{str(exc)[-200:]}")
-            video = download_with_ytdlp(item, directory, stem, max_height, log)
+            video = download_with_ytdlp(item, directory, stem, max_height, log, cookie_browser)
     else:
-        video = download_with_ytdlp(item, directory, stem, max_height, log)
+        video = download_with_ytdlp(item, directory, stem, max_height, log, cookie_browser)
     audio = extract_audio(video, audio_target, log)
     return {"video": str(video), "audio": str(audio)}
 
@@ -119,7 +125,14 @@ def download_bilibili(item: CourseItem, target: Path, log: LogFn | None = None) 
     return target
 
 
-def download_with_ytdlp(item: CourseItem, directory: Path, stem: str, max_height: int, log: LogFn | None = None) -> Path:
+def download_with_ytdlp(
+    item: CourseItem,
+    directory: Path,
+    stem: str,
+    max_height: int,
+    log: LogFn | None = None,
+    cookie_browser: str = "",
+) -> Path:
     output = str(directory / f"{stem}.%(ext)s")
     fmt = f"bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}]/best"
     cmd = [
@@ -131,9 +144,13 @@ def download_with_ytdlp(item: CourseItem, directory: Path, stem: str, max_height
         "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/131.0 Safari/537.36",
         "--add-header", "Accept-Language:zh-CN,zh;q=0.9,en;q=0.7",
         "--referer", item.source_url,
+        "--impersonate", "chrome",
     ]
+    if cookie_browser:
+        cmd.extend(["--cookies-from-browser", cookie_browser])
     if log:
-        log(f"yt-dlp 下载：{item.title}")
+        cookie_note = f" · 临时使用 {cookie_browser} Cookie" if cookie_browser else ""
+        log(f"yt-dlp 下载：{item.title}{cookie_note}")
     process = subprocess.run(cmd, capture_output=True, text=True)
     if process.returncode:
         detail = (process.stdout + process.stderr)[-1200:]

@@ -108,12 +108,14 @@
   <dialog id="settingsDialog">
     <form method="dialog" class="dialog-card" id="settingsForm">
       <div class="dialog-head"><div><span class="kicker">ONE API ONLY</span><h3>中转模型接口</h3></div><button value="cancel" aria-label="关闭">×</button></div>
-      <p>支持 OpenAI-compatible <code>/chat/completions</code>。密钥仅保存在本机 <code>data/runtime_settings.json</code>，不会进入浏览器存储或 Git。</p>
+      <p>支持 OpenAI-compatible <code>/chat/completions</code>。密钥仅保存在本机 <code>data/runtime_settings.json</code>，不会进入浏览器存储或 Git。视频 Cookie 只从所选浏览器临时读取目标域名，不导出明文。</p>
       <label><span>Base URL</span><input id="baseUrl" placeholder="https://relay.example.com/v1"></label>
       <label><span>API Key</span><input id="apiKey" type="password" autocomplete="off" placeholder="sk-…（留空则保留已有密钥）"></label>
       <label><span>Model</span><input id="modelName" placeholder="gpt-4.1-mini"></label>
       <label><span>Whisper 模型</span><select id="whisperModel"><option>tiny</option><option>base</option><option selected>small</option><option>medium</option><option>large-v3</option></select></label>
-      <div class="dialog-actions"><button class="ghost" id="testApi" type="button">测试连接</button><button class="primary" id="saveSettings" type="button">保存设置</button></div>
+      <label><span>视频站点 Cookie（可选）</span><select id="cookieBrowser"><option value="">不使用浏览器 Cookie</option><option value="chrome">Chrome</option><option value="safari">Safari</option><option value="firefox">Firefox</option><option value="edge">Edge</option><option value="brave">Brave</option><option value="chromium">Chromium</option></select></label>
+      <p>先在所选浏览器访问一次目标网站，再将网址粘贴到工作台。首次检测时 macOS 可能询问钥匙串权限。</p>
+      <div class="dialog-actions"><button class="ghost" id="testCookies" type="button">一键检测 Cookie</button><button class="ghost" id="testApi" type="button">测试 API</button><button class="primary" id="saveSettings" type="button">保存设置</button></div>
       <output id="settingsMessage"></output>
     </form>
   </dialog>

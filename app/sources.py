@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -35,6 +37,8 @@ VIDEO_SITES = (
     VideoSite("huya", "虎牙", ("huya.com",)),
     VideoSite("douyu", "斗鱼", ("douyu.com",)),
 )
+
+COOKIE_BROWSERS = {"chrome", "safari", "firefox", "edge", "brave", "chromium"}
 
 
 def _host_matches(host: str, domain: str) -> bool:
@@ -133,9 +137,10 @@ def search_bilibili(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
     ]
 
 
-def discover_generic(url: str, limit: int = 5) -> list[CourseItem]:
+def discover_generic(url: str, limit: int = 5, cookie_browser: str = "") -> list[CourseItem]:
     try:
         import yt_dlp
+        from yt_dlp.networking.impersonate import ImpersonateTarget
     except ImportError as exc:
         raise RuntimeError("通用来源解析需要安装 yt-dlp") from exc
     site = identify_site(url)
@@ -150,7 +155,12 @@ def discover_generic(url: str, limit: int = 5) -> list[CourseItem]:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/131.0 Safari/537.36",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.7",
         },
+        "impersonate": ImpersonateTarget.from_str("chrome"),
     }
+    if cookie_browser:
+        if cookie_browser not in COOKIE_BROWSERS:
+            raise RuntimeError("不支持的浏览器 Cookie 来源")
+        options["cookiesfrombrowser"] = (cookie_browser,)
     with yt_dlp.YoutubeDL(options) as ydl:
         info = ydl.extract_info(url, download=False)
     if not info:
@@ -180,7 +190,7 @@ def discover_generic(url: str, limit: int = 5) -> list[CourseItem]:
     return items
 
 
-def discover(url: str, limit: int = 5) -> list[CourseItem]:
+def discover(url: str, limit: int = 5, cookie_browser: str = "") -> list[CourseItem]:
     value = validate_video_url(url)
     site = identify_site(value)
     if site and site.key == "bilibili" and BVID_RE.search(value):
@@ -192,10 +202,43 @@ def discover(url: str, limit: int = 5) -> list[CourseItem]:
             # WBI and Bilibili APIs change frequently; yt-dlp is the maintained fallback.
             pass
     try:
-        return discover_generic(value, limit)
+        return discover_generic(value, limit, cookie_browser)
     except Exception as exc:
         name = site.name if site else "该网站"
         detail = str(exc).strip().splitlines()[-1] if str(exc).strip() else type(exc).__name__
         raise RuntimeError(
             f"{name}解析失败：{detail}。请确认链接公开可访问；登录、付费或 DRM 视频不受支持。"
         ) from exc
+
+
+def probe_browser_cookies(url: str, browser: str, timeout: int = 120) -> dict[str, str]:
+    value = validate_video_url(url)
+    if browser not in COOKIE_BROWSERS:
+        raise RuntimeError("不支持的浏览器 Cookie 来源")
+    command = [
+        sys.executable, "-m", "yt_dlp", "--cookies-from-browser", browser,
+        "--impersonate", "chrome",
+        "--simulate", "--no-playlist", "--no-warnings", "--socket-timeout", "20",
+        "--retries", "1", "--print", "%(extractor_key)s\t%(id)s\t%(title).120s", value,
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "读取浏览器 Cookie 超时。请检查 macOS 是否正在等待钥匙串授权，并先在该浏览器打开一次目标网站。"
+        ) from exc
+    if result.returncode:
+        detail = (result.stdout + result.stderr).strip().splitlines()
+        message = detail[-1] if detail else "未知错误"
+        raise RuntimeError(
+            f"浏览器 Cookie 检测失败：{message}。请先在该浏览器访问目标网站，并允许 macOS 钥匙串访问。"
+        )
+    line = next((line for line in reversed(result.stdout.splitlines()) if "\t" in line), "")
+    extractor, video_id, title = (line.split("\t", 2) + ["", "", ""])[:3]
+    return {
+        "browser": browser,
+        "extractor": extractor,
+        "video_id": video_id,
+        "title": title,
+        "message": f"{browser} Cookie 可用，已成功解析《{title or video_id}》。Cookie 内容未被保存。",
+    }

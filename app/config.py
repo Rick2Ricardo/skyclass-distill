@@ -34,6 +34,7 @@ class Settings:
     whisper_model: str = "small"
     max_video_height: int = 720
     max_upload_size_mb: int = 4096
+    video_cookie_browser: str = ""
 
     @property
     def runtime_file(self) -> Path:
@@ -50,6 +51,7 @@ class Settings:
             "whisper_model": self.whisper_model,
             "max_video_height": self.max_video_height,
             "max_upload_size_mb": self.max_upload_size_mb,
+            "video_cookie_browser": self.video_cookie_browser,
             "data_dir": str(self.data_dir),
         }
 
@@ -58,6 +60,7 @@ class Settings:
             "llm_base_url", "llm_api_key", "llm_model", "llm_timeout_seconds",
             "llm_max_attempts", "whisper_model", "max_video_height",
             "max_upload_size_mb",
+            "video_cookie_browser",
         }
         existing: dict[str, Any] = {}
         if self.runtime_file.exists():
@@ -100,4 +103,5 @@ def load_settings() -> Settings:
         whisper_model=str(runtime.get("whisper_model") or os.getenv("WHISPER_MODEL", "small")),
         max_video_height=int(runtime.get("max_video_height") or os.getenv("MAX_VIDEO_HEIGHT", "720")),
         max_upload_size_mb=int(runtime.get("max_upload_size_mb") or os.getenv("MAX_UPLOAD_SIZE_MB", "4096")),
+        video_cookie_browser=str(runtime.get("video_cookie_browser") or os.getenv("VIDEO_COOKIE_BROWSER", "")),
     )

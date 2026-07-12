@@ -62,3 +62,25 @@ def test_generic_discovery_normalizes_provider_metadata(monkeypatch):
     assert item.metadata["provider"] == "tencent"
     assert item.metadata["extractor"] == "TencentVideo"
     assert item.metadata["uploader"] == "示例老师"
+
+
+def test_generic_discovery_passes_browser_cookie_source(monkeypatch):
+    observed = {}
+
+    class FakeYDL:
+        def __init__(self, options):
+            observed.update(options)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def extract_info(self, url, download):
+            return {"id": "demo", "title": "测试", "webpage_url": url}
+
+    monkeypatch.setitem(sys.modules, "yt_dlp", SimpleNamespace(YoutubeDL=FakeYDL))
+    discover_generic("https://www.douyin.com/video/1", 1, "chrome")
+
+    assert observed["cookiesfrombrowser"] == ("chrome",)

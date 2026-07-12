@@ -6,7 +6,7 @@
 
 ## 主要能力
 
-- 复用 `yt-dlp` 的站点适配器解析国内主流视频网站，B 站额外使用 `bilibili-api-python` 并支持自动回退。
+- 复用 `yt-dlp` 的站点适配器解析国内主流视频网站，并通过 `curl-cffi` 模拟 Chrome TLS；B 站额外使用 `bilibili-api-python` 并支持自动回退。
 - 支持选择一个或多个本地视频。
 - 使用本地 Faster Whisper 转写，不消耗云端语音 API。
 - 使用一个 OpenAI-compatible 中转 API 完成课堂分析与能力蒸馏。
@@ -30,7 +30,9 @@ discover → download → transcribe → analyze → distill → package
 
 当前界面会识别哔哩哔哩、抖音、西瓜视频、快手、优酷/土豆、爱奇艺、腾讯视频、芒果 TV、微博视频、小红书、AcFun、虎牙和斗鱼等来源。未列出的站点也会交给 `yt-dlp` 的通用适配器尝试解析。
 
-站点页面和反爬策略会变化，因此“已适配”不等于每条链接始终可下载。本项目只处理公开、无需登录且没有 DRM 的媒体，不读取浏览器 Cookie，也不绕过会员、付费或访问控制。
+站点页面和反爬策略会变化，因此“已适配”不等于每条链接始终可下载。本项目只处理公开且没有 DRM 的媒体，默认不读取浏览器 Cookie，也不绕过会员、付费或访问控制。
+
+对于抖音、西瓜等要求访客 Cookie 的公开页面，可在前端“模型接口”中选择 Chrome、Safari、Firefox 等浏览器并点击“一键检测 Cookie”。项目只保存浏览器名称；`yt-dlp` 每次解析当前网址时临时读取目标域名 Cookie，不生成 Cookie 文件、不显示明文，也不会绕过会员、付费或 DRM。首次使用可能触发 macOS 钥匙串授权，且需要先在所选浏览器访问一次目标网站。
 
 ### 2. Whisper 转写
 
@@ -123,6 +125,7 @@ LLM_MAX_ATTEMPTS=2
 
 WHISPER_MODEL=small
 MAX_UPLOAD_SIZE_MB=4096
+VIDEO_COOKIE_BROWSER=        # 可选：chrome / safari / firefox / edge / brave / chromium
 ```
 
 也可以在前端右上角的“模型接口”中填写。密钥保存在本机，不会进入浏览器存储；`.env` 和 `data/runtime_settings.json` 已加入 Git 忽略列表。
