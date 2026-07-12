@@ -1,0 +1,180 @@
+.project-card-wrap {
+  position: relative;
+  min-width: 0;
+}
+.project-card-wrap .project-card {
+  width: 100%;
+  height: 100%;
+}
+.project-delete {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #e4c7c1;
+  border-radius: 50%;
+  background: #fff7f4;
+  color: #a54a3e;
+  cursor: pointer;
+  z-index: 2;
+  font-size: 17px;
+}
+.project-delete:hover { background: #ffe2dc; }
+.delete-project-name {
+  margin: 16px 0;
+  padding: 13px 15px;
+  border-radius: 9px;
+  background: #f0efe9;
+  font: 600 15px Georgia, "Songti SC", serif;
+}
+.delete-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.delete-choice {
+  min-height: 105px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: white;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.delete-choice:hover { border-color: #6d9890; }
+.delete-choice.destructive {
+  border-color: #e8c6bf;
+  background: #fff8f6;
+  color: #8f3f34;
+}
+.delete-choice strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.delete-choice span {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.6;
+}
+.asset-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ghost.compact {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 9px;
+}
+.ghost.danger {
+  color: #a54a3e;
+  border-color: #e8c6bf;
+}
+.video-row {
+  grid-template-columns: 25px 45px minmax(0, 1fr) 145px 90px;
+  cursor: pointer;
+}
+.video-row.selected { background: #eef6f2; }
+.video-pick { display: none; }
+.row-check {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #cdd2ca;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  color: transparent;
+  background: white;
+  font-size: 10px;
+}
+.video-row.selected .row-check {
+  background: var(--deep);
+  border-color: var(--deep);
+  color: var(--mint);
+}
+.skill-actions {
+  display: flex !important;
+  justify-content: flex-start !important;
+  gap: 16px;
+  border-top: 1px solid #e5e6df !important;
+  padding-top: 14px !important;
+  margin-top: 16px !important;
+}
+.skill-actions button { padding: 0; }
+.skill-actions a {
+  color: #356b63;
+  font-size: 10px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.skill-actions .danger { color: #a54a3e; }
+@media (max-width: 720px) {
+  .asset-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .video-row {
+    grid-template-columns: 24px 38px minmax(0, 1fr) 90px;
+  }
+  .video-date { display: none; }
+}
+.task-drawer {
+  touch-action: none;
+  transition: width .2s ease, padding .2s ease;
+}
+.task-top {
+  cursor: grab;
+  user-select: none;
+}
+.task-top:active { cursor: grabbing; }
+.task-window-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+.task-window-actions button {
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 1px solid #3d5c58;
+  border-radius: 7px;
+  background: #173936;
+  color: #b9d1cb;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.task-window-actions button:hover {
+  background: #244944;
+  color: white;
+}
+.task-drawer.minimized {
+  width: min(280px, calc(100vw - 32px));
+  padding: 12px 14px;
+}
+.task-drawer.minimized .task-top {
+  align-items: center;
+}
+.task-drawer.minimized .task-top h3 {
+  margin: 2px 0 0;
+  max-width: 125px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.task-drawer.minimized .task-top .eyebrow,
+.task-drawer.minimized .progress,
+.task-drawer.minimized .task-message,
+.task-drawer.minimized .task-error,
+.task-drawer.minimized .task-actions,
+.task-drawer.minimized .task-log {
+  display: none !important;
+}
+.task-drawer.minimized .job-status {
+  align-self: center;
+}

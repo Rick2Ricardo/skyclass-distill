@@ -3,131 +3,129 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#102a2a">
-  <title>教学蒸馏台 · SkyClass Distill</title>
+  <title>教学 Skill 工坊</title>
   <link rel="stylesheet" href="/assets/styles.css">
-  <style>.inline-actions{display:flex;gap:18px;align-items:center}.text-button:disabled{opacity:.35;cursor:not-allowed}.source-sites{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:12px;color:var(--muted);font-size:10px}.source-sites>b{color:var(--ink)}.source-sites span{padding:4px 7px;border-radius:99px;background:#edf0e9;border:1px solid #dfe2da}.source-sites small{flex-basis:100%;line-height:1.5;color:#8b9692}</style>
+  <link rel="stylesheet" href="/assets/management.css">
 </head>
 <body>
-  <div class="shell">
+  <div class="app-shell">
     <aside class="sidebar">
-      <a class="brand" href="#top" aria-label="教学蒸馏台首页">
-        <span class="brand-mark">析</span>
-        <span><strong>教学蒸馏台</strong><small>SKYCLASS DISTILL</small></span>
-      </a>
+      <div class="brand"><span class="brand-mark">S</span><div><strong>Skill Forge</strong><small>教学能力蒸馏工作台</small></div></div>
       <nav>
-        <a class="active" href="#workspace"><span>◫</span>工作台</a>
-        <a href="#courses"><span>▶</span>课程样本</a>
-        <a href="#skills"><span>✦</span>能力 Skills</a>
-        <a href="#activity"><span>⌁</span>运行日志</a>
+        <button class="nav-item active" data-view="projects"><span>⌂</span><div>项目池<small>PROJECTS</small></div></button>
+        <button class="nav-item" data-view="videos"><span>▣</span><div>视频库<small>VIDEOS</small></div></button>
+        <button class="nav-item" data-view="distill"><span>✦</span><div>Skill 蒸馏<small>DISTILL</small></div></button>
+        <button class="nav-item" data-view="skills"><span>◇</span><div>Skills<small>LIBRARY</small></div></button>
       </nav>
-      <div class="sidebar-foot">
-        <div class="runtime-dot" id="runtimeDot"></div>
-        <div><small>LOCAL RUNTIME</small><strong id="runtimeText">正在检查…</strong></div>
-      </div>
+      <div class="runtime"><i id="runtimeDot"></i><div><small>LOCAL RUNTIME</small><strong id="runtimeText">正在检查…</strong></div></div>
     </aside>
 
-    <main id="top">
+    <main>
       <header class="topbar">
-        <div><span class="eyebrow">AI 教研工作流</span><h1>把好课堂，蒸馏成可复用能力</h1></div>
-        <button class="ghost" id="openSettings">⚙ 模型接口</button>
+        <div><span class="eyebrow" id="viewEyebrow">PROJECT WORKSPACE</span><h1 id="viewTitle">教学项目池</h1></div>
+        <div class="top-actions">
+          <label class="project-switch"><span>当前项目</span><select id="projectSelect"><option value="">请选择项目</option></select></label>
+          <button class="ghost" id="openSettings">⚙ 接口设置</button>
+        </div>
       </header>
 
-      <section class="hero" id="workspace">
-        <div class="hero-copy">
-          <div class="status-pill"><i></i> 本地 Whisper · 单一中转 API</div>
-          <h2>从视频到教学 Skill，<br><em>证据始终在线。</em></h2>
-          <p>可解析国内主流视频网站的公开课程，也可选择本地视频；保留时间戳转写，比较多节课的共同教学动作，并输出可验证、可追溯的 Codex Skills。</p>
+      <section class="view active" id="view-projects">
+        <div class="hero">
+          <div><span class="hero-tag">PROJECT FIRST WORKFLOW</span><h2>先组织素材，<br>再沉淀<em>教学能力</em>。</h2><p>每个项目拥有独立的视频池、转写资产与 Skills。视频只转写一次，之后可以自由选择并反复蒸馏。</p></div>
+          <div class="hero-orbit"><strong id="projectTotal">0</strong><span>PROJECTS</span><i>VIDEO</i><i>WHISPER</i><i>SKILL</i></div>
         </div>
-        <div class="hero-stat">
-          <span>本轮目标</span><strong>05</strong><small>高中物理样例课</small>
-          <div class="orbit"><b>MP4</b><b>TXT</b><b>SKILL</b></div>
-        </div>
+        <div class="section-heading"><div><span class="eyebrow">YOUR WORKSPACES</span><h2>项目池</h2></div><button class="primary" id="newProjectBtn">＋ 新建项目</button></div>
+        <div class="project-grid" id="projectGrid"><div class="empty-state">还没有项目。先创建一个“高中物理”项目。</div></div>
       </section>
 
-      <section class="launcher card">
-        <div class="section-head">
-          <div><span class="kicker">NEW PIPELINE</span><h3>创建一次教学蒸馏</h3></div>
-          <span class="legal">仅处理公开且获授权使用的内容</span>
-        </div>
-        <div class="source-switch" role="tablist" aria-label="视频来源">
-          <button type="button" class="active" data-source-mode="remote" role="tab" aria-selected="true">在线视频</button>
-          <button type="button" data-source-mode="local" role="tab" aria-selected="false">本地视频</button>
-        </div>
-        <form id="pipelineForm">
-          <label class="source-field" id="remoteSourceField"><span>课程、合集或单集页面地址</span><input id="sourceUrl" type="url" required value="https://www.bilibili.com/video/BV1Ha411r7Hk/" placeholder="粘贴 B 站、抖音、西瓜、优酷、腾讯视频等公开页面" spellcheck="false"></label>
-          <label class="source-field local-source-field" id="localSourceField" hidden><span>本地视频（可多选）</span><input id="localFiles" type="file" accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-msvideo,video/mpeg,.m4v" multiple></label>
-          <label><span>学科</span><input id="subject" value="高中物理"></label>
-          <label class="small" id="limitField"><span>数量</span><input id="limit" type="number" min="1" max="50" value="5"></label>
-          <button class="primary" type="submit"><span>开始蒸馏</span><b>→</b></button>
-        </form>
-        <div class="preview-row">
-          <button class="text-button" id="previewBtn" type="button">先预览课程列表</button>
-          <span id="previewStatus">粘贴公开课程网址；不支持登录、付费或 DRM 内容。</span>
-        </div>
-        <div class="source-sites" id="sourceSites">正在读取支持的网站…</div>
-      </section>
-
-      <section class="pipeline-card card" id="currentJob">
-        <div class="section-head">
-          <div><span class="kicker">LIVE PIPELINE</span><h3>当前任务</h3></div>
-          <div class="job-badge" id="jobBadge">等待任务</div>
-        </div>
-        <div class="stages" id="stages">
-          <div data-stage="discover"><b>01</b><span>发现课程<small>DISCOVER</small></span></div>
-          <i></i><div data-stage="download"><b>02</b><span>下载视频<small>DOWNLOAD</small></span></div>
-          <i></i><div data-stage="transcribe"><b>03</b><span>语音转写<small>WHISPER</small></span></div>
-          <i></i><div data-stage="analyze"><b>04</b><span>课堂分析<small>ANALYZE</small></span></div>
-          <i></i><div data-stage="distill"><b>05</b><span>能力蒸馏<small>DISTILL</small></span></div>
-          <i></i><div data-stage="package"><b>06</b><span>技能打包<small>PACKAGE</small></span></div>
-        </div>
-        <div class="progress-wrap"><div class="progress"><span id="progressBar"></span></div><strong id="progressLabel">0%</strong></div>
-      </section>
-
-      <div class="content-grid">
-        <section class="card" id="courses">
-          <div class="section-head compact"><div><span class="kicker">COURSE EVIDENCE</span><h3>课程样本</h3></div><span class="count" id="courseCount">0</span></div>
-          <div class="course-list" id="courseList"><div class="empty">预览或运行任务后，这里会显示课程与转写状态。</div></div>
+      <section class="view" id="view-videos">
+        <div class="page-intro"><div><span class="eyebrow">STEP 01 · INGEST</span><h2>下载与转录</h2><p>选择目标项目后导入网络视频或本地文件。本阶段只负责下载和 Whisper 转录，不消耗蒸馏 API。</p></div><div class="stat-card"><strong id="videoTotal">0</strong><span>READY VIDEOS</span></div></div>
+        <section class="panel import-panel requires-project">
+          <div class="panel-head"><div><span class="eyebrow">ADD MATERIAL</span><h3>导入到 <b data-project-name>未选择项目</b></h3></div><div class="segmented"><button class="active" data-source-mode="remote">网络视频</button><button data-source-mode="local">本地视频</button></div></div>
+          <form id="videoImportForm">
+            <label id="remoteField" class="wide"><span>视频或课程列表网址</span><input id="sourceUrl" type="url" placeholder="支持 Bilibili、YouTube 及 yt-dlp 可解析的公开站点"></label>
+            <label id="localField" class="wide" hidden><span>本地视频（可多选）</span><input id="localFiles" type="file" accept="video/*,.mkv,.flv,.ts,.m4v" multiple></label>
+            <label id="limitField"><span>最多导入</span><input id="videoLimit" type="number" min="1" max="50" value="1"></label>
+            <button class="primary" type="submit">开始下载并转录 →</button>
+          </form>
+          <p class="hint" id="importHint">网络内容仅支持公开、无 DRM 且你有权处理的视频。</p>
         </section>
-
-        <section class="card" id="skills">
-          <div class="section-head compact"><div><span class="kicker">DISTILLED SKILLS</span><h3>共性教学能力</h3></div><span class="count accent" id="skillCount">0</span></div>
-          <div class="skill-list" id="skillList"><div class="empty">多课证据将被压缩成少而精的教学能力。</div></div>
+        <section class="panel">
+          <div class="panel-head"><div><span class="eyebrow">PROJECT ASSETS</span><h3>项目视频池</h3></div><div class="asset-actions"><span class="count-pill" id="videoCountPill">0 个视频</span><button class="ghost compact" id="selectAllVideos" disabled>全选</button><button class="ghost compact danger" id="deleteVideos" disabled>删除所选</button></div></div>
+          <div class="video-table" id="videoList"><div class="empty-state">选择项目后查看视频。</div></div>
         </section>
-      </div>
-
-      <section class="activity card" id="activity">
-        <div class="section-head compact"><div><span class="kicker">TRACE LOG</span><h3>证据链与运行日志</h3></div><div class="inline-actions"><button class="text-button" id="retryBtn" disabled>用当前 API 重新蒸馏</button><button class="text-button" id="cancelBtn" disabled>取消任务</button></div></div>
-        <div class="log" id="eventLog"><div class="empty">尚无运行记录。</div></div>
       </section>
 
-      <footer><span>SkyClass Distill / 2026</span><span>公开来源 · 本地转写 · 可追溯蒸馏</span></footer>
+      <section class="view" id="view-distill">
+        <div class="page-intro"><div><span class="eyebrow">STEP 02 · DISTILL</span><h2>选择证据，蒸馏 Skill</h2><p>单视频模式提炼这一节课的教法；共性模式跨至少 4 个视频寻找稳定、可迁移的教学能力。</p></div><div class="stat-card coral"><strong id="selectedTotal">0</strong><span>SELECTED</span></div></div>
+        <section class="mode-grid">
+          <label class="mode-card active"><input type="radio" name="distillMode" value="single" checked><span class="mode-icon">1</span><div><strong>单视频 Skill</strong><p>必须选择 1 个视频，提炼这节课中可复用的教师行动。</p></div><b>ONE</b></label>
+          <label class="mode-card"><input type="radio" name="distillMode" value="common"><span class="mode-icon">4+</span><div><strong>共性 Skills</strong><p>至少选择 4 个视频，只保留跨课程重复出现的教学能力。</p></div><b>COMMON</b></label>
+        </section>
+        <section class="panel requires-project">
+          <div class="panel-head"><div><span class="eyebrow">SELECT EVIDENCE</span><h3><b data-project-name>未选择项目</b>的视频</h3></div><span class="selection-rule" id="selectionRule">请选择 1 个视频</span></div>
+          <div class="select-video-grid" id="distillVideoList"><div class="empty-state">选择项目后挑选视频。</div></div>
+          <div class="distill-action"><p id="distillHelp">单视频模式必须选择且只能选择 1 个视频。</p><button class="primary" id="startDistill" disabled>开始蒸馏 Skill →</button></div>
+        </section>
+      </section>
+
+      <section class="view" id="view-skills">
+        <div class="page-intro"><div><span class="eyebrow">STEP 03 · LIBRARY</span><h2>Skills 成果库</h2><p>查看每个 Skill 的教师行动指南、教学模式说明与可追溯证据。</p></div><div class="stat-card mint"><strong id="skillTotal">0</strong><span>VALID SKILLS</span></div></div>
+        <div class="skill-library" id="skillLibrary"><div class="empty-state">选择项目后查看生成的 Skills。</div></div>
+      </section>
+
+      <section class="task-drawer" id="taskDrawer" hidden>
+        <div class="task-top" id="taskDragHandle"><div><span class="eyebrow">CURRENT TASK</span><h3 id="taskTitle">任务运行中</h3></div><div class="task-window-actions"><span class="job-status" id="jobStatus">QUEUED</span><button id="minimizeTask" type="button" title="收起日志">−</button><button id="closeTask" type="button" title="关闭日志">×</button></div></div>
+        <div class="progress"><i id="jobProgress"></i></div>
+        <div class="task-message" id="taskMessage">正在准备…</div>
+        <div class="task-error" id="taskError" hidden></div>
+        <div class="task-actions"><button class="text-button" id="toggleLog">查看运行日志</button><button class="text-button danger" id="cancelJob">取消任务</button></div>
+        <div class="task-log" id="taskLog" hidden></div>
+      </section>
     </main>
   </div>
 
-  <dialog id="settingsDialog">
-    <form method="dialog" class="dialog-card" id="settingsForm">
-      <div class="dialog-head"><div><span class="kicker">ONE API ONLY</span><h3>中转模型接口</h3></div><button value="cancel" aria-label="关闭">×</button></div>
-      <p>支持 OpenAI-compatible <code>/chat/completions</code>。密钥仅保存在本机 <code>data/runtime_settings.json</code>，不会进入浏览器存储或 Git。视频 Cookie 只从所选浏览器临时读取目标域名，不导出明文。</p>
-      <label><span>Base URL</span><input id="baseUrl" placeholder="https://relay.example.com/v1"></label>
-      <label><span>API Key</span><input id="apiKey" type="password" autocomplete="off" placeholder="sk-…（留空则保留已有密钥）"></label>
-      <label><span>Model</span><input id="modelName" placeholder="gpt-4.1-mini"></label>
-      <label><span>Whisper 模型</span><select id="whisperModel"><option>tiny</option><option>base</option><option selected>small</option><option>medium</option><option>large-v3</option></select></label>
-      <label><span>视频站点 Cookie（可选）</span><select id="cookieBrowser"><option value="">不使用浏览器 Cookie</option><option value="chrome">Chrome</option><option value="safari">Safari</option><option value="firefox">Firefox</option><option value="edge">Edge</option><option value="brave">Brave</option><option value="chromium">Chromium</option></select></label>
-      <p>先在所选浏览器访问一次目标网站，再将网址粘贴到工作台。首次检测时 macOS 可能询问钥匙串权限。</p>
-      <div class="dialog-actions"><button class="ghost" id="testCookies" type="button">一键检测 Cookie</button><button class="ghost" id="testApi" type="button">测试 API</button><button class="primary" id="saveSettings" type="button">保存设置</button></div>
-      <output id="settingsMessage"></output>
+  <dialog id="projectDialog">
+    <form method="dialog" class="dialog-card" id="projectForm">
+      <div class="dialog-head"><div><span class="eyebrow">NEW WORKSPACE</span><h2>新建教学项目</h2></div><button value="cancel">×</button></div>
+      <label><span>项目名称</span><input id="projectName" required maxlength="80" placeholder="例如：高中物理"></label>
+      <div class="form-row"><label><span>学科</span><input id="projectSubject" value="高中物理" required></label><label><span>学段</span><input id="projectGrade" value="高中" required></label></div>
+      <label><span>项目说明（可选）</span><textarea id="projectDescription" placeholder="课程范围、教学目标或素材标准"></textarea></label>
+      <div class="dialog-actions"><button class="ghost" value="cancel">取消</button><button class="primary" id="createProject" type="button">创建项目</button></div>
     </form>
   </dialog>
+
+  <dialog id="deleteProjectDialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-head"><div><span class="eyebrow">DELETE PROJECT</span><h2>删除项目</h2></div><button value="cancel">×</button></div>
+      <p class="dialog-copy">请选择删除方式：仅移出可以保留全部磁盘数据；永久删除会清理视频、音频、转录、分析、Skills 和任务记录。</p>
+      <div class="delete-project-name" id="deleteProjectName"></div>
+      <div class="delete-choice-grid">
+        <button class="delete-choice" id="removeProjectSoft" type="button"><strong>仅移出项目池</strong><span>保留磁盘文件和历史数据，可人工恢复</span></button>
+        <button class="delete-choice destructive" id="removeProjectPermanent" type="button"><strong>永久删除文件</strong><span>释放磁盘空间，此操作不可恢复</span></button>
+      </div>
+      <output id="deleteProjectMessage"></output>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-head"><div><span class="eyebrow">ONE API ONLY</span><h2>模型与转录设置</h2></div><button value="cancel">×</button></div>
+      <p class="dialog-copy">中转 API 用于教研分析和 Skill 蒸馏；Whisper 在本机运行。密钥只保存在本机，不进入 Git。</p>
+      <label><span>Base URL</span><input id="baseUrl" placeholder="https://relay.example.com/v1"></label>
+      <label><span>API Key</span><input id="apiKey" type="password" autocomplete="off" placeholder="留空则保留现有密钥"></label>
+      <label><span>模型</span><input id="modelName"></label>
+      <div class="form-row"><label><span>Whisper 模型</span><select id="whisperModel"><option>tiny</option><option>base</option><option>small</option><option>medium</option><option>large-v3</option></select></label><label><span>Cookie 浏览器</span><select id="cookieBrowser"><option value="">不使用</option><option value="chrome">Chrome</option><option value="safari">Safari</option><option value="firefox">Firefox</option><option value="edge">Edge</option><option value="brave">Brave</option></select></label></div>
+      <output id="settingsMessage"></output>
+      <div class="dialog-actions"><button class="ghost" id="testApi" type="button">测试 API</button><button class="primary" id="saveSettings" type="button">保存设置</button></div>
+    </form>
+  </dialog>
+
   <dialog id="skillDialog" class="skill-dialog">
     <form method="dialog" class="dialog-card">
-      <div class="dialog-head"><div><span class="kicker">GENERATED ARTIFACT</span><h3 id="skillDialogTitle">Skill 内容</h3></div><button value="cancel" aria-label="关闭">×</button></div>
-      <p id="skillDialogMeta">直接查看 API 蒸馏出的 Skill 与原课证据。</p>
-      <div class="document-tabs" role="tablist">
-        <button type="button" class="active" data-skill-document="skill">SKILL.md</button>
-        <button type="button" data-skill-document="pattern">模式说明</button>
-        <button type="button" data-skill-document="evidence">证据索引</button>
-      </div>
+      <div class="dialog-head"><div><span class="eyebrow">SKILL ARTIFACT</span><h2 id="skillDialogTitle">Skill</h2></div><button value="cancel">×</button></div>
+      <p class="dialog-copy" id="skillDialogMeta"></p>
+      <div class="document-tabs"><button type="button" class="active" data-doc="skill">SKILL.md</button><button type="button" data-doc="pattern">模式说明</button><button type="button" data-doc="evidence">证据索引</button></div>
       <pre id="skillDocument"></pre>
     </form>
   </dialog>
