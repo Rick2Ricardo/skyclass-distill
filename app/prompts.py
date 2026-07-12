@@ -1,5 +1,5 @@
 ANALYSIS_PROMPT_VERSION = "teacher-analysis-v2"
-DISTILL_PROMPT_VERSION = "teacher-action-guide-v3"
+DISTILL_PROMPT_VERSION = "teacher-action-guide-v4"
 
 
 ANALYSIS_SYSTEM = """你是一名高中物理教研员与教师教练。只根据给出的逐字稿证据分析，不补写课堂中没有发生的事实。输出严格 JSON。分析重点不是给课堂贴标签，而是还原教师怎样把学生从当前认知带到学习目标：何时采取动作、具体做什么、希望学生产生什么可观察反应、学生卡住时如何支架。区分原课事实与后续教学建议；本步骤只抽取事实。每个判断尽量给出时间戳和短证据。"""
@@ -32,6 +32,35 @@ COURSE_REDUCE_USER = """将以下同一课的分段分析合并为一个 JSON，
 课程：{title}
 分段分析：
 {analyses}
+"""
+
+SINGLE_DISTILL_SYSTEM = """你是一名资深高中物理教研员。只根据这一节课的分析，提炼少而精、可迁移且有本课证据支持的教学能力。这里不要求跨课程重复；判断标准是教师行动是否明确、是否对应学生认知变化、是否能由时间戳证据追溯。课程知识本身不能冒充教学能力。只做能力识别与证据筛选，不在本步骤展开完整教案。输出严格 JSON。"""
+
+SINGLE_DISTILL_USER = """从下面这一节课的分析中，输出 1–3 个有明确课堂证据、可供其他老师复用的教学能力候选：
+{{
+  "suite_name": "单课教学能力",
+  "methodology": "如何从本课证据判定可迁移教学能力",
+  "capabilities": [{{
+    "key": "英文小写连字符，如 concept-modeling",
+    "name": "中文能力名",
+    "summary": "一句话说明这种教法怎样帮助学生学习",
+    "teaching_goal": "学生完成这段教学后应该能做什么",
+    "use_when": ["可观察的学生状态或课堂触发场景"],
+    "prerequisites": ["学生需要的起点认知、教师需要的材料"],
+    "quality_checks": ["教师课后或观课者可检查的标准"],
+    "failure_modes": ["常见教法失败：具体纠偏动作"],
+    "evidence": [{{"lesson":"课程名","timestamp":"MM:SS","quote":"不超过30字","supports":"支持何种教师行动"}}],
+    "supporting_lessons": 1,
+    "confidence": 0.0
+  }}],
+  "excluded_course_specific_patterns": ["只有本课知识内容、不可迁移的候选"],
+  "limitations": ["单课证据的适用边界"]
+}}
+
+要求：每个 capability 至少包含一条来自本课的时间戳证据；能力必须描述教师何时做什么、希望学生发生什么变化，禁止空泛的“因材施教”“启发学生”；不要因为只有一节课而返回空列表；confidence 为 0–1。
+
+课程分析：
+{analysis}
 """
 
 DISTILL_SYSTEM = """你是一名资深高中物理教研员。先从多节课中提炼少而精的共性教学能力，只做能力识别与证据筛选，不在本步骤展开完整教案。只保留至少两节课支持的模式；课程特有知识不要伪装成共性。输出严格 JSON。"""

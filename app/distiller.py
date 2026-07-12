@@ -11,6 +11,7 @@ from .llm_schemas import TeacherGuide
 from .prompts import (
     ANALYSIS_SYSTEM, ANALYSIS_USER, COURSE_REDUCE_SYSTEM, COURSE_REDUCE_USER,
     DISTILL_SYSTEM, DISTILL_USER, GUIDE_SYSTEM, GUIDE_USER,
+    SINGLE_DISTILL_SYSTEM, SINGLE_DISTILL_USER,
 )
 
 
@@ -48,6 +49,29 @@ def analyze_lesson(client: LLMClient, title: str, subject: str, transcript: dict
 
 
 CheckpointFn = Callable[[dict[str, Any]], None]
+
+
+def distill_single(
+    client: LLMClient,
+    analysis: dict[str, Any],
+    log: Callable[[str], None] | None = None,
+    initial_suite: dict[str, Any] | None = None,
+    checkpoint: CheckpointFn | None = None,
+) -> dict[str, Any]:
+    if log:
+        log("从单节课提炼可迁移教学能力")
+    suite = initial_suite
+    if suite is None:
+        suite = client.chat_json(
+            SINGLE_DISTILL_SYSTEM,
+            SINGLE_DISTILL_USER.format(analysis=json.dumps(analysis, ensure_ascii=False)),
+        )
+        if checkpoint:
+            checkpoint(suite)
+    elif log:
+        completed = sum(_guide_complete(capability) for capability in suite.get("capabilities", []))
+        log(f"恢复单视频蒸馏检查点：已完成 {completed}/{len(suite.get('capabilities', []))} 个教师指南")
+    return add_teacher_guides(client, suite, [analysis], log, checkpoint)
 
 
 def distill_common(

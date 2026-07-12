@@ -10,7 +10,7 @@ from typing import Callable
 
 from .artifacts import VersionedJsonArtifact, atomic_write_json, content_fingerprint
 from .config import Settings
-from .distiller import analyze_lesson, distill_common, offline_draft
+from .distiller import analyze_lesson, distill_common, distill_single, offline_draft
 from .downloader import download_item, valid_media
 from .llm import LLMClient
 from .library import LibraryStore
@@ -368,16 +368,26 @@ class PipelineManager:
         self._stage(job, "distill", 0.74, f"正在提炼{label}")
         checkpoint = VersionedJsonArtifact(analysis_dir / "skill-suite.checkpoint.json", DISTILL_PROMPT_VERSION)
         fingerprint = content_fingerprint(job.distill_mode, analyses)
-        suite = distill_common(
-            client, analyses, lambda msg: self.store.event(job, msg),
-            initial_suite=checkpoint.load(fingerprint),
-            checkpoint=lambda payload: checkpoint.save(payload, fingerprint),
-        )
+        distill_log = lambda msg: self.store.event(job, msg)
+        if job.distill_mode == "single":
+            suite = distill_single(
+                client, analyses[0], distill_log,
+                initial_suite=checkpoint.load(fingerprint),
+                checkpoint=lambda payload: checkpoint.save(payload, fingerprint),
+            )
+        else:
+            suite = distill_common(
+                client, analyses, distill_log,
+                initial_suite=checkpoint.load(fingerprint),
+                checkpoint=lambda payload: checkpoint.save(payload, fingerprint),
+            )
         suite["distill_mode"] = job.distill_mode
         suite_file = analysis_dir / "skill-suite.json"
         atomic_write_json(suite_file, suite)
         if not suite.get("capabilities"):
-            raise RuntimeError("未生成任何 Skill：API 已正常调用，但所选视频没有提供足够明确、可操作的教学能力证据；请更换教学型视频或检查转写质量")
+            if job.distill_mode == "single":
+                raise RuntimeError("未生成任何单视频 Skill：API 已正常调用，但模型未从本课分析中返回带证据的可迁移教师行动；请检查转写和单课分析质量")
+            raise RuntimeError("未生成任何共性 Skill：API 已正常调用，但所选视频之间没有足够明确、可操作的共同教学能力证据")
 
         self._stage(job, "package", 0.92, "正在打包并校验 Skills")
         skills_dir = settings.data_dir / "projects" / str(job.project_id) / "skills" / job.id
