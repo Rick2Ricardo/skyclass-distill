@@ -199,7 +199,10 @@ def create_api_router(manager: PipelineManager, settings_loader: SettingsLoader)
     @router.post("/projects/{project_id}/distill")
     def distill_project(project_id: str, payload: DistillRequest):
         try:
-            job = manager.create_distill(project_id, payload.video_ids, payload.mode)
+            job = manager.create_distill(
+                project_id, payload.video_ids, payload.mode, payload.modality,
+                payload.generate_executable_assets,
+            )
         except KeyError as exc:
             raise HTTPException(404, "项目或视频不存在") from exc
         except ValueError as exc:
@@ -221,6 +224,8 @@ def create_api_router(manager: PipelineManager, settings_loader: SettingsLoader)
                     continue
                 result.append(skill | {
                     "job_id": job.id, "distill_mode": job.distill_mode,
+                    "distill_modality": job.distill_modality,
+                    "generate_executable_assets": job.generate_executable_assets,
                     "video_ids": job.video_ids, "created_at": job.updated_at,
                 })
         return result
@@ -306,6 +311,8 @@ def create_api_router(manager: PipelineManager, settings_loader: SettingsLoader)
             "skill": folder / "SKILL.md",
             "pattern": folder / "references" / "pattern.md",
             "evidence": folder / "references" / "evidence.md",
+            "visual": folder / "references" / "visual-evidence.md",
+            "code": folder / "references" / "executable-asset.md",
         }
         return {
             "name": skill_name,

@@ -83,6 +83,8 @@ class ProjectLocalVideoRequest(BaseModel):
 class DistillRequest(BaseModel):
     video_ids: list[str] = Field(min_length=1, max_length=50)
     mode: Literal["single", "common"] = "single"
+    modality: Literal["text", "multimodal"] = "text"
+    generate_executable_assets: bool = False
 
 
 class VideoDeleteRequest(BaseModel):
@@ -147,3 +149,5 @@ class JobState(BaseModel):
     project_id: str | None = None
     video_ids: list[str] = Field(default_factory=list)
     distill_mode: Literal["single", "common"] | None = None
+    distill_modality: Literal["text", "multimodal"] = "text"
+    generate_executable_assets: bool = False

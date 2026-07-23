@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import base64
 import json
+import mimetypes
 import re
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -52,6 +55,32 @@ class LLMClient:
             "temperature": temperature,
             "response_format": {"type": "json_object"},
         }
+        return self._post_json(body)
+
+    def chat_json_multimodal(
+        self,
+        system: str,
+        user: str,
+        images: list[tuple[str, Path]],
+        temperature: float = 0.2,
+    ) -> dict[str, Any]:
+        """Call an OpenAI-compatible vision model with labeled local images."""
+        if not self.configured:
+            raise RuntimeError("尚未配置中转 API：需要 base_url、api_key 和 model")
+        if not images:
+            raise RuntimeError("多模态分析需要至少一张有效关键帧")
+        body = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": multimodal_content(user, images)},
+            ],
+            "temperature": temperature,
+            "response_format": {"type": "json_object"},
+        }
+        return self._post_json(body)
+
+    def _post_json(self, body: dict[str, Any]) -> dict[str, Any]:
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -88,16 +117,80 @@ class LLMClient:
         return result
 
 
+def multimodal_content(user: str, images: list[tuple[str, Path]]) -> list[dict[str, Any]]:
+    content: list[dict[str, Any]] = [{"type": "text", "text": user}]
+    for label, image_path in images:
+        path = Path(image_path)
+        if not path.is_file():
+            raise RuntimeError(f"多模态分析失败：关键帧不存在 · {label}")
+        mime_type = mimetypes.guess_type(path.name)[0] or "image/jpeg"
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+        content.extend([
+            {"type": "text", "text": f"下一张图像的证据编号是 {label}；请在输出中原样保留该编号。"},
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime_type};base64,{encoded}", "detail": "low"},
+            },
+        ])
+    return content
+
+
 def parse_json_object(text: str | dict[str, Any]) -> dict[str, Any]:
     if isinstance(text, dict):
         return text
     cleaned = text.strip()
     cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
     cleaned = re.sub(r"\s*```$", "", cleaned)
-    try:
-        return json.loads(cleaned)
-    except json.JSONDecodeError:
-        start, end = cleaned.find("{"), cleaned.rfind("}")
-        if start >= 0 and end > start:
-            return json.loads(cleaned[start : end + 1])
-        raise
+    candidates = [cleaned]
+    start, end = cleaned.find("{"), cleaned.rfind("}")
+    if start >= 0 and end > start and (start != 0 or end != len(cleaned) - 1):
+        candidates.append(cleaned[start : end + 1])
+    last_error: json.JSONDecodeError | None = None
+    for candidate in candidates:
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError as exc:
+            last_error = exc
+        repaired = _repair_common_json(candidate)
+        if repaired != candidate:
+            try:
+                return json.loads(repaired)
+            except json.JSONDecodeError as exc:
+                last_error = exc
+    if last_error is not None:
+        raise last_error
+    raise json.JSONDecodeError("未找到 JSON 对象", cleaned, 0)
+
+
+def _repair_common_json(value: str, max_fixes: int = 8) -> str:
+    """Conservatively repair commas commonly omitted by compatible relays."""
+    repaired = value
+    for _ in range(max_fixes):
+        try:
+            json.loads(repaired)
+            return repaired
+        except json.JSONDecodeError as exc:
+            position = exc.pos
+            if not 0 <= position < len(repaired):
+                return repaired
+            previous = position - 1
+            while previous >= 0 and repaired[previous].isspace():
+                previous -= 1
+            current = repaired[position]
+            previous_char = repaired[previous] if previous >= 0 else ""
+            message = exc.msg.lower()
+            if "trailing comma" in message and current == ",":
+                repaired = repaired[:position] + repaired[position + 1 :]
+                continue
+            if "expecting ',' delimiter" in message:
+                if current in '"[{' and previous_char in '"}]0123456789':
+                    repaired = repaired[:position] + "," + repaired[position:]
+                    continue
+            if (
+                ("expecting property name" in message and current == "}")
+                or ("expecting value" in message and current in "]}")
+            ) and previous_char == ",":
+                repaired = repaired[:previous] + repaired[previous + 1 :]
+                continue
+            return repaired
+    return repaired

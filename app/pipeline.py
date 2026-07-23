@@ -6,20 +6,68 @@ import threading
 import traceback
 import uuid
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from .artifacts import VersionedJsonArtifact, atomic_write_json, content_fingerprint
+from .code_assets import CODE_ASSET_PROMPT_VERSION, add_executable_assets
 from .config import Settings
-from .distiller import analyze_lesson, distill_common, distill_single, offline_draft
+from .distiller import (
+    MULTIMODAL_FRAMES_PER_CHUNK, MULTIMODAL_FRAMES_PER_LESSON,
+    analyze_lesson, analyze_lesson_multimodal,
+    distill_common, distill_common_multimodal,
+    distill_single, distill_single_multimodal, offline_draft,
+)
 from .downloader import download_item, valid_media
+from .frame_extractor import FRAME_EXTRACTOR_VERSION, extract_keyframes
 from .llm import LLMClient
 from .library import LibraryStore
 from .models import JobEvent, JobState, PipelineRequest
-from .prompts import ANALYSIS_PROMPT_VERSION, DISTILL_PROMPT_VERSION
+from .prompts import (
+    ANALYSIS_PROMPT_VERSION, DISTILL_PROMPT_VERSION,
+    MULTIMODAL_ANALYSIS_PROMPT_VERSION, MULTIMODAL_DISTILL_PROMPT_VERSION,
+)
 from .skill_builder import build_skill_suite
 from .sources import discover
 from .store import JobStore
 from .transcriber import transcribe
+
+
+def _attach_visual_sources(
+    suite: dict[str, Any], videos: list[Any], frame_indexes: dict[str, dict[str, Any]],
+) -> None:
+    """Resolve model-returned frame IDs only against frames extracted for this job."""
+    by_lesson: dict[tuple[str, str], tuple[Any, dict[str, Any]]] = {}
+    by_id: dict[str, list[tuple[Any, dict[str, Any]]]] = {}
+    for video in videos:
+        for frame in frame_indexes.get(video.id, {}).get("frames", []):
+            frame_id = str(frame.get("frame_id", ""))
+            if not frame_id:
+                continue
+            by_lesson[(video.title, frame_id)] = (video, frame)
+            by_id.setdefault(frame_id, []).append((video, frame))
+    for capability in suite.get("capabilities", []):
+        for evidence in capability.get("evidence", []):
+            evidence.pop("frame_path", None)
+            frame_id = str(evidence.get("frame_id", "")).split("@", 1)[0]
+            if not frame_id:
+                continue
+            resolved = by_lesson.get((str(evidence.get("lesson", "")), frame_id))
+            if resolved is None and len(by_id.get(frame_id, [])) == 1:
+                resolved = by_id[frame_id][0]
+            if resolved is None:
+                continue
+            video, frame = resolved
+            evidence["frame_id"] = frame_id
+            evidence["frame_path"] = str(frame["path"])
+            evidence["source_video_id"] = video.id
+            evidence["frame_timestamp"] = _seconds_to_timestamp(float(frame.get("timestamp", 0)))
+            evidence["frame_selection_reason"] = frame.get("selection_reason")
+            evidence.setdefault("timestamp", _seconds_to_timestamp(float(frame.get("timestamp", 0))))
+
+
+def _seconds_to_timestamp(seconds: float) -> str:
+    minutes, second = divmod(int(seconds), 60)
+    return f"{minutes:02d}:{second:02d}"
 
 
 class PipelineManager:
@@ -48,9 +96,20 @@ class PipelineManager:
         self.store.save(job)
         return job
 
-    def create_distill(self, project_id: str, video_ids: list[str], mode: str) -> JobState:
+    def create_distill(
+        self,
+        project_id: str,
+        video_ids: list[str],
+        mode: str,
+        modality: str = "text",
+        generate_executable_assets: bool = False,
+    ) -> JobState:
         project = self.library.get_project(project_id)
         unique_ids = list(dict.fromkeys(video_ids))
+        if mode not in {"single", "common"}:
+            raise ValueError("蒸馏范围必须是单视频或共性 Skills")
+        if modality not in {"text", "multimodal"}:
+            raise ValueError("蒸馏模态必须是纯文本或多模态")
         if mode == "single" and len(unique_ids) != 1:
             raise ValueError("单视频 Skill 必须且只能选择 1 个视频")
         if mode == "common" and len(unique_ids) < 4:
@@ -63,10 +122,14 @@ class PipelineManager:
         job = JobState(
             id=uuid.uuid4().hex[:10],
             request=PipelineRequest(source_url=f"project://{project_id}", limit=len(videos), subject=project.subject, grade=project.grade),
-            kind="distill", project_id=project_id, video_ids=unique_ids, distill_mode=mode,
+            kind="distill", project_id=project_id, video_ids=unique_ids,
+            distill_mode=mode, distill_modality=modality,
+            generate_executable_assets=generate_executable_assets,
         )
         label = "单视频 Skill" if mode == "single" else "共性 Skills"
-        job.events.append(JobEvent(message=f"{label} 蒸馏任务已创建，已选择 {len(videos)} 个视频"))
+        modality_label = "多模态" if modality == "multimodal" else "纯文本"
+        asset_label = " · 可执行图示/实验" if generate_executable_assets else ""
+        job.events.append(JobEvent(message=f"{label} · {modality_label}{asset_label}蒸馏任务已创建，已选择 {len(videos)} 个视频"))
         self.store.save(job)
         return job
 
@@ -79,6 +142,7 @@ class PipelineManager:
             self._cancel.discard(job_id)
             job.status = "queued"
             job.error = None
+            job.artifacts.pop("traceback", None)
             self.store.save(job)
             thread = threading.Thread(target=self.run, args=(job_id,), name=f"pipeline-{job_id}", daemon=True)
             self._threads[job_id] = thread
@@ -118,6 +182,9 @@ class PipelineManager:
         for video in videos:
             targets.add(root / "analysis" / "videos" / f"{video.id}.json")
             targets.add(root / "analysis" / "videos" / f"{video.id}.meta.json")
+            targets.add(root / "analysis" / "videos" / f"{video.id}.multimodal.json")
+            targets.add(root / "analysis" / "videos" / f"{video.id}.multimodal.meta.json")
+            targets.add(root / "visual" / "videos" / video.id)
             for value in video.artifacts.values():
                 path = Path(str(value))
                 targets.add(path if path.is_absolute() else root / path)
@@ -340,10 +407,12 @@ class PipelineManager:
 
         analyses = []
         transcripts = []
+        frame_indexes: dict[str, dict] = {}
         analysis_dir = settings.data_dir / "analysis" / job.id
         analysis_dir.mkdir(parents=True, exist_ok=True)
         job.items = []
         total = len(videos)
+        multimodal = job.distill_modality == "multimodal"
         for index, video in enumerate(videos, 1):
             self._check_cancel(job)
             transcript_path = Path(video.artifacts.get("transcript_json", ""))
@@ -353,35 +422,94 @@ class PipelineManager:
             transcripts.append((video.title, transcript))
             self._stage(job, "analyze", 0.08 + 0.62 * (index - 1) / total, f"教研分析 {index}/{total} · {video.title}")
             cached_dir = settings.data_dir / "analysis" / "videos"
-            target = cached_dir / f"{video.id}.json"
-            artifact = VersionedJsonArtifact(target, ANALYSIS_PROMPT_VERSION)
-            fingerprint = content_fingerprint(video.title, job.request.subject, transcript)
+            if multimodal:
+                video_path = Path(video.artifacts.get("video", ""))
+                if not video_path.is_file():
+                    raise RuntimeError(f"无法多模态蒸馏《{video.title}》：原始视频不存在，请重新入库")
+                self.store.event(job, f"提取课堂关键帧 · {video.title}")
+                frame_index = extract_keyframes(
+                    video_path,
+                    transcript,
+                    settings.data_dir / "visual" / "videos" / video.id,
+                    lambda msg: self.store.event(job, f"{msg} · {video.title}"),
+                )
+                frame_indexes[video.id] = frame_index
+                target = cached_dir / f"{video.id}.multimodal.json"
+                artifact = VersionedJsonArtifact(target, MULTIMODAL_ANALYSIS_PROMPT_VERSION)
+                text_artifact = VersionedJsonArtifact(cached_dir / f"{video.id}.json", ANALYSIS_PROMPT_VERSION)
+                text_fingerprint = content_fingerprint(video.title, job.request.subject, transcript)
+                base_analysis = text_artifact.load(text_fingerprint)
+                if base_analysis is None:
+                    self.store.event(job, f"生成多模态所需的纯文本基线 · {video.title}")
+                    base_analysis = analyze_lesson(
+                        client, video.title, job.request.subject, transcript,
+                        lambda msg: self.store.event(job, msg),
+                    )
+                    text_artifact.save(base_analysis, text_fingerprint)
+                else:
+                    self.store.event(job, f"复用纯文本教研基线 · {video.title}")
+                fingerprint = content_fingerprint(
+                    video.title, job.request.subject, transcript,
+                    FRAME_EXTRACTOR_VERSION, frame_index.get("fingerprint"),
+                    MULTIMODAL_FRAMES_PER_CHUNK, MULTIMODAL_FRAMES_PER_LESSON,
+                    base_analysis,
+                )
+            else:
+                target = cached_dir / f"{video.id}.json"
+                artifact = VersionedJsonArtifact(target, ANALYSIS_PROMPT_VERSION)
+                fingerprint = content_fingerprint(video.title, job.request.subject, transcript)
             analysis = artifact.load(fingerprint)
             if analysis is None:
-                analysis = analyze_lesson(client, video.title, job.request.subject, transcript, lambda msg: self.store.event(job, msg))
+                if multimodal:
+                    try:
+                        analysis = analyze_lesson_multimodal(
+                            client, video.title, job.request.subject, transcript,
+                            frame_indexes[video.id].get("frames", []),
+                            lambda msg: self.store.event(job, msg),
+                            base_analysis=base_analysis,
+                        )
+                    except RuntimeError as exc:
+                        raise RuntimeError(
+                            f"《{video.title}》多模态分析失败：{exc}。"
+                            "请确认当前中转模型支持 OpenAI 兼容的 image_url 输入"
+                        ) from exc
+                else:
+                    analysis = analyze_lesson(client, video.title, job.request.subject, transcript, lambda msg: self.store.event(job, msg))
                 artifact.save(analysis, fingerprint)
             else:
-                self.store.event(job, f"复用单课分析 · {video.title}")
+                cache_label = "多模态单课分析" if multimodal else "单课分析"
+                self.store.event(job, f"复用{cache_label} · {video.title}")
             analyses.append(analysis)
 
         label = "单视频教学能力" if job.distill_mode == "single" else "跨视频共性教学能力"
-        self._stage(job, "distill", 0.74, f"正在提炼{label}")
-        checkpoint = VersionedJsonArtifact(analysis_dir / "skill-suite.checkpoint.json", DISTILL_PROMPT_VERSION)
-        fingerprint = content_fingerprint(job.distill_mode, analyses)
+        modality_label = "多模态" if multimodal else "纯文本"
+        self._stage(job, "distill", 0.74, f"正在提炼{label} · {modality_label}")
+        checkpoint_version = MULTIMODAL_DISTILL_PROMPT_VERSION if multimodal else DISTILL_PROMPT_VERSION
+        checkpoint_name = "skill-suite.multimodal.checkpoint.json" if multimodal else "skill-suite.checkpoint.json"
+        checkpoint = VersionedJsonArtifact(analysis_dir / checkpoint_name, checkpoint_version)
+        fingerprint = (
+            content_fingerprint(job.distill_mode, job.distill_modality, analyses)
+            if multimodal else content_fingerprint(job.distill_mode, analyses)
+        )
         distill_log = lambda msg: self.store.event(job, msg)
         if job.distill_mode == "single":
-            suite = distill_single(
+            distill_fn = distill_single_multimodal if multimodal else distill_single
+            suite = distill_fn(
                 client, analyses[0], distill_log,
                 initial_suite=checkpoint.load(fingerprint),
                 checkpoint=lambda payload: checkpoint.save(payload, fingerprint),
             )
         else:
-            suite = distill_common(
+            distill_fn = distill_common_multimodal if multimodal else distill_common
+            suite = distill_fn(
                 client, analyses, distill_log,
                 initial_suite=checkpoint.load(fingerprint),
                 checkpoint=lambda payload: checkpoint.save(payload, fingerprint),
             )
         suite["distill_mode"] = job.distill_mode
+        suite["distill_modality"] = job.distill_modality
+        if multimodal:
+            _attach_visual_sources(suite, videos, frame_indexes)
         suite_file = analysis_dir / "skill-suite.json"
         atomic_write_json(suite_file, suite)
         if not suite.get("capabilities"):
@@ -389,15 +517,53 @@ class PipelineManager:
                 raise RuntimeError("未生成任何单视频 Skill：API 已正常调用，但模型未从本课分析中返回带证据的可迁移教师行动；请检查转写和单课分析质量")
             raise RuntimeError("未生成任何共性 Skill：API 已正常调用，但所选视频之间没有足够明确、可操作的共同教学能力证据")
 
+        code_checkpoint: VersionedJsonArtifact | None = None
+        if job.generate_executable_assets:
+            self._stage(job, "code-assets", 0.86, "正在生成可执行图示与实验示意资产")
+            code_checkpoint = VersionedJsonArtifact(
+                analysis_dir / "executable-assets.checkpoint.json", CODE_ASSET_PROMPT_VERSION,
+            )
+            code_basis = [
+                {key: value for key, value in capability.items() if key != "executable_asset"}
+                for capability in suite.get("capabilities", [])
+            ]
+            code_fingerprint = content_fingerprint(
+                job.distill_mode, job.distill_modality, analyses, code_basis,
+            )
+            restored_suite = code_checkpoint.load(code_fingerprint)
+            if restored_suite is not None:
+                suite = restored_suite
+                self.store.event(job, "复用可执行资产生成检查点")
+            suite = add_executable_assets(
+                client, suite, analyses, distill_log,
+                checkpoint=lambda payload: code_checkpoint.save(payload, code_fingerprint),
+            )
+            suite["generate_executable_assets"] = True
+            atomic_write_json(suite_file, suite)
+
         self._stage(job, "package", 0.92, "正在打包并校验 Skills")
         skills_dir = settings.data_dir / "projects" / str(job.project_id) / "skills" / job.id
         provenance = {
             "job_id": job.id, "project_id": job.project_id, "distill_mode": job.distill_mode,
+            "distill_modality": job.distill_modality,
             "video_ids": job.video_ids,
             "courses": [{"id": video.id, "title": video.title, "url": video.source_url} for video in videos],
-            "llm_model": settings.llm_model, "analysis_prompt_version": ANALYSIS_PROMPT_VERSION,
-            "distill_prompt_version": DISTILL_PROMPT_VERSION, "analysis_file": str(suite_file),
+            "llm_model": settings.llm_model,
+            "analysis_prompt_version": MULTIMODAL_ANALYSIS_PROMPT_VERSION if multimodal else ANALYSIS_PROMPT_VERSION,
+            "distill_prompt_version": checkpoint_version, "analysis_file": str(suite_file),
         }
+        if job.generate_executable_assets:
+            provenance["generate_executable_assets"] = True
+            provenance["code_asset_prompt_version"] = CODE_ASSET_PROMPT_VERSION
+        if multimodal:
+            provenance["visual_extraction"] = {
+                "version": FRAME_EXTRACTOR_VERSION,
+                "strategy": "scene_change+transcript_cue+periodic",
+                "frames_per_analysis_chunk": MULTIMODAL_FRAMES_PER_CHUNK,
+                "frames_per_lesson_visual_enrichment": MULTIMODAL_FRAMES_PER_LESSON,
+                "architecture": "cached_text_analysis+short_visual_enrichment",
+                "frame_counts": {video_id: len(index.get("frames", [])) for video_id, index in frame_indexes.items()},
+            }
         built = build_skill_suite(suite, skills_dir, job.request.subject, provenance)
         if not built:
             raise RuntimeError("未生成任何 Skill：模型返回了空能力列表，可能是视频内容偏科普/闲聊，或转写证据不足")
@@ -406,11 +572,15 @@ class PipelineManager:
             detail = "; ".join(f"{item['name']}: {', '.join(item.get('errors', []))}" for item in invalid)
             raise RuntimeError(f"Skills 已生成但格式校验失败：{detail}")
         checkpoint.clear()
+        if code_checkpoint is not None:
+            code_checkpoint.clear()
         job.artifacts.update({"analysis": str(suite_file), "skills_dir": str(skills_dir), "skills": built})
         job.status = "completed"
         job.stage = "completed"
         job.progress = 1
-        self.store.event(job, f"蒸馏完成：生成 {len(built)} 个 Skills", "success")
+        code_count = sum(bool(item.get("has_executable_asset")) for item in built)
+        code_summary = f"，其中 {code_count} 个附带可执行资产" if job.generate_executable_assets else ""
+        self.store.event(job, f"蒸馏完成：生成 {len(built)} 个 Skills{code_summary}", "success")
         return self.store.save(job)
 
 

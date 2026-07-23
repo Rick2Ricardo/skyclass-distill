@@ -62,6 +62,13 @@
           <label class="mode-card active"><input type="radio" name="distillMode" value="single" checked><span class="mode-icon">1</span><div><strong>单视频 Skill</strong><p>必须选择 1 个视频，提炼这节课中可复用的教师行动。</p></div><b>ONE</b></label>
           <label class="mode-card"><input type="radio" name="distillMode" value="common"><span class="mode-icon">4+</span><div><strong>共性 Skills</strong><p>至少选择 4 个视频，只保留跨课程重复出现的教学能力。</p></div><b>COMMON</b></label>
         </section>
+        <div class="choice-label"><span class="eyebrow">INPUT MODALITY</span><h3>选择蒸馏输入</h3></div>
+        <section class="modality-grid">
+          <label class="modality-card active"><input type="radio" name="distillModality" value="text" checked><span class="mode-icon">T</span><div><strong>纯文本蒸馏</strong><p>只分析 Whisper 逐字稿，速度快、费用低，与现有流程一致。</p></div><b>TEXT</b></label>
+          <label class="modality-card"><input type="radio" name="distillModality" value="multimodal"><span class="mode-icon">◉</span><div><strong>多模态蒸馏</strong><p>联合逐字稿与关键帧，识别板书、图示、实验与表征转换。</p></div><b>VISION</b></label>
+        </section>
+        <div class="choice-label"><span class="eyebrow">OUTPUT CAPABILITY</span><h3>选择 Skill 输出</h3></div>
+        <label class="asset-toggle"><input id="generateExecutableAssets" type="checkbox"><span class="toggle-check">✓</span><div><strong>生成可执行图示/实验资产</strong><p>对适合画图或实验示意的能力，生成参数化 SVG 规范、可运行渲染器与默认示例。</p></div><b>CODE</b></label>
         <section class="panel requires-project">
           <div class="panel-head"><div><span class="eyebrow">SELECT EVIDENCE</span><h3><b data-project-name>未选择项目</b>的视频</h3></div><span class="selection-rule" id="selectionRule">请选择 1 个视频</span></div>
           <div class="select-video-grid" id="distillVideoList"><div class="empty-state">选择项目后挑选视频。</div></div>
@@ -125,7 +132,7 @@
     <form method="dialog" class="dialog-card">
       <div class="dialog-head"><div><span class="eyebrow">SKILL ARTIFACT</span><h2 id="skillDialogTitle">Skill</h2></div><button value="cancel">×</button></div>
       <p class="dialog-copy" id="skillDialogMeta"></p>
-      <div class="document-tabs"><button type="button" class="active" data-doc="skill">SKILL.md</button><button type="button" data-doc="pattern">模式说明</button><button type="button" data-doc="evidence">证据索引</button></div>
+      <div class="document-tabs"><button type="button" class="active" data-doc="skill">SKILL.md</button><button type="button" data-doc="pattern">模式说明</button><button type="button" data-doc="evidence">证据索引</button><button type="button" data-doc="visual">视觉证据</button><button type="button" data-doc="code">可执行资产</button></div>
       <pre id="skillDocument"></pre>
     </form>
   </dialog>

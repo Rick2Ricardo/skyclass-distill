@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f63.svg)](LICENSE)
 
-面向教学素材的项目化工作台：按学科建立项目池，集中管理国内主流视频网站或本地视频，在本机完成 Faster Whisper 转写，再按需生成单视频 Skill 或跨视频共性 Skills。
+面向教学素材的项目化工作台：按学科建立项目池，集中管理国内主流视频网站或本地视频，在本机完成 Faster Whisper 转写，再选择纯文本或多模态证据生成单视频 Skill 或跨视频共性 Skills。
 
 > 这里的“蒸馏”不是训练或微调模型，而是通过大模型完成结构化知识提取：`视频 → 逐字稿 → 单课分析 → 多课共性 → 教师行动指南 → Skill`。
 
@@ -20,6 +20,9 @@
 - **项目化成果库**：Skills 按项目和蒸馏任务独立落盘，前端只展示当前项目成果，并支持查看、ZIP 下载和删除。
 - **安全资产清理**：项目可仅移出工作台或永久清理磁盘文件；视频支持批量删除，运行中的项目会阻止永久清理。
 - **两种蒸馏模式**：单视频模式必须选择 1 个视频；共性模式由前后端共同强制至少选择 4 个视频。
+- **两种输入模态**：纯文本蒸馏保持原有逐字稿流程；多模态蒸馏联合语音时间戳与视频关键帧，并将视觉证据打包进 Skill。
+- **中转稳定性控制**：多模态流程先复用纯文本教研基线，再从每课候选帧中选 6 张、按每批 3 张配合附近短字幕做视觉增量取证，避免向第三方兼容接口同时发送长逐字稿并请求长响应。
+- **可执行教学资产**：可选地为适合画图、图像或实验示意的能力生成参数化 SVG 场景、渐进教步和可独立运行的渲染器。
 - **显式失败原因**：未配置 API、转写文件缺失、视频证据不足、模型返回空能力或 Skill 格式异常都会让任务失败并展示具体原因，零 Skill 不会被标记为成功。
 
 ## 蒸馏流程
@@ -28,7 +31,7 @@
 
 ```text
 项目 → 视频入库：discover → download → transcribe → 视频池
-项目 → Skill 蒸馏：选择视频 → analyze → distill → validate → Skills 库
+项目 → Skill 蒸馏：选择范围、输入模态与输出资产 → analyze → distill → validate → Skills 库
 ```
 
 下载与转录阶段不调用大模型。完成的转写成为项目资产，可被不同组合重复使用；单课分析也按视频内容指纹缓存。
@@ -75,6 +78,20 @@ Faster Whisper 在本机运行，默认使用 `small` 模型。每个视频输�
 
 没有出现在视频里的行为不会作为原课事实补写。
 
+多模态模式会额外使用镜头变化、逐字稿视觉提示词和周期采样提取最多 20 张候选关键帧。每张帧都有稳定编号和时间戳；模型必须区分画面直接观察与教学意图推断。两种输入使用独立缓存和 Prompt 版本，不会互相覆盖。
+
+实际调用采用“冻结文本基线 + 视觉增量取证”，而不是让视觉模型重新生成整份教研分析：
+
+1. 先加载或生成完整的纯文本单课分析。
+2. 从一节课的候选帧中均匀选择最多 6 张代表帧。
+3. 每批发送 3 张图片及图片附近约 25 秒的短字幕，只请求板书、图示、实验和表征转换证据。
+4. 本地校验模型返回的 `frame_id`，过滤不存在或跨批次引用的帧。
+5. 将有效视觉证据合并回纯文本分析，再进入单课或跨课能力蒸馏。
+
+这种拆分避免了“长逐字稿 + 多图 + 长结构化响应”在部分 OpenAI-compatible 中转服务上断连，也减少了不必要的课程内容外发。客户端会保守修复模型 JSON 中明确可定位的漏逗号和尾逗号，不会对无法确定的结构做模糊改写。
+
+如何判断多模态是否真正有效，见 [纯文本 / 多模态蒸馏配对评测](MULTIMODAL_EVALUATION.md)。
+
 ### 4. 单视频与多课共性提炼
 
 - **单视频 Skill**：选择且只能选择 1 个已转录视频，提炼该课中有证据支持的教师行动。
@@ -104,7 +121,18 @@ Faster Whisper 在本机运行，默认使用 `small` 模型。每个视频输�
 
 建议话术由模型根据多课共性生成，不会伪装成来源视频的原话；原课短摘录单独保存在证据索引中。
 
-### 6. Skill 打包
+### 6. 可执行图示与实验资产
+
+“纯文本 / 多模态”决定输入证据，“生成可执行图示/实验资产”是独立的输出开关。启用后不会让模型直接生成并执行 Python 或 JavaScript，而是采用两级流程：
+
+1. 先用短请求判断当前教学能力是否真的需要参数化图示、坐标图或实验示意。
+2. 只有通过门控的能力才生成受限场景 JSON；课堂组织、话术、复盘仪式等能力会直接标记为不适用。
+3. 可信渲染器只接受预定义 SVG 图元、声明参数及受限数学表达式。
+4. 打包前自动渲染默认结果、全部教学阶段和参数边界，并检查参数是否真正改变输出。
+
+自动校验回答“资产能否安全运行、参数是否有效”，不能完全回答“物理模型是否适合当前题目”，所以 `validation.json` 始终保留 `teacher-review-required` 标记。
+
+### 7. Skill 打包
 
 每个能力最终生成一个独立 Skill，并检查名称、YAML frontmatter、界面元数据和引用文件是否完整。
 
@@ -114,6 +142,10 @@ Faster Whisper 在本机运行，默认使用 `small` 模型。每个视频输�
 - `app/api.py`：HTTP API Router。
 - `app/upload_store.py`：本地视频上传、路径安全和文件大小控制。
 - `app/artifacts.py`：原子写入、内容指纹和版本化检查点。
+- `app/frame_extractor.py`：镜头变化、视觉提示词和周期采样的关键帧提取与缓存。
+- `app/llm.py`：纯文本与 OpenAI-compatible `image_url` 多模态请求。
+- `app/code_assets.py`：可执行资产生成 Prompt、受限场景契约与检查点。
+- `app/physics_svg_renderer.py`：不执行模型代码的参数化 SVG 可信渲染器。
 - `app/prompts.py`：单课分析、共性提炼和教师指南 Prompt。
 - `app/distiller.py`：分段分析、共性蒸馏和逐能力指南生成。
 - `app/skill_builder.py`：Skill 文件生成与结构校验。
@@ -135,8 +167,10 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 1. `项目池`：创建“高中物理”等独立教学项目。
 2. `视频库`：选择项目后，导入公开网址或本地视频并完成 Whisper 转录。
-3. `Skill 蒸馏`：选择项目、蒸馏模式和参与视频；共性模式不足 4 个视频时无法提交。
-4. `Skills`：按当前项目查看 `SKILL.md`、模式说明和来源证据，并可下载完整 Skill ZIP。
+3. `Skill 蒸馏`：分别选择单课/共性范围、纯文本/多模态输入，以及是否附带可执行图示/实验资产；共性模式不足 4 个视频时无法提交。
+4. `Skills`：按当前项目查看 `SKILL.md`、模式说明、来源证据和视觉证据索引，并可下载完整 Skill ZIP。
+
+当前 Skill 详情弹窗以纯文本方式展示 Markdown，因此“视觉证据”页会显示关键帧编号、时间戳、图片相对路径、画面观察和支持判断，但不会在弹窗内直接渲染图片。真实关键帧位于下载 ZIP 的 `assets/visual/`；前端关键帧画廊和 SVG 内嵌预览尚未实现。
 
 ### 项目与资产管理
 
@@ -147,7 +181,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 ## API 配置
 
-项目只需要一个 OpenAI-compatible Chat Completions API。在项目根目录创建 `.env`：
+项目只需要一个 OpenAI-compatible Chat Completions API。如果选择多模态蒸馏，当前模型和中转服务还必须支持 OpenAI 兼容的 `image_url` 输入。在项目根目录创建 `.env`：
 
 ```dotenv
 LLM_BASE_URL=https://your-relay.example.com/v1
@@ -207,13 +241,18 @@ data/
 ├── analysis/
 │   ├── videos/                    # 可跨蒸馏任务复用的单课分析
 │   │   ├── <video_id>.json
-│   │   └── <video_id>.meta.json
+│   │   ├── <video_id>.meta.json
+│   │   ├── <video_id>.multimodal.json
+│   │   └── <video_id>.multimodal.meta.json
 │   └── <distill_job_id>/
 │       ├── lesson-001.json
 │       ├── lesson-001.meta.json
 │       ├── lesson-002.json
 │       ├── skill-suite.checkpoint.json  # 仅未完成任务可能存在
 │       └── skill-suite.json
+├── visual/videos/<video_id>/         # 关键帧与版本化索引
+│   ├── index.json
+│   └── F001-*.jpg
 └── projects/
     └── <project_id>/skills/<distill_job_id>/
         ├── suite.json
@@ -222,9 +261,18 @@ data/
             ├── manifest.json
             ├── agents/
             │   └── openai.yaml
-            └── references/
-                ├── pattern.md
-                └── evidence.md
+            ├── references/
+            │   ├── pattern.md
+            │   ├── evidence.md
+            │   ├── visual-evidence.md  # 有视觉证据时生成
+            │   └── executable-asset.md # 有可执行资产时生成
+            ├── assets/
+            │   ├── visual/             # 打包后的可溯源关键帧
+            │   └── code/
+            │       ├── spec.json
+            │       ├── example.svg
+            │       └── validation.json      # 阶段、边界参数与输出敏感性检查
+            └── scripts/render.py       # 可独立运行的受限渲染器
 ```
 
 ### 任务文件
@@ -261,7 +309,11 @@ data/
 - `agents/openai.yaml`：Codex 的展示名称、说明和默认调用提示。
 - `references/pattern.md`：教学模式、适用场景和证据强度。
 - `references/evidence.md`：来源课程、时间戳和短摘录。
+- `references/visual-evidence.md` 与 `assets/visual/`：多模态结果中的帧编号、画面观察和打包关键帧。
+- `references/executable-asset.md`、`assets/code/` 与 `scripts/render.py`：参数、教学步骤、场景规范、默认 SVG、自动检查报告和独立渲染器。
 - `manifest.json`：任务、课程、模型、能力结构和来源信息。
+
+可执行资产中的场景规范由模型生成，但项目不会执行模型返回的任意 Python 或 JavaScript。只允许预定义图元和受限算术表达式，并自动检查默认渲染、全部教学阶段、参数边界和参数是否真正改变输出。该检查证明资产可运行且参数有效，不等于自动证明其适用于所有物理条件；`validation.json` 会明确保留教师复核标记。
 
 同一目录下的 `suite.json` 是该蒸馏任务全部教学能力的汇总结果。
 
@@ -273,7 +325,20 @@ data/
 pytest -q
 ```
 
-当前测试覆盖应用工厂、项目持久化、单视频/共性模式数量约束、零 Skill 失败契约、API 路由、设置安全合并、上传路径校验、同源重定向保护、版本化缓存、蒸馏检查点、模型输出契约和 Skill 打包。
+当前测试覆盖应用工厂、项目持久化、单视频/共性模式数量约束、零 Skill 失败契约、API 路由、设置安全合并、上传路径校验、同源重定向保护、版本化缓存、蒸馏检查点、多模态帧对齐、Gemini 常见 JSON 兼容、受限表达式安全、参数探测、模型输出契约和 Skill 打包。
+
+### 本地真实试跑
+
+2026-07-23 使用 `gemini-3.1-pro-preview` 通过 OpenAI-compatible 中转接口，对“质点、参考系、时间与时刻、矢量与标量”4 节已转录物理课执行了一次“跨课共性 + 多模态 + 可执行资产”任务：
+
+- 共提取 56 张候选关键帧，实际发送 24 张代表帧。
+- 生成 4 个通过格式校验的共性 Skills。
+- “语言到图形的表征转换”由 3 节课共同支持，并打包了 3 张来源关键帧。
+- 资产门控只为该能力生成“一维矢量的图形化表征”；其余课堂策略能力没有强行附带代码。
+- 可执行资产包含 `start_x`、`delta_x` 两个参数和 3 个渐进教学阶段，默认渲染、阶段渲染与参数边界探测均通过。
+- 本次实现完成后的全量测试结果为 `47 passed`。
+
+该试跑也验证了一个工程结论：让视觉模型同时重做长篇文本分析容易触发中转断连；复用文本基线、只做短视觉增量取证更加稳定。
 
 ## 合规边界
 

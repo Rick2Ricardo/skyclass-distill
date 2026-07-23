@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import copy
 import json
 import re
+from pathlib import Path
 from typing import Any, Callable
 
 from pydantic import ValidationError
@@ -11,8 +13,17 @@ from .llm_schemas import TeacherGuide
 from .prompts import (
     ANALYSIS_SYSTEM, ANALYSIS_USER, COURSE_REDUCE_SYSTEM, COURSE_REDUCE_USER,
     DISTILL_SYSTEM, DISTILL_USER, GUIDE_SYSTEM, GUIDE_USER,
+    MULTIMODAL_ANALYSIS_SYSTEM, MULTIMODAL_ANALYSIS_USER,
+    MULTIMODAL_COURSE_REDUCE_SYSTEM, MULTIMODAL_COURSE_REDUCE_USER,
+    MULTIMODAL_DISTILL_SYSTEM, MULTIMODAL_DISTILL_USER,
+    MULTIMODAL_SINGLE_DISTILL_SYSTEM, MULTIMODAL_SINGLE_DISTILL_USER,
     SINGLE_DISTILL_SYSTEM, SINGLE_DISTILL_USER,
 )
+
+
+MULTIMODAL_FRAMES_PER_CHUNK = 3
+MULTIMODAL_FRAMES_PER_LESSON = 6
+MULTIMODAL_TRANSCRIPT_MAX_CHARS = 7_000
 
 
 def _timestamp(seconds: float) -> str:
@@ -33,6 +44,82 @@ def transcript_chunks(payload: dict[str, Any], max_chars: int = 28_000) -> list[
     return ["\n".join(chunk) for chunk in chunks if chunk]
 
 
+def transcript_chunks_with_ranges(
+    payload: dict[str, Any], max_chars: int = MULTIMODAL_TRANSCRIPT_MAX_CHARS,
+) -> list[dict[str, Any]]:
+    """Chunk a transcript while retaining the time range needed for frame alignment."""
+    chunks: list[dict[str, Any]] = []
+    lines: list[str] = []
+    size = 0
+    start = 0.0
+    end = 0.0
+    for segment in payload.get("segments", []):
+        segment_start = float(segment.get("start", 0) or 0)
+        segment_end = float(segment.get("end", segment_start) or segment_start)
+        line = f"[{_timestamp(segment_start)}] {str(segment.get('text', '')).strip()}"
+        if size + len(line) > max_chars and lines:
+            chunks.append({"text": "\n".join(lines), "start": start, "end": end})
+            lines, size, start, end = [], 0, segment_start, segment_end
+        if not lines:
+            start = segment_start
+        lines.append(line)
+        size += len(line) + 1
+        end = max(end, segment_end, segment_start)
+    if lines:
+        chunks.append({"text": "\n".join(lines), "start": start, "end": end})
+    return chunks
+
+
+def _bounded_frames(frames: list[dict[str, Any]], limit: int = 6) -> list[dict[str, Any]]:
+    if len(frames) <= limit:
+        return frames
+    if limit <= 1:
+        return frames[:1]
+    indexes = [round(index * (len(frames) - 1) / (limit - 1)) for index in range(limit)]
+    return [frames[index] for index in dict.fromkeys(indexes)]
+
+
+def frames_for_range(
+    frames: list[dict[str, Any]], start: float, end: float,
+    limit: int = MULTIMODAL_FRAMES_PER_CHUNK,
+) -> list[dict[str, Any]]:
+    aligned = [
+        frame for frame in frames
+        if start - 2 <= float(frame.get("timestamp", 0)) <= end + 2
+    ]
+    if not aligned and frames:
+        center = (start + end) / 2
+        aligned = [min(frames, key=lambda frame: abs(float(frame.get("timestamp", 0)) - center))]
+    return _bounded_frames(aligned, limit)
+
+
+def transcript_near_frames(
+    transcript: dict[str, Any], frames: list[dict[str, Any]], window_seconds: float = 25,
+) -> str:
+    timestamps = [float(frame.get("timestamp", 0)) for frame in frames]
+    lines = []
+    for segment in transcript.get("segments", []):
+        start = float(segment.get("start", 0) or 0)
+        end = float(segment.get("end", start) or start)
+        if any(start <= timestamp + window_seconds and end >= timestamp - window_seconds for timestamp in timestamps):
+            lines.append(f"[{_timestamp(start)}] {str(segment.get('text', '')).strip()}")
+    return "\n".join(lines)[:4_000]
+
+
+def _merge_unique(target: dict[str, Any], key: str, values: Any) -> None:
+    if not isinstance(values, list):
+        return
+    existing = target.setdefault(key, [])
+    if not isinstance(existing, list):
+        existing = target[key] = []
+    seen = {json.dumps(item, ensure_ascii=False, sort_keys=True) for item in existing}
+    for item in values:
+        marker = json.dumps(item, ensure_ascii=False, sort_keys=True)
+        if marker not in seen:
+            existing.append(item)
+            seen.add(marker)
+
+
 def analyze_lesson(client: LLMClient, title: str, subject: str, transcript: dict[str, Any], log: Callable[[str], None] | None = None) -> dict[str, Any]:
     chunks = transcript_chunks(transcript)
     analyses = []
@@ -46,6 +133,74 @@ def analyze_lesson(client: LLMClient, title: str, subject: str, transcript: dict
         COURSE_REDUCE_SYSTEM,
         COURSE_REDUCE_USER.format(title=title, analyses=json.dumps(analyses, ensure_ascii=False)),
     )
+
+
+def analyze_lesson_multimodal(
+    client: LLMClient,
+    title: str,
+    subject: str,
+    transcript: dict[str, Any],
+    frames: list[dict[str, Any]],
+    log: Callable[[str], None] | None = None,
+    base_analysis: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    chunks = transcript_chunks_with_ranges(transcript)
+    if not chunks:
+        raise RuntimeError(f"无法多模态分析《{title}》：逐字稿为空")
+    selected = frames_for_range(
+        frames, float(chunks[0]["start"]), float(chunks[-1]["end"]),
+        limit=MULTIMODAL_FRAMES_PER_LESSON,
+    )
+    if not selected:
+        raise RuntimeError(f"无法多模态分析《{title}》：没有可用关键帧")
+    result = copy.deepcopy(base_analysis) if base_analysis else {"lesson_title": title}
+    batches = [
+        selected[index : index + MULTIMODAL_FRAMES_PER_CHUNK]
+        for index in range(0, len(selected), MULTIMODAL_FRAMES_PER_CHUNK)
+    ]
+    valid_visual_count = 0
+    for index, batch in enumerate(batches, 1):
+        if log:
+            log(f"视觉取证《{title}》批次 {index}/{len(batches)} · {len(batch)} 张帧")
+        frame_index = [
+            {
+                "frame_id": frame.get("frame_id"),
+                "timestamp": _timestamp(float(frame.get("timestamp", 0))),
+                "selection_reason": frame.get("selection_reason"),
+            }
+            for frame in batch
+        ]
+        images = [
+            (
+                f"{frame.get('frame_id')}@{_timestamp(float(frame.get('timestamp', 0)))}",
+                Path(str(frame.get("path", ""))),
+            )
+            for frame in batch
+        ]
+        enrichment = client.chat_json_multimodal(
+            MULTIMODAL_ANALYSIS_SYSTEM,
+            MULTIMODAL_ANALYSIS_USER.format(
+                title=title,
+                subject=subject,
+                frame_index=json.dumps(frame_index, ensure_ascii=False),
+                transcript=transcript_near_frames(transcript, batch),
+            ),
+            images,
+        )
+        allowed_ids = {str(frame.get("frame_id", "")) for frame in batch}
+        visual = [
+            evidence for evidence in enrichment.get("visual_evidence", [])
+            if isinstance(evidence, dict)
+            and str(evidence.get("frame_id", "")).split("@", 1)[0] in allowed_ids
+        ]
+        valid_visual_count += len(visual)
+        _merge_unique(result, "visual_evidence", visual)
+        for key in ("representation_moves", "experiment_reasoning", "uncertainties"):
+            _merge_unique(result, key, enrichment.get(key, []))
+    if not valid_visual_count:
+        result.setdefault("uncertainties", []).append("模型未返回可解析且 frame_id 有效的视觉证据")
+    result["analysis_modalities"] = ["text", "visual"] if base_analysis else ["visual"]
+    return result
 
 
 CheckpointFn = Callable[[dict[str, Any]], None]
@@ -94,6 +249,54 @@ def distill_common(
     elif log:
         completed = sum(_guide_complete(capability) for capability in suite.get("capabilities", []))
         log(f"恢复蒸馏检查点：已完成 {completed}/{len(suite.get('capabilities', []))} 个教师指南")
+    return add_teacher_guides(client, suite, analyses, log, checkpoint)
+
+
+def distill_single_multimodal(
+    client: LLMClient,
+    analysis: dict[str, Any],
+    log: Callable[[str], None] | None = None,
+    initial_suite: dict[str, Any] | None = None,
+    checkpoint: CheckpointFn | None = None,
+) -> dict[str, Any]:
+    if log:
+        log("从单节课的语音与画面证据提炼教学能力")
+    suite = initial_suite
+    if suite is None:
+        suite = client.chat_json(
+            MULTIMODAL_SINGLE_DISTILL_SYSTEM,
+            MULTIMODAL_SINGLE_DISTILL_USER.format(analysis=json.dumps(analysis, ensure_ascii=False)),
+        )
+        if checkpoint:
+            checkpoint(suite)
+    elif log:
+        completed = sum(_guide_complete(capability) for capability in suite.get("capabilities", []))
+        log(f"恢复多模态单视频检查点：已完成 {completed}/{len(suite.get('capabilities', []))} 个教师指南")
+    return add_teacher_guides(client, suite, [analysis], log, checkpoint)
+
+
+def distill_common_multimodal(
+    client: LLMClient,
+    analyses: list[dict[str, Any]],
+    log: Callable[[str], None] | None = None,
+    initial_suite: dict[str, Any] | None = None,
+    checkpoint: CheckpointFn | None = None,
+) -> dict[str, Any]:
+    if log:
+        log(f"联合语音与画面证据，跨 {len(analyses)} 节课归纳共性能力")
+    suite = initial_suite
+    if suite is None:
+        suite = client.chat_json(
+            MULTIMODAL_DISTILL_SYSTEM,
+            MULTIMODAL_DISTILL_USER.format(
+                count=len(analyses), analyses=json.dumps(analyses, ensure_ascii=False),
+            ),
+        )
+        if checkpoint:
+            checkpoint(suite)
+    elif log:
+        completed = sum(_guide_complete(capability) for capability in suite.get("capabilities", []))
+        log(f"恢复多模态蒸馏检查点：已完成 {completed}/{len(suite.get('capabilities', []))} 个教师指南")
     return add_teacher_guides(client, suite, analyses, log, checkpoint)
 
 

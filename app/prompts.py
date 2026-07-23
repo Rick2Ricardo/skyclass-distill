@@ -1,5 +1,7 @@
 ANALYSIS_PROMPT_VERSION = "teacher-analysis-v2"
 DISTILL_PROMPT_VERSION = "teacher-action-guide-v4"
+MULTIMODAL_ANALYSIS_PROMPT_VERSION = "teacher-visual-enrichment-v2"
+MULTIMODAL_DISTILL_PROMPT_VERSION = "teacher-multimodal-action-guide-v1"
 
 
 ANALYSIS_SYSTEM = """你是一名高中物理教研员与教师教练。只根据给出的逐字稿证据分析，不补写课堂中没有发生的事实。输出严格 JSON。分析重点不是给课堂贴标签，而是还原教师怎样把学生从当前认知带到学习目标：何时采取动作、具体做什么、希望学生产生什么可观察反应、学生卡住时如何支架。区分原课事实与后续教学建议；本步骤只抽取事实。每个判断尽量给出时间戳和短证据。"""
@@ -29,6 +31,32 @@ ANALYSIS_USER = """分析下面这段教师课程逐字稿，返回：
 COURSE_REDUCE_SYSTEM = """你是严谨的教研分析员。合并同一课的分段分析，去重并保留时间戳证据。不得发明证据。输出 JSON。"""
 
 COURSE_REDUCE_USER = """将以下同一课的分段分析合并为一个 JSON，沿用原字段。证据冲突时写入 uncertainties。
+课程：{title}
+分段分析：
+{analyses}
+"""
+
+MULTIMODAL_ANALYSIS_SYSTEM = """你是高中物理课堂的视觉证据记录员。纯文本教研分析已经由另一阶段完成；你只负责读取关键帧及其附近短字幕，补充板书、图示、实验装置与表征转换证据。只记录画面直接可见的事实，不能从单帧推断学生已经理解、教师意图或动态过程。frame_id 必须来自输入；无法辨认时明确写入 uncertainties。输出简短、严格 JSON。"""
+
+MULTIMODAL_ANALYSIS_USER = """分析下面一小批课堂关键帧及其附近字幕，只返回：
+{{
+  "representation_moves": [{{"from":"现象/语言/图/公式","to":"...","how":"...","evidence":[]}}],
+  "experiment_reasoning": [{{"move":"...","variables_or_evidence":"...","evidence":[]}}],
+  "visual_evidence": [{{"frame_id":"F001","timestamp":"MM:SS","observation":"只写画面可直接看到的内容","nearby_transcript_quote":"不超过30字","teaching_function":"字幕与画面共同支持的教学功能；无法确定则写证据不足","supports":"支持哪个表征转换或教师动作","confidence":0.0}}],
+  "uncertainties": ["证据不足之处"]
+}}
+
+课程：{title}
+学科：{subject}
+本批关键帧索引（图像按同样的 frame_id 随请求提供）：
+{frame_index}
+关键帧附近字幕（带时间戳）：
+{transcript}
+"""
+
+MULTIMODAL_COURSE_REDUCE_SYSTEM = """你是严谨的多模态教研分析员。合并同一课的分段分析，去重并保留原始时间戳和 frame_id。不得发明证据或改写证据编号。输出 JSON。"""
+
+MULTIMODAL_COURSE_REDUCE_USER = """将以下同一课的多模态分段分析合并为一个 JSON，沿用原字段，特别保留 visual_evidence。证据冲突时写入 uncertainties。
 课程：{title}
 分段分析：
 {analyses}
@@ -90,6 +118,20 @@ DISTILL_USER = """比较下面 {count} 节课的分析，输出 3–5 个有跨�
 
 课程分析：
 {analyses}
+"""
+
+MULTIMODAL_SINGLE_DISTILL_SYSTEM = """你是一名资深高中物理教研员。根据一节课的语音与视觉联合分析，提炼少而精的可迁移教学能力。保留能支持教师动作的时间戳与 frame_id；图像只能支持其直接可见内容。不要因为只有一节课而返回空列表。输出严格 JSON。"""
+
+MULTIMODAL_SINGLE_DISTILL_USER = SINGLE_DISTILL_USER + """
+
+这是多模态蒸馏：evidence 可增加 "frame_id" 和 "visual_observation"。引用视觉证据时，frame_id 必须来自 visual_evidence，visual_observation 必须是画面直接可见事实。不能用单帧推断学生已经理解。
+"""
+
+MULTIMODAL_DISTILL_SYSTEM = """你是一名资深高中物理教研员。从多节课的语音与视觉联合分析中提炼共性教学能力。只保留至少两节课支持的模式；视觉证据不能替代跨课支持，也不能超过画面可见事实。输出严格 JSON。"""
+
+MULTIMODAL_DISTILL_USER = DISTILL_USER + """
+
+这是多模态蒸馏：evidence 可增加 "frame_id" 和 "visual_observation"。引用视觉证据时，frame_id 必须来自对应课程的 visual_evidence，visual_observation 必须是画面直接可见事实。视觉证据不能代替至少两节不同课程的支持。
 """
 
 GUIDE_SYSTEM = """你是一名资深高中物理教师教练。把一个已有跨课证据的教学能力扩展成老师明天就能照着实施、同时能根据学生反应调整的课堂行动指南。原课短摘录只能留在输入 capability 的 evidence 中；suggested_language 是你新生成的建议话术，不能声称是原课引用。输出严格 JSON，简洁具体。"""
