@@ -1,11 +1,11 @@
-# AnyTeacher
+# 空中课堂蒸馏 SkyClass Distill
 
 [![CI](https://github.com/Rick2Ricardo/skyclass-distill/actions/workflows/ci.yml/badge.svg)](https://github.com/Rick2Ricardo/skyclass-distill/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node-%3E%3D22.19-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f63.svg)](LICENSE)
 
-AnyTeacher 把真实课堂视频、逐字稿和关键帧蒸馏为可追溯的 Teaching Skills，再由受限的 Pi Agent 教师运行时读取 Skill、直接讲解、检查理解并比较不同教学条件。
+空中课堂蒸馏把真实课堂视频、逐字稿和关键帧蒸馏为可追溯的 Teaching Skills，再由受限的 Pi Agent 教师运行时读取 Skill、直接讲解、检查理解并比较不同教学条件。
 
 > 这里的“蒸馏”不是训练模型，而是把课堂证据编译为带触发条件、教学动作、预期回应、学习检查、补救和拒绝条件的结构化 Skill。
 
@@ -25,7 +25,7 @@ Typed Pipeline ── Media CLI (yt-dlp / FFmpeg / whisper.cpp)
         └── Pi AgentSession teacher runtime
 ```
 
-项目参考 [Inno Agent](https://github.com/hhyqhh/inno-agent) 的工程边界：单一 Node 后端、React/Vite 前端、Pi SDK 不改内核、业务能力通过受限工具扩展、运行数据与代码分离。AnyTeacher 不引入长期学习者记忆，重点保持课堂证据与教学 Skill 的可审计链路。
+项目参考 [Inno Agent](https://github.com/hhyqhh/inno-agent) 的工程边界：单一 Node 后端、React/Vite 前端、Pi SDK 不改内核、业务能力通过受限工具扩展、运行数据与代码分离。SkyClass Distill 不引入长期学习者记忆，重点保持课堂证据与教学 Skill 的可审计链路。
 
 ```text
 apps/anyteacher/
@@ -58,8 +58,8 @@ data/                       # 本地运行数据，Git 忽略
 - 单课或至少四课的共性 Skill 蒸馏，支持文本和文本＋视觉证据。
 - Skill 包保存 `SKILL.md`、manifest、来源证据和视觉证据。
 - Pi Agent 只开放 `load_teaching_skill` 与 `inspect_visual_evidence`，屏蔽内置文件和命令工具。
-- Tutor Lab 对学生直接讲解，并记录实际模态、证据数量和工具调用。
-- Experiments 在同一模型与运行时下比较 Base、Text Skill 和 Vision Skill。
+- Skill 调试运行用于查看单题回答、实际模态、证据数量和工具调用。
+- 评估中心使用版本化 benchmark 比较 Base、Text Skill 和 Vision Skill，并保存运行历史。
 
 ## 快速开始
 
@@ -107,8 +107,8 @@ LLM_MODEL=your-model
 LLM_TIMEOUT_SECONDS=240
 LLM_MAX_ATTEMPTS=3
 
-ANYTEACHER_DATA_DIR=./data
-ANYTEACHER_PORT=3000
+SKYCLASS_DATA_DIR=./data
+SKYCLASS_PORT=3000
 
 WHISPER_MODEL=small
 WHISPER_COMMAND=whisper-cli

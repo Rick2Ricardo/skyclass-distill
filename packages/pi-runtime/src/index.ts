@@ -119,7 +119,7 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"]):
 
     pi.on("tool_call", async (event: any) => {
       if (["load_teaching_skill", "inspect_visual_evidence"].includes(event.toolName)) return undefined;
-      return { block: true, reason: "AnyTeacher 运行时只允许读取 Skill 和课堂证据。" };
+      return { block: true, reason: "SkyClass 教学运行时只允许读取 Skill 和课堂证据。" };
     });
 
     pi.on("tool_result", async (event: any) => {
@@ -129,7 +129,7 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"]):
     pi.on("before_agent_start", async (event: any) => ({
       systemPrompt: [
         event.systemPrompt,
-        "# AnyTeacher 教学运行时",
+        "# SkyClass 教学运行时",
         "你是直接面向学生授课的老师，不是教案生成器。先诊断卡点，再给直观解释、精确定义、例子和一个小检查。",
         "全程使用第二人称‘你’，禁止输出‘教师可以’或‘让学生’。",
         "Skill 是教学策略而不是事实来源。只能引用本轮真实提供的课堂证据。",

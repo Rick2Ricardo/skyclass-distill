@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type {
+  BenchmarkDataset,
+  BenchmarkScenario,
   DistillMode,
   ExperimentRun,
+  ExperimentSummary,
   Health,
   JobState,
   Modality,
@@ -17,24 +20,20 @@ import { api, uploadVideo } from "./api.js";
 import { formatDate, formatDuration, percent } from "./format.js";
 import { Markdown } from "./components/Markdown.js";
 
-type View = "overview" | "sources" | "distill" | "skills" | "tutor" | "experiments";
+type View = "overview" | "evidence" | "skills" | "evaluation";
 
 const NAV: Array<{ key: View; number: string; label: string; hint: string }> = [
-  { key: "overview", number: "00", label: "总览", hint: "Observe → Evaluate" },
-  { key: "sources", number: "01", label: "课堂素材", hint: "Observe" },
-  { key: "distill", number: "02", label: "Skill 蒸馏", hint: "Ground · Distill" },
-  { key: "skills", number: "03", label: "Skills", hint: "Compile" },
-  { key: "tutor", number: "04", label: "Tutor Lab", hint: "Teach" },
-  { key: "experiments", number: "05", label: "Experiments", hint: "Evaluate" },
+  { key: "overview", number: "00", label: "项目总览", hint: "Readiness" },
+  { key: "evidence", number: "01", label: "课堂证据", hint: "Source · Trace" },
+  { key: "skills", number: "02", label: "Skill 工坊", hint: "Distill · Review" },
+  { key: "evaluation", number: "03", label: "评估中心", hint: "Dataset · Compare" },
 ];
 
 const VIEW_COPY: Record<View, { eyebrow: string; title: string; intro: string }> = {
-  overview: { eyebrow: "ANYTEACHER / CONTROL ROOM", title: "从课堂证据，到可验证的教学能力。", intro: "一个项目贯穿素材、蒸馏、执行与实验，不再切换工作台。" },
-  sources: { eyebrow: "01 / OBSERVE", title: "课堂素材", intro: "导入真实课堂，保留视频、字幕与后续证据的统一来源。" },
-  distill: { eyebrow: "02 / GROUND · DISTILL", title: "Skill 蒸馏", intro: "选择课程范围和证据模态，把教师示范编译为可执行教学策略。" },
-  skills: { eyebrow: "03 / COMPILE", title: "Skill Repository", intro: "检查版本、来源、视觉证据与执行边界。" },
-  tutor: { eyebrow: "04 / TEACH", title: "Tutor Lab", intro: "Pi Agent 读取 Skill，直接向学生解释、检查并决定下一步。" },
-  experiments: { eyebrow: "05 / EVALUATE", title: "Experiments", intro: "在同一问题和同一运行时下比较 Base、Text Skill 与 Vision Skill。" },
+  overview: { eyebrow: "SKYCLASS DISTILL / PROJECT", title: "从课堂证据，到可复现的教学验证。", intro: "先确认素材与 Skill 是否就绪，再进入固定数据集上的对照实验。" },
+  evidence: { eyebrow: "01 / CLASSROOM EVIDENCE", title: "课堂证据", intro: "管理视频、逐字稿和视觉证据，让每个教学结论都能回到真实课堂。" },
+  skills: { eyebrow: "02 / SKILL WORKSHOP", title: "Skill 工坊", intro: "蒸馏、检查并调试教学 Skill；只有可追溯版本才进入评估。" },
+  evaluation: { eyebrow: "03 / EVALUATION CENTER", title: "评估中心", intro: "用版本化数据集、固定实验条件和运行历史验证 Skill 的真实增益。" },
 };
 
 function modeLabel(mode: TutorMode): string {
@@ -56,6 +55,8 @@ function App() {
   const [videos, setVideos] = useState<VideoAsset[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [jobs, setJobs] = useState<JobState[]>([]);
+  const [datasets, setDatasets] = useState<BenchmarkDataset[]>([]);
+  const [experimentRuns, setExperimentRuns] = useState<ExperimentSummary[]>([]);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [projectDialog, setProjectDialog] = useState(false);
@@ -86,23 +87,27 @@ function App() {
     if (!projectId) {
       setVideos([]);
       setSkills([]);
+      setExperimentRuns([]);
       return;
     }
-    const [nextVideos, nextSkills] = await Promise.all([
+    const [nextVideos, nextSkills, nextRuns] = await Promise.all([
       api<VideoAsset[]>(`/api/projects/${projectId}/videos`),
       api<Skill[]>(`/api/projects/${projectId}/skills`),
+      api<ExperimentSummary[]>(`/api/projects/${projectId}/experiments`),
     ]);
     setVideos(nextVideos);
     setSkills(nextSkills);
+    setExperimentRuns(nextRuns);
   }, [projectId]);
 
   const loadJobs = useCallback(async () => setJobs(await api<JobState[]>("/api/jobs")), []);
+  const loadDatasets = useCallback(async () => setDatasets(await api<BenchmarkDataset[]>("/api/evaluations/datasets")), []);
 
   useEffect(() => {
-    Promise.all([api<Health>("/api/health"), loadProjects(), loadJobs()])
+    Promise.all([api<Health>("/api/health"), loadProjects(), loadJobs(), loadDatasets()])
       .then(([nextHealth]) => setHealth(nextHealth))
       .catch((cause) => flash(cause instanceof Error ? cause.message : String(cause), true));
-  }, [flash, loadJobs, loadProjects]);
+  }, [flash, loadDatasets, loadJobs, loadProjects]);
 
   useEffect(() => {
     loadProjectData().catch((cause) => flash(cause instanceof Error ? cause.message : String(cause), true));
@@ -117,7 +122,7 @@ function App() {
   }, [jobs, loadJobs, loadProjects, loadProjectData, projectId]);
 
   async function refreshAll(): Promise<void> {
-    await Promise.all([loadProjects(projectId), loadProjectData(), loadJobs()]);
+    await Promise.all([loadProjects(projectId), loadProjectData(), loadJobs(), loadDatasets()]);
   }
 
   async function openSkill(skill: Skill): Promise<void> {
@@ -134,22 +139,20 @@ function App() {
 
   const content = !project && view !== "overview"
     ? <EmptyProject onCreate={() => setProjectDialog(true)} />
-    : view === "overview" ? <Overview project={project} videos={videos} skills={skills} jobs={projectJobs} onNavigate={setView} onCreate={() => setProjectDialog(true)} />
-    : view === "sources" ? <Sources project={project!} videos={videos} onCreated={async (job) => { setJobs((items) => [job, ...items]); flash("素材任务已开始"); }} flash={flash} />
-    : view === "distill" ? <Distill project={project!} videos={videos} onCreated={async (job) => { setJobs((items) => [job, ...items]); setView("overview"); flash("蒸馏任务已开始"); }} flash={flash} />
-    : view === "skills" ? <Skills project={project!} skills={skills} onOpen={openSkill} onRefresh={refreshAll} flash={flash} />
-    : view === "tutor" ? <Tutor project={project!} skills={skills} />
-    : <Experiments project={project!} />;
+    : view === "overview" ? <Overview project={project} videos={videos} skills={skills} jobs={projectJobs} datasets={datasets} runs={experimentRuns} onNavigate={setView} onCreate={() => setProjectDialog(true)} />
+    : view === "evidence" ? <EvidenceWorkspace project={project!} videos={videos} onCreated={async (job) => { setJobs((items) => [job, ...items]); flash("素材任务已开始"); }} flash={flash} />
+    : view === "skills" ? <SkillWorkshop project={project!} videos={videos} skills={skills} onCreated={async (job) => { setJobs((items) => [job, ...items]); flash("蒸馏任务已开始"); }} onOpen={openSkill} onRefresh={refreshAll} flash={flash} />
+    : <EvaluationCenter project={project!} datasets={datasets} runs={experimentRuns} onRun={loadProjectData} />;
 
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand-row">
-        <div className="brand-mark"><span>A</span></div>
-        <div><strong>AnyTeacher</strong><small>evidence → skill → learning</small></div>
+        <div className="brand-mark"><span>S</span></div>
+        <div><strong>空中课堂蒸馏</strong><small>SKYCLASS DISTILL</small></div>
       </div>
 
       <div className="project-switcher">
-        <label>ACTIVE PROJECT</label>
+        <label>当前研究项目</label>
         <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
           {!projects.length && <option value="">尚无项目</option>}
           {projects.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
@@ -176,7 +179,7 @@ function App() {
 
     <main className="main-stage">
       <header className="topbar">
-        <div><span className="context-dot" />{project ? `${project.subject} · ${project.grade}` : "ANYTEACHER RESEARCH SYSTEM"}</div>
+        <div><span className="context-dot" />{project ? `${project.subject} · ${project.grade}` : "SKYCLASS DISTILL RESEARCH SYSTEM"}</div>
         <div className="top-actions">
           {activeJobs.length > 0 && <span className="running-badge">{activeJobs.length} 个任务运行中</span>}
           <button onClick={() => refreshAll().catch((cause) => flash(String(cause), true))}>刷新</button>
@@ -194,39 +197,43 @@ function App() {
     <JobRail jobs={projectJobs} onCancel={async (id) => { await api(`/api/jobs/${id}/cancel`, { method: "POST" }); await loadJobs(); }} />
     {notice && <div className="toast success">{notice}</div>}
     {error && <div className="toast error">{error}</div>}
-    {projectDialog && <ProjectDialog onClose={() => setProjectDialog(false)} onCreated={async (created) => { setProjectDialog(false); await loadProjects(created.id); setView("sources"); flash("项目已创建"); }} />}
+    {projectDialog && <ProjectDialog onClose={() => setProjectDialog(false)} onCreated={async (created) => { setProjectDialog(false); await loadProjects(created.id); setView("evidence"); flash("项目已创建"); }} />}
     {settingsDialog && <SettingsDialog onClose={() => setSettingsDialog(false)} onSaved={async () => { setHealth(await api<Health>("/api/health")); flash("设置已保存"); }} />}
     {skillDialog && <SkillDialog detail={skillDialog} onClose={() => setSkillDialog(null)} />}
     {busy && <div className="global-busy"><span /></div>}
   </div>;
 }
 
-function Overview({ project, videos, skills, jobs, onNavigate, onCreate }: {
+function Overview({ project, videos, skills, jobs, datasets, runs, onNavigate, onCreate }: {
   project?: Project;
   videos: VideoAsset[];
   skills: Skill[];
   jobs: JobState[];
+  datasets: BenchmarkDataset[];
+  runs: ExperimentSummary[];
   onNavigate: (view: View) => void;
   onCreate: () => void;
 }) {
   if (!project) return <div className="first-run">
     <p className="eyebrow">START HERE</p><h2>建立第一个课堂能力项目</h2>
-    <p>项目会把素材、证据、Skills、Tutor 与实验绑定在同一条溯源链上。</p>
+    <p>项目会把课堂证据、Skill 版本、评估数据集与实验记录绑定在同一条溯源链上。</p>
     <button className="primary" onClick={onCreate}>创建项目</button>
   </div>;
   const latest = jobs.slice(0, 4);
+  const readyEvidence = videos.filter((video) => video.status === "ready" && video.artifacts?.transcript_txt).length;
+  const scenarioCount = datasets.reduce((sum, dataset) => sum + dataset.scenario_count, 0);
   return <>
     <div className="metric-grid">
-      <Metric value={videos.length} label="课堂素材" note="可用于证据恢复" />
-      <Metric value={skills.length} label="有效 Skills" note="可交给 Tutor 执行" />
-      <Metric value={jobs.filter((item) => item.status === "completed").length} label="完成任务" note="保留完整溯源" />
-      <Metric value={jobs.filter((item) => item.status === "running").length} label="正在运行" note="后台持续处理" accent />
+      <Metric value={readyEvidence} label="证据已就绪" note={`${videos.length} 段课堂素材`} />
+      <Metric value={skills.length} label="可用 Skills" note="待进入版本审核" />
+      <Metric value={scenarioCount} label="评估案例" note={`${datasets.length} 个数据集`} />
+      <Metric value={runs.length} label="实验记录" note="可用于回归比较" accent />
     </div>
     <div className="overview-grid">
       <section className="paper-panel pipeline-panel">
-        <div className="panel-title"><div><p className="eyebrow">UNIFIED PIPELINE</p><h2>一条主线完成能力迁移</h2></div></div>
+        <div className="panel-title"><div><p className="eyebrow">VALIDATION PIPELINE</p><h2>从证据到验证的三段主线</h2></div></div>
         <div className="pipeline-flow">
-          {[{ n: "01", title: "Observe", text: "课堂素材", view: "sources" }, { n: "02", title: "Distill", text: "证据与策略", view: "distill" }, { n: "03", title: "Compile", text: "版本化 Skills", view: "skills" }, { n: "04", title: "Teach", text: "闭环辅导", view: "tutor" }, { n: "05", title: "Evaluate", text: "基线与消融", view: "experiments" }].map((step) => <button key={step.n} onClick={() => onNavigate(step.view as View)}>
+          {[{ n: "01", title: "Evidence", text: "素材与证据就绪", view: "evidence" }, { n: "02", title: "Skill", text: "蒸馏、审核与调试", view: "skills" }, { n: "03", title: "Evaluate", text: "数据集与对照实验", view: "evaluation" }].map((step) => <button key={step.n} onClick={() => onNavigate(step.view as View)}>
             <span>{step.n}</span><b>{step.title}</b><small>{step.text}</small>
           </button>)}
         </div>
@@ -241,6 +248,115 @@ function Overview({ project, videos, skills, jobs, onNavigate, onCreate }: {
 
 function Metric({ value, label, note, accent = false }: { value: number; label: string; note: string; accent?: boolean }) {
   return <div className={`metric ${accent ? "accent" : ""}`}><strong>{String(value).padStart(2, "0")}</strong><div><b>{label}</b><small>{note}</small></div></div>;
+}
+
+function WorkspaceTabs<T extends string>({ value, items, onChange }: {
+  value: T;
+  items: Array<{ key: T; label: string; note?: string }>;
+  onChange: (value: T) => void;
+}) {
+  return <div className="workspace-tabs">{items.map((item) => <button key={item.key} className={value === item.key ? "active" : ""} onClick={() => onChange(item.key)}><b>{item.label}</b>{item.note && <small>{item.note}</small>}</button>)}</div>;
+}
+
+function EvidenceWorkspace({ project, videos, onCreated, flash }: {
+  project: Project;
+  videos: VideoAsset[];
+  onCreated: (job: JobState) => void;
+  flash: (message: string, error?: boolean) => void;
+}) {
+  const ready = videos.filter((video) => video.status === "ready").length;
+  const transcripts = videos.filter((video) => Boolean(video.artifacts?.transcript_txt)).length;
+  const local = videos.filter((video) => video.source_url.startsWith("local://")).length;
+  return <div className="workspace-stack">
+    <section className="readiness-strip">
+      <div><span>01</span><b>课堂素材</b><strong>{ready}/{videos.length}</strong><small>已完成媒体处理</small></div>
+      <div><span>02</span><b>逐字稿</b><strong>{transcripts}/{videos.length}</strong><small>具备时间戳证据</small></div>
+      <div><span>03</span><b>来源构成</b><strong>{local} 本地</strong><small>{videos.length - local} 条公开来源</small></div>
+      <div className={ready && transcripts === videos.length ? "ready" : "pending"}><span>状态</span><b>证据就绪度</b><strong>{ready && transcripts === videos.length ? "可蒸馏" : "待处理"}</strong><small>关键帧将在多模态蒸馏时冻结</small></div>
+    </section>
+    <Sources project={project} videos={videos} onCreated={onCreated} flash={flash} />
+  </div>;
+}
+
+type SkillTab = "distill" | "library" | "debug";
+
+function SkillWorkshop({ project, videos, skills, onCreated, onOpen, onRefresh, flash }: {
+  project: Project;
+  videos: VideoAsset[];
+  skills: Skill[];
+  onCreated: (job: JobState) => void;
+  onOpen: (skill: Skill) => void;
+  onRefresh: () => Promise<void>;
+  flash: (message: string, error?: boolean) => void;
+}) {
+  const [tab, setTab] = useState<SkillTab>(skills.length ? "library" : "distill");
+  return <div className="workspace-stack">
+    <WorkspaceTabs value={tab} onChange={setTab} items={[
+      { key: "distill", label: "蒸馏任务", note: "选择课堂与模态" },
+      { key: "library", label: `Skills (${skills.length})`, note: "检查产物与证据" },
+      { key: "debug", label: "调试运行", note: "单题查看执行 trace" },
+    ]} />
+    {tab === "distill"
+      ? <Distill project={project} videos={videos} onCreated={(job) => { onCreated(job); setTab("library"); }} flash={flash} />
+      : tab === "library"
+        ? <Skills project={project} skills={skills} onOpen={onOpen} onRefresh={onRefresh} flash={flash} />
+        : <Tutor project={project} skills={skills} />}
+  </div>;
+}
+
+type EvaluationTab = "datasets" | "quick" | "history" | "review";
+
+function EvaluationCenter({ project, datasets, runs, onRun }: {
+  project: Project;
+  datasets: BenchmarkDataset[];
+  runs: ExperimentSummary[];
+  onRun: () => Promise<void>;
+}) {
+  const [tab, setTab] = useState<EvaluationTab>("datasets");
+  const [datasetId, setDatasetId] = useState("");
+  const [unit, setUnit] = useState("all");
+  const [scenario, setScenario] = useState<BenchmarkScenario | undefined>();
+  const dataset = datasets.find((item) => item.benchmark_id === datasetId) ?? datasets[0];
+  const units = Array.from(new Set(dataset?.scenarios.map((item) => item.unit) ?? []));
+  const scenarios = dataset?.scenarios.filter((item) => unit === "all" || item.unit === unit) ?? [];
+
+  useEffect(() => {
+    if (!datasetId && datasets[0]) setDatasetId(datasets[0].benchmark_id);
+  }, [datasetId, datasets]);
+
+  function useScenario(item: BenchmarkScenario): void {
+    setScenario(item);
+    setTab("quick");
+  }
+
+  return <div className="workspace-stack">
+    <WorkspaceTabs value={tab} onChange={setTab} items={[
+      { key: "datasets", label: "数据集", note: `${datasets.reduce((sum, item) => sum + item.scenario_count, 0)} 个案例` },
+      { key: "quick", label: "快速实验", note: "Base / Text / Vision" },
+      { key: "history", label: "运行记录", note: `${runs.length} 次实验` },
+      { key: "review", label: "评审与报告", note: "验证闭环" },
+    ]} />
+
+    {tab === "datasets" && <section className="paper-panel dataset-panel">
+      <div className="dataset-head"><div><p className="eyebrow">VERSIONED BENCHMARK</p><h2>{dataset?.benchmark_id || "尚无评估数据集"}</h2><p>固定案例是可复现实验的起点。选择案例后进入快速实验，不会修改数据集。</p></div>{datasets.length > 1 && <select value={dataset?.benchmark_id} onChange={(event) => setDatasetId(event.target.value)}>{datasets.map((item) => <option key={item.benchmark_id} value={item.benchmark_id}>{item.benchmark_id}</option>)}</select>}</div>
+      {dataset && <>
+        <div className="dataset-metrics"><span><b>v{dataset.version}</b>数据集版本</span><span><b>{dataset.scenario_count}</b>案例总数</span><span><b>{units.length}</b>知识单元</span><span><b>{dataset.scenarios.filter((item) => item.visual_required).length}</b>视觉必需</span></div>
+        <div className="dataset-toolbar"><div className="segmented compact"><button className={unit === "all" ? "active" : ""} onClick={() => setUnit("all")}>全部</button>{units.map((item) => <button key={item} className={unit === item ? "active" : ""} onClick={() => setUnit(item)}>{item}</button>)}</div><small>{scenarios.length} cases</small></div>
+        <div className="scenario-grid">{scenarios.map((item) => <article key={item.id}><div><span className="scenario-id">{item.id}</span><span className={`difficulty ${item.difficulty}`}>{item.difficulty}</span>{item.visual_required && <span className="visual-required">视觉</span>}</div><h3>{item.question}</h3><p>{item.unit} · {item.error_type}</p><button onClick={() => useScenario(item)}>用于快速实验 →</button></article>)}</div>
+      </>}
+    </section>}
+
+    {tab === "quick" && <Experiments project={project} datasetId={dataset?.benchmark_id} scenario={scenario} onRun={onRun} />}
+
+    {tab === "history" && <section className="paper-panel history-panel"><div className="panel-title"><div><p className="eyebrow">IMMUTABLE RUNS</p><h2>实验运行记录</h2></div><span>{runs.length} runs</span></div>{runs.length ? <div className="history-list">{runs.map((run) => <article key={run.id}><span className={`run-status ${run.status}`} /> <div><b>{run.benchmark_id || "单题快速实验"}</b><p>{run.question || `${run.scenario_count} 个评估案例`}</p><small>{formatDate(run.created_at)} · {run.modes.map(modeLabel).join(" / ") || "历史三条件实验"}</small></div><strong>{run.source === "benchmark" ? `${run.scenario_count} cases` : run.status}</strong></article>)}</div> : <Blank title="还没有实验记录" text="从数据集中选择一条案例，运行第一次三条件比较。" />}</section>}
+
+    {tab === "review" && <div className="review-grid">
+      <section className="paper-panel review-card active"><span>01</span><p className="eyebrow">AVAILABLE NOW</p><h2>运行审计</h2><p>已记录实际模态、视觉证据数量、工具调用和回退原因，视觉回退不会伪装成有效多模态结果。</p></section>
+      <section className="paper-panel review-card"><span>02</span><p className="eyebrow">NEXT / P1</p><h2>单样本 Rubric</h2><p>对正确性、可执行性、学习检查、补救和证据忠实度逐项评分。</p></section>
+      <section className="paper-panel review-card"><span>03</span><p className="eyebrow">NEXT / P1</p><h2>盲化成对评审</h2><p>随机隐藏 Base 与 Candidate 身份，记录 A / B / 相当以及评审理由。</p></section>
+      <section className="paper-panel review-card"><span>04</span><p className="eyebrow">NEXT / P2</p><h2>验证报告</h2><p>按难度、错误类型和视觉需求输出胜率、回归案例、成本与统计区间。</p></section>
+    </div>}
+  </div>;
 }
 
 function Sources({ project, videos, onCreated, flash }: { project: Project; videos: VideoAsset[]; onCreated: (job: JobState) => void; flash: (message: string, error?: boolean) => void }) {
@@ -360,7 +476,7 @@ function Skills({ project, skills, onOpen, onRefresh, flash }: { project: Projec
     <h2>{skill.display_name || skill.name}</h2><p>{skill.summary || "可追溯的教学策略 Skill"}</p>
     <div className="skill-meta"><span>{skill.video_ids?.length || 0} 个来源</span><span>{skill.visual_asset_count || 0} 个视觉证据</span></div>
     <div className="card-actions"><button onClick={() => onOpen(skill)}>查看证据</button>{skill.job_id && <a href={`/api/jobs/${skill.job_id}/skills/${skill.name}/download`} download>下载</a>}<button className="danger-link" onClick={() => remove(skill)}>移除</button></div>
-  </article>) : <div className="full-empty"><Blank title="Skill Repository 为空" text="完成蒸馏后，每个教学策略都会以可验证版本出现在这里。" /></div>}</div>;
+  </article>) : <div className="full-empty"><Blank title="Skill 成果库为空" text="完成蒸馏后，每个教学策略都会以可验证版本出现在这里。" /></div>}</div>;
 }
 
 function Tutor({ project, skills }: { project: Project; skills: Skill[] }) {
@@ -405,22 +521,37 @@ function TutorAnswer({ result }: { result: TutorResult }) {
   </article>;
 }
 
-function Experiments({ project }: { project: Project }) {
-  const [question, setQuestion] = useState("");
+function Experiments({ project, datasetId, scenario, onRun }: {
+  project: Project;
+  datasetId?: string;
+  scenario?: BenchmarkScenario;
+  onRun: () => Promise<void>;
+}) {
+  const [question, setQuestion] = useState(scenario?.question || "");
   const [run, setRun] = useState<ExperimentRun | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    if (scenario) {
+      setQuestion(scenario.question);
+      setRun(null);
+    }
+  }, [scenario]);
+
   async function compare(): Promise<void> {
     if (question.trim().length < 4) return;
     setBusy(true); setError("");
-    try { setRun(await api<ExperimentRun>("/api/experiments/compare", { method: "POST", body: JSON.stringify({ project_id: project.id, question }) })); }
+    try {
+      setRun(await api<ExperimentRun>("/api/experiments/compare", { method: "POST", body: JSON.stringify({ project_id: project.id, question, benchmark_id: datasetId, scenario_id: scenario?.id }) }));
+      await onRun();
+    }
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   }
 
   return <div className="experiment-stack">
-    <section className="experiment-setup paper-panel"><div><p className="eyebrow">CONTROLLED COMPARISON</p><h2>同题、同模型、同一运行时</h2><p>只改变 Skill 与视觉证据条件，避免不同代码路径造成基线偏差。</p></div><div className="experiment-input"><textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="输入一条用于比较的学生问题……" /><button className="primary" disabled={busy || question.trim().length < 4} onClick={compare}>{busy ? "正在运行 3 个条件…" : "运行配对实验"}</button></div></section>
+    <section className="experiment-setup paper-panel"><div><p className="eyebrow">CONTROLLED COMPARISON</p><h2>同题、同模型、同一运行时</h2><p>只改变 Skill 与视觉证据条件。每次结果都会写入不可变运行记录，供后续回归和人工评审。</p>{scenario && <div className="scenario-context"><span>{scenario.id}</span><b>{scenario.unit}</b><small>{scenario.error_type} · {scenario.visual_required ? "视觉必需" : "文本可评"}</small></div>}</div><div className="experiment-input"><textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="从数据集选择案例，或输入一条临时学生问题……" /><button className="primary" disabled={busy || question.trim().length < 4} onClick={compare}>{busy ? "正在运行 3 个条件…" : "运行并保存实验"}</button></div></section>
     {error && <div className="inline-error">{error}</div>}
     {busy && <div className="compare-loading"><span /><span /><span /></div>}
     {run && !busy && <div className="compare-grid">{run.modes.map((mode) => {

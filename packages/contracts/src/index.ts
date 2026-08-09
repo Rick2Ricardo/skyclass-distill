@@ -118,7 +118,7 @@ export interface RuntimeSettings {
 
 export interface Health {
   ok: boolean;
-  studio: "anyteacher";
+  studio: "skyclass";
   backend: "node";
   ts_runtime: boolean;
   media_ready: boolean;
@@ -171,9 +171,41 @@ export interface ExperimentRun {
   project_id: string;
   question: string;
   created_at: string;
+  benchmark_id?: string;
+  scenario_id?: string;
   modes: TutorMode[];
   results: Partial<Record<TutorMode, TutorResult>>;
   errors: Partial<Record<TutorMode, string>>;
+}
+
+export interface BenchmarkScenario {
+  id: string;
+  unit: string;
+  difficulty: "basic" | "intermediate" | "advanced" | string;
+  visual_required: boolean;
+  error_type: string;
+  question: string;
+}
+
+export interface BenchmarkDataset {
+  benchmark_id: string;
+  version: number;
+  subject: string;
+  language: string;
+  scenario_count: number;
+  scenarios: BenchmarkScenario[];
+}
+
+export interface ExperimentSummary {
+  id: string;
+  project_id: string;
+  benchmark_id?: string;
+  question?: string;
+  created_at?: string;
+  scenario_count: number;
+  modes: TutorMode[];
+  status: "completed" | "partial" | "failed";
+  source: "quick" | "benchmark";
 }
 
 export interface QaHistoryItem {

@@ -4,7 +4,9 @@ import { createReadStream, existsSync } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import type {
+  BenchmarkDataset,
   ExperimentRun,
+  ExperimentSummary,
   Health,
   JobState,
   Project,
@@ -21,6 +23,7 @@ import { PipelineEngine } from "../../../packages/pipeline/src/engine.js";
 import { SettingsStore } from "../../../packages/runtime-config/src/settings.js";
 import { JobStore } from "../../../packages/store/src/jobStore.js";
 import { LibraryStore } from "../../../packages/store/src/libraryStore.js";
+import { EvaluationStore } from "../../../packages/store/src/evaluationStore.js";
 import { DATA_DIR, PORT, ROOT, WEB_DIST_DIR } from "./config.js";
 import { TutorService } from "./services/tutorService.js";
 
@@ -29,6 +32,7 @@ type RequestBody = Record<string, unknown>;
 const app = Fastify({ logger: true, bodyLimit: 2 * 1024 * 1024 * 1024 });
 const library = new LibraryStore(DATA_DIR);
 const jobs = new JobStore(DATA_DIR);
+const evaluations = new EvaluationStore(ROOT, DATA_DIR);
 const settings = new SettingsStore(ROOT, DATA_DIR);
 const pipeline = new PipelineEngine(ROOT, DATA_DIR, library, jobs, settings);
 const tutor = new TutorService(library, jobs, settings);
@@ -61,7 +65,7 @@ app.get("/api/health", async (): Promise<Health> => {
   const mediaReady = Boolean(runtime.ffmpeg && runtime.ffprobe && runtime.yt_dlp && (runtime.whisper_cli || apiConfigured));
   return {
     ok: true,
-    studio: "anyteacher",
+    studio: "skyclass",
     backend: "node",
     ts_runtime: true,
     media_ready: mediaReady,
@@ -279,17 +283,26 @@ app.post("/api/experiments/compare", async (request, reply): Promise<ExperimentR
     const modes = Array.isArray(body.modes) ? body.modes.filter((mode): mode is TutorMode => ["base", "text_skill", "multimodal_skill"].includes(String(mode))) : undefined;
     if (!projectId) return reply.code(400).send({ detail: "缺少项目" });
     if (question.length < 4) return reply.code(400).send({ detail: "请输入至少 4 个字符的实验问题" });
-    return await tutor.compare(projectId, question, modes);
+    const run = await tutor.compare(projectId, question, modes);
+    run.benchmark_id = typeof body.benchmark_id === "string" ? body.benchmark_id : undefined;
+    run.scenario_id = typeof body.scenario_id === "string" ? body.scenario_id : undefined;
+    await evaluations.saveRun(run);
+    return run;
   } catch (error) { return httpError(reply, error, 502); }
 });
+
+app.get("/api/evaluations/datasets", async (): Promise<BenchmarkDataset[]> => evaluations.listDatasets());
+app.get("/api/projects/:id/experiments", async (request): Promise<ExperimentSummary[]> => (
+  evaluations.listRuns(paramsOf<{ id: string }>(request).id)
+));
 
 app.get("/api/projects/:id/qa", async (request) => (await jobs.list()).filter((job) => job.project_id === paramsOf<{ id: string }>(request).id && job.kind === "qa"));
 
 app.setNotFoundHandler(async (request, reply) => {
   if (request.url.startsWith("/api/")) return reply.code(404).send({ detail: "Not found" });
   if (existsSync(join(webRoot, "index.html"))) return reply.sendFile("index.html");
-  return reply.code(503).type("text/plain").send("AnyTeacher Studio 尚未构建，请运行 npm run build:web");
+  return reply.code(503).type("text/plain").send("SkyClass Distill 尚未构建，请运行 npm run build:web");
 });
 
 await app.listen({ host: "127.0.0.1", port: PORT });
-console.log(`AnyTeacher Studio running at http://127.0.0.1:${PORT}`);
+console.log(`SkyClass Distill running at http://127.0.0.1:${PORT}`);
