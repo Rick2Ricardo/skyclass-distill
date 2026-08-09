@@ -231,7 +231,6 @@ function App() {
       <section className={`content ${view === "studio" ? "studio-content" : ""}`}>{content}</section>
     </main>
 
-    <JobRail jobs={projectJobs} onCancel={async (id) => { await api(`/api/jobs/${id}/cancel`, { method: "POST" }); await loadJobs(); }} />
     {notice && <div className="toast success">{notice}</div>}
     {error && <div className="toast error">{error}</div>}
     {projectDialog && <ProjectDialog onClose={() => setProjectDialog(false)} onCreated={async (created) => { setProjectDialog(false); await loadProjects(created.id); setView("evidence"); flash("项目已创建"); }} />}
@@ -793,15 +792,6 @@ function Experiments({ project, datasetId, scenario, onRun }: {
     })}</div>}
     {!run && !busy && <section className="paper-panel experiment-guide"><p className="eyebrow">EXPERIMENT MATRIX</p><div>{(["base", "text_skill", "multimodal_skill"] as TutorMode[]).map((mode, index) => <article key={mode}><span>0{index + 1}</span><b>{modeLabel(mode)}</b><p>{mode === "base" ? "不读取任何课堂 Skill" : mode === "text_skill" ? "读取结构化教学策略，不提供关键帧" : "读取教学策略并提供可追溯视觉证据"}</p></article>)}</div></section>}
   </div>;
-}
-
-function JobRail({ jobs, onCancel }: { jobs: JobState[]; onCancel: (id: string) => Promise<void> }) {
-  const [open, setOpen] = useState(false);
-  const active = jobs.filter((item) => item.status === "running" || item.status === "queued");
-  return <aside className={`job-rail ${open ? "open" : ""}`}>
-    <button className="job-trigger" onClick={() => setOpen(!open)}><span>{active.length || jobs.length}</span><div><b>{active.length ? "后台任务进行中" : "任务记录"}</b><small>{active.length ? active.map((job) => `${percent(job.progress)} ${job.stage}`).join(" · ") : "查看最近处理状态"}</small></div><i>{open ? "×" : "↑"}</i></button>
-    {open && <div className="job-drawer"><div className="job-drawer-head"><p className="eyebrow">BACKGROUND RUNS</p><h2>任务与溯源</h2></div>{jobs.length ? jobs.slice(0, 8).map((job) => <div className="job-detail" key={job.id}><JobRow job={job} />{(job.status === "running" || job.status === "queued") && <><div className="progress"><span style={{ width: percent(job.progress) }} /></div><button onClick={() => onCancel(job.id)}>取消任务</button></>}</div>) : <Blank title="没有任务" text="新任务会在这里持续更新。" />}</div>}
-  </aside>;
 }
 
 function JobRow({ job }: { job: JobState }) {
