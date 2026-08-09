@@ -1,0 +1,6 @@
+{
+  "name": "@anyteacher/skills",
+  "private": true,
+  "type": "module",
+  "exports": "./src/builder.ts"
+}

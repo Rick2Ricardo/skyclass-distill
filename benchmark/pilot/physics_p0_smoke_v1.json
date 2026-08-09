@@ -1,0 +1,36 @@
+{
+  "benchmark_id": "physics-p0-smoke-v1",
+  "version": 1,
+  "subject": "高中物理",
+  "language": "zh-CN",
+  "scenario_count": 24,
+  "scenarios": [
+    {"id":"motion-01","unit":"运动的描述","difficulty":"basic","visual_required":false,"error_type":"概念混淆","question":"我总把路程和位移混在一起，请先用一个生活例子讲清楚，再出一道小题检查我。"},
+    {"id":"motion-02","unit":"运动的描述","difficulty":"basic","visual_required":true,"error_type":"表征转换","question":"请用坐标轴和箭头解释位置、位移和路程之间的区别，然后让我自己画一次。"},
+    {"id":"motion-03","unit":"运动的描述","difficulty":"basic","visual_required":false,"error_type":"时间时刻混淆","question":"第 2 秒和前 2 秒为什么不是一回事？请诊断我可能错在哪里。"},
+    {"id":"motion-04","unit":"运动的描述","difficulty":"intermediate","visual_required":false,"error_type":"模型条件遗漏","question":"研究火车运动时什么时候能看成质点，什么时候不能？不要只告诉我结论。"},
+    {"id":"motion-05","unit":"运动的描述","difficulty":"intermediate","visual_required":true,"error_type":"图像读取","question":"速度—时间图像的斜率和面积各表示什么？请配合图像思路逐步检查我。"},
+    {"id":"motion-06","unit":"运动的描述","difficulty":"intermediate","visual_required":true,"error_type":"方向符号","question":"物体先向东再向西，我不会在坐标轴上表示速度和位移的正负，请一步步教我。"},
+
+    {"id":"force-01","unit":"相互作用与运动定律","difficulty":"basic","visual_required":true,"error_type":"漏力","question":"我画受力图时总是漏力，请教我一个能自检的画图顺序。"},
+    {"id":"force-02","unit":"相互作用与运动定律","difficulty":"basic","visual_required":false,"error_type":"作用反作用混淆","question":"作用力和反作用力为什么不能互相抵消？请用具体物体来讲。"},
+    {"id":"force-03","unit":"相互作用与运动定律","difficulty":"intermediate","visual_required":true,"error_type":"方向判断","question":"斜面上的物块受到哪些力？请先让我判断，再根据我的回答补救。"},
+    {"id":"force-04","unit":"相互作用与运动定律","difficulty":"intermediate","visual_required":false,"error_type":"惯性误解","question":"物体运动就一定受向前的力吗？我觉得不受力就会停，请帮我纠正。"},
+    {"id":"force-05","unit":"相互作用与运动定律","difficulty":"advanced","visual_required":true,"error_type":"整体隔离选择","question":"连接体问题什么时候用整体法、什么时候用隔离法？请给我一个可操作的选择标准。"},
+    {"id":"force-06","unit":"相互作用与运动定律","difficulty":"advanced","visual_required":false,"error_type":"公式套用","question":"为什么牛顿第二定律中的合力和加速度必须对应同一个研究对象？"},
+
+    {"id":"energy-01","unit":"机械能","difficulty":"basic","visual_required":false,"error_type":"功的正负","question":"力做正功和负功到底看什么？请用位移方向带我判断。"},
+    {"id":"energy-02","unit":"机械能","difficulty":"intermediate","visual_required":true,"error_type":"过程图景缺失","question":"小球沿斜面下滑时动能和重力势能怎样变化？请画出过程关系再检查我。"},
+    {"id":"energy-03","unit":"机械能","difficulty":"intermediate","visual_required":false,"error_type":"守恒条件遗漏","question":"有摩擦时机械能为什么不守恒？能量是不是消失了？"},
+    {"id":"energy-04","unit":"机械能","difficulty":"advanced","visual_required":true,"error_type":"零势能面误解","question":"重力势能的零点可以随便选，为什么最后答案还能一致？请用图示解释。"},
+    {"id":"energy-05","unit":"机械能","difficulty":"advanced","visual_required":false,"error_type":"系统边界","question":"判断机械能守恒时，应该怎样选系统？请给我一个分步骤检查表。"},
+    {"id":"energy-06","unit":"机械能","difficulty":"advanced","visual_required":true,"error_type":"图像迁移","question":"请教我怎样从势能曲线判断平衡位置、受力方向和运动范围。"},
+
+    {"id":"electric-01","unit":"静电场","difficulty":"basic","visual_required":true,"error_type":"场线误读","question":"电场线是真实存在的吗？怎样从电场线图判断场强方向和强弱？"},
+    {"id":"electric-02","unit":"静电场","difficulty":"intermediate","visual_required":false,"error_type":"电势场强混淆","question":"电势为零的地方电场强度一定为零吗？请用反例帮我理解。"},
+    {"id":"electric-03","unit":"静电场","difficulty":"intermediate","visual_required":true,"error_type":"等势面读取","question":"我不会从等势线判断电场方向，请用图示规则一步步带我做。"},
+    {"id":"electric-04","unit":"静电场","difficulty":"advanced","visual_required":false,"error_type":"功与能符号","question":"负电荷沿电场线方向移动时，电场力做什么功，电势能怎么变？"},
+    {"id":"electric-05","unit":"静电场","difficulty":"advanced","visual_required":true,"error_type":"矢量叠加","question":"两个点电荷产生的电场怎样在一点叠加？请让我先画方向再算大小。"},
+    {"id":"electric-06","unit":"静电场","difficulty":"advanced","visual_required":false,"error_type":"条件迁移","question":"平行板电容器断开电源后再拉开极板，场强、电势差和能量怎样变？请先明确不变量。"}
+  ]
+}

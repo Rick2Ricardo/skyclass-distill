@@ -1,0 +1,929 @@
+from __future__ import annotations
+
+import json
+import shutil
+import threading
+import traceback
+import uuid
+from pathlib import Path
+from typing import Any, Callable
+
+from .artifacts import VersionedJsonArtifact, atomic_write_json, content_fingerprint
+from .code_assets import CODE_ASSET_PROMPT_VERSION, add_executable_assets
+from .config import Settings
+from .distiller import (
+    MULTIMODAL_FRAMES_PER_CHUNK, MULTIMODAL_FRAMES_PER_LESSON,
+    analyze_lesson, analyze_lesson_multimodal,
+    distill_common, distill_common_multimodal,
+    distill_single, distill_single_multimodal, offline_draft,
+)
+from .downloader import download_item, valid_media
+from .frame_extractor import FRAME_EXTRACTOR_VERSION, extract_keyframes
+from .llm import LLMClient
+from .library import LibraryStore
+from .models import JobEvent, JobState, PipelineRequest, QARequest
+from .prompts import (
+    ANALYSIS_PROMPT_VERSION, DISTILL_PROMPT_VERSION,
+    MULTIMODAL_ANALYSIS_PROMPT_VERSION, MULTIMODAL_DISTILL_PROMPT_VERSION,
+)
+from .skill_builder import build_skill_suite
+from .skill_qa import (
+    QA_JUDGE_VERSION, QA_PROMPT_VERSION, QA_TURN_SCHEMA_VERSION, blind_answers,
+    collect_project_skill_records, delivery_audit, generate_answer,
+    generate_followup_answer, judge_answers, normalize_answer, public_skill_cards,
+    rank_skill_records, select_skills,
+)
+from .sources import discover
+from .store import JobStore
+from .transcriber import transcribe
+
+
+def _attach_visual_sources(
+    suite: dict[str, Any], videos: list[Any], frame_indexes: dict[str, dict[str, Any]],
+) -> None:
+    """Resolve model-returned frame IDs only against frames extracted for this job."""
+    by_lesson: dict[tuple[str, str], tuple[Any, dict[str, Any]]] = {}
+    by_id: dict[str, list[tuple[Any, dict[str, Any]]]] = {}
+    for video in videos:
+        for frame in frame_indexes.get(video.id, {}).get("frames", []):
+            frame_id = str(frame.get("frame_id", ""))
+            if not frame_id:
+                continue
+            by_lesson[(video.title, frame_id)] = (video, frame)
+            by_id.setdefault(frame_id, []).append((video, frame))
+    for capability in suite.get("capabilities", []):
+        for evidence in capability.get("evidence", []):
+            evidence.pop("frame_path", None)
+            frame_id = str(evidence.get("frame_id", "")).split("@", 1)[0]
+            if not frame_id:
+                continue
+            resolved = by_lesson.get((str(evidence.get("lesson", "")), frame_id))
+            if resolved is None and len(by_id.get(frame_id, [])) == 1:
+                resolved = by_id[frame_id][0]
+            if resolved is None:
+                continue
+            video, frame = resolved
+            evidence["frame_id"] = frame_id
+            evidence["frame_path"] = str(frame["path"])
+            evidence["source_video_id"] = video.id
+            evidence["frame_timestamp"] = _seconds_to_timestamp(float(frame.get("timestamp", 0)))
+            evidence["frame_selection_reason"] = frame.get("selection_reason")
+            evidence.setdefault("timestamp", _seconds_to_timestamp(float(frame.get("timestamp", 0))))
+
+
+def _seconds_to_timestamp(seconds: float) -> str:
+    minutes, second = divmod(int(seconds), 60)
+    return f"{minutes:02d}:{second:02d}"
+
+
+class PipelineManager:
+    def __init__(self, settings_loader: Callable[[], Settings]):
+        self.settings_loader = settings_loader
+        self.settings = settings_loader()
+        self.store = JobStore(self.settings.data_dir)
+        self.library = LibraryStore(self.settings.data_dir)
+        self._threads: dict[str, threading.Thread] = {}
+        self._cancel: set[str] = set()
+        self._lock = threading.RLock()
+
+    def create(self, request: PipelineRequest) -> JobState:
+        job = JobState(id=uuid.uuid4().hex[:10], request=request)
+        job.events.append(JobEvent(message="任务已创建，等待启动", level="info"))
+        self.store.save(job)
+        return job
+
+    def create_ingest(self, project_id: str, request: PipelineRequest, items=None) -> JobState:
+        self.library.get_project(project_id)
+        job = JobState(
+            id=uuid.uuid4().hex[:10], request=request, kind="ingest",
+            project_id=project_id, items=items or [],
+        )
+        job.events.append(JobEvent(message="视频入库任务已创建：仅下载并转录，不调用蒸馏 API"))
+        self.store.save(job)
+        return job
+
+    def create_distill(
+        self,
+        project_id: str,
+        video_ids: list[str],
+        mode: str,
+        modality: str = "text",
+        generate_executable_assets: bool = False,
+    ) -> JobState:
+        project = self.library.get_project(project_id)
+        unique_ids = list(dict.fromkeys(video_ids))
+        if mode not in {"single", "common"}:
+            raise ValueError("蒸馏范围必须是单视频或共性 Skills")
+        if modality not in {"text", "multimodal"}:
+            raise ValueError("蒸馏模态必须是纯文本或多模态")
+        if mode == "single" and len(unique_ids) != 1:
+            raise ValueError("单视频 Skill 必须且只能选择 1 个视频")
+        if mode == "common" and len(unique_ids) < 4:
+            raise ValueError("共性 Skills 至少需要选择 4 个视频")
+        videos = [self.library.get_video(video_id) for video_id in unique_ids]
+        if any(video.project_id != project_id for video in videos):
+            raise ValueError("所选视频不属于当前项目")
+        if any(video.deleted_at for video in videos):
+            raise ValueError("所选视频已从项目视频池删除，请刷新后重新选择")
+        job = JobState(
+            id=uuid.uuid4().hex[:10],
+            request=PipelineRequest(source_url=f"project://{project_id}", limit=len(videos), subject=project.subject, grade=project.grade),
+            kind="distill", project_id=project_id, video_ids=unique_ids,
+            distill_mode=mode, distill_modality=modality,
+            generate_executable_assets=generate_executable_assets,
+        )
+        label = "单视频 Skill" if mode == "single" else "共性 Skills"
+        modality_label = "多模态" if modality == "multimodal" else "纯文本"
+        asset_label = " · 可执行图示/实验" if generate_executable_assets else ""
+        job.events.append(JobEvent(message=f"{label} · {modality_label}{asset_label}蒸馏任务已创建，已选择 {len(videos)} 个视频"))
+        self.store.save(job)
+        return job
+
+    def create_qa(self, project_id: str, payload: QARequest) -> JobState:
+        project = self.library.get_project(project_id)
+        records = collect_project_skill_records(
+            project_id, self.store.list(), self.library.skill_deleted,
+        )
+        if not records:
+            raise ValueError("当前项目没有可用 Skill，请先完成一次蒸馏")
+        job = JobState(
+            id=uuid.uuid4().hex[:10],
+            request=PipelineRequest(
+                source_url=f"project://{project_id}/qa",
+                limit=1,
+                subject=project.subject,
+                grade=project.grade,
+            ),
+            kind="qa",
+            project_id=project_id,
+            qa_mode=payload.mode,
+            qa_question=payload.question.strip(),
+            qa_skill_modality=payload.skill_modality,
+            qa_max_skills=payload.max_skills,
+        )
+        label = "匿名 A/B 实验" if payload.mode == "ab" else "Skill QA"
+        modality = "多模态 Skill" if payload.skill_modality == "multimodal" else "文本 Skill"
+        job.events.append(JobEvent(message=f"{label}任务已创建 · {modality} · 最多选择 {payload.max_skills} 个 Skills"))
+        self.store.save(job)
+        return job
+
+    def create_qa_followup(self, parent_job_id: str, student_response: str) -> JobState:
+        parent = self.store.get(parent_job_id)
+        if parent.kind != "qa" or parent.qa_mode != "qa":
+            raise ValueError("只有已完成的直接授课任务可以继续回答")
+        if parent.status != "completed":
+            raise ValueError("上一轮教学尚未完成")
+        if not parent.project_id or not parent.qa_question:
+            raise ValueError("上一轮教学缺少项目或问题信息")
+        response = student_response.strip()
+        if not response:
+            raise ValueError("学生回答不能为空")
+        project = self.library.get_project(parent.project_id)
+        job = JobState(
+            id=uuid.uuid4().hex[:10],
+            request=PipelineRequest(
+                source_url=f"project://{parent.project_id}/qa/{parent.id}",
+                limit=1,
+                subject=project.subject,
+                grade=project.grade,
+            ),
+            kind="qa",
+            project_id=parent.project_id,
+            qa_mode="qa",
+            qa_question=parent.qa_question,
+            qa_skill_modality=parent.qa_skill_modality,
+            qa_max_skills=parent.qa_max_skills,
+            qa_parent_id=parent.id,
+            qa_student_response=response,
+        )
+        job.events.append(JobEvent(message="已收到学生回答，正在进入学习检查与下一步教学"))
+        self.store.save(job)
+        return job
+
+    def start(self, job_id: str) -> JobState:
+        job = self.store.get(job_id)
+        with self._lock:
+            thread = self._threads.get(job_id)
+            if thread and thread.is_alive():
+                return job
+            self._cancel.discard(job_id)
+            job.status = "queued"
+            job.error = None
+            job.artifacts.pop("traceback", None)
+            self.store.save(job)
+            thread = threading.Thread(target=self.run, args=(job_id,), name=f"pipeline-{job_id}", daemon=True)
+            self._threads[job_id] = thread
+            thread.start()
+        return self.store.get(job_id)
+
+    def cancel(self, job_id: str) -> JobState:
+        with self._lock:
+            self._cancel.add(job_id)
+        job = self.store.get(job_id)
+        self.store.event(job, "已请求取消；当前原子步骤结束后停止", "warning")
+        return job
+
+    def delete_project(self, project_id: str, permanent: bool = False) -> dict:
+        self.library.get_project(project_id)
+        if not permanent:
+            self.library.delete_project(project_id)
+            return {"deleted": True, "permanent": False, "released_bytes": 0}
+
+        jobs = [job for job in self.store.list() if job.project_id == project_id]
+        active = [job for job in jobs if job.status in {"queued", "running"}]
+        if active:
+            raise ValueError("项目仍有运行中的任务，请等待完成或取消任务后再永久删除")
+
+        settings = self.settings_loader()
+        root = settings.data_dir.resolve()
+        videos = self.library.list_videos(project_id, include_deleted=True)
+        targets: set[Path] = set()
+        for job in jobs:
+            targets.update({
+                root / "media" / job.id,
+                root / "transcripts" / job.id,
+                root / "analysis" / job.id,
+                root / "skills" / job.id,
+                root / "projects" / project_id / "skills" / job.id,
+            })
+        for video in videos:
+            targets.add(root / "analysis" / "videos" / f"{video.id}.json")
+            targets.add(root / "analysis" / "videos" / f"{video.id}.meta.json")
+            targets.add(root / "analysis" / "videos" / f"{video.id}.multimodal.json")
+            targets.add(root / "analysis" / "videos" / f"{video.id}.multimodal.meta.json")
+            targets.add(root / "visual" / "videos" / video.id)
+            for value in video.artifacts.values():
+                path = Path(str(value))
+                targets.add(path if path.is_absolute() else root / path)
+
+        safe_targets: list[Path] = []
+        for target in targets:
+            resolved = target.resolve()
+            if resolved != root and root in resolved.parents and resolved.exists():
+                safe_targets.append(resolved)
+        files_to_delete: set[Path] = set()
+        for target in safe_targets:
+            if target.is_file():
+                files_to_delete.add(target)
+            elif target.is_dir():
+                files_to_delete.update(path.resolve() for path in target.rglob("*") if path.is_file())
+        released_bytes = sum(path.stat().st_size for path in files_to_delete if path.exists())
+        for target in sorted(safe_targets, key=lambda path: len(path.parts), reverse=True):
+            if not target.exists():
+                continue
+            shutil.rmtree(target) if target.is_dir() else target.unlink(missing_ok=True)
+        for job in jobs:
+            self.store.path(job.id).unlink(missing_ok=True)
+        project_skills = root / "projects" / project_id
+        if project_skills.exists():
+            shutil.rmtree(project_skills)
+        self.library.purge_project_catalog(project_id)
+        return {
+            "deleted": True,
+            "permanent": True,
+            "released_bytes": released_bytes,
+            "video_count": len(videos),
+            "job_count": len(jobs),
+        }
+
+    def _check_cancel(self, job: JobState) -> None:
+        if job.id in self._cancel:
+            job.status = "cancelled"
+            job.stage = "cancelled"
+            self.store.event(job, "任务已取消", "warning")
+            raise PipelineCancelled()
+
+    def _stage(self, job: JobState, stage: str, progress: float, message: str) -> None:
+        job.stage = stage
+        job.progress = round(progress, 3)
+        self.store.event(job, message)
+
+    def run(self, job_id: str) -> JobState:
+        settings = self.settings_loader()
+        job = self.store.get(job_id)
+        job.status = "running"
+        job.error = None
+        self.store.save(job)
+        try:
+            if job.kind == "distill":
+                return self._run_project_distill(job, settings)
+            if job.kind == "qa":
+                return self._run_project_qa(job, settings)
+            local_source = job.request.source_url.startswith("local://")
+            self._stage(job, "discover", 0.02, "正在读取本地视频" if local_source else "正在解析课程列表")
+            if not job.items:
+                job.items = discover(
+                    job.request.source_url,
+                    job.request.limit,
+                    cookie_browser=settings.video_cookie_browser,
+                )
+                if not job.items:
+                    raise RuntimeError("未发现课程视频")
+                self.store.event(job, f"发现 {len(job.items)} 个视频", "success")
+            self._check_cancel(job)
+
+            media_dir = settings.data_dir / "media" / job.id
+            transcript_dir = settings.data_dir / "transcripts" / job.id
+            analysis_dir = settings.data_dir / "analysis" / job.id
+            analysis_dir.mkdir(parents=True, exist_ok=True)
+            item_artifacts = job.artifacts.setdefault("items", {})
+            transcripts: list[tuple[str, dict]] = []
+            total = len(job.items)
+
+            for idx, item in enumerate(job.items):
+                self._check_cancel(job)
+                job.current_item = idx + 1
+                base = 0.08 + 0.37 * idx / total
+                self._stage(job, "download", base, f"下载 {idx + 1}/{total} · {item.title}")
+                record = item_artifacts.setdefault(item.id, {})
+                media_ok = (
+                    bool(record.get("video") and record.get("audio"))
+                    and valid_media(Path(record["video"]), item.duration)
+                    and valid_media(Path(record["audio"]), item.duration)
+                )
+                if not media_ok:
+                    files = download_item(
+                        item, media_dir,
+                        max_height=job.request.max_video_height or settings.max_video_height,
+                        log=lambda msg: self.store.event(job, msg),
+                        cookie_browser=settings.video_cookie_browser,
+                    )
+                    record.update(files)
+                    self.store.save(job)
+                self._stage(job, "transcribe", base + 0.19 / total, f"转写 {idx + 1}/{total} · {item.title}")
+                transcript = transcribe(
+                    Path(record["audio"]), transcript_dir,
+                    model_name=job.request.whisper_model or settings.whisper_model,
+                    language=job.request.language,
+                    log=lambda msg: self.store.event(job, msg),
+                )
+                record["transcript_json"] = str(transcript_dir / f"{Path(record['audio']).stem}.json")
+                record["transcript_txt"] = str(transcript_dir / f"{Path(record['audio']).stem}.txt")
+                record["transcript_srt"] = str(transcript_dir / f"{Path(record['audio']).stem}.srt")
+                transcripts.append((item.title, transcript))
+                self.store.event(job, f"《{item.title}》转写完成", "success")
+                self.store.save(job)
+
+            if job.kind == "ingest":
+                video_ids = []
+                for item in job.items:
+                    record = item_artifacts[item.id]
+                    video = self.library.add_video(
+                        project_id=str(job.project_id), title=item.title, source_url=item.source_url,
+                        source=item.source, duration=item.duration, cover_url=item.cover_url,
+                        job_id=job.id, course_item_id=item.id,
+                        artifacts={key: str(value) for key, value in record.items()}, metadata=item.metadata,
+                    )
+                    video_ids.append(video.id)
+                job.artifacts["video_ids"] = video_ids
+                job.status = "completed"
+                job.stage = "completed"
+                job.progress = 1
+                self.store.event(job, f"入库完成：{len(video_ids)} 个视频已可用于蒸馏", "success")
+                return self.store.save(job)
+
+            self._check_cancel(job)
+            client = LLMClient(
+                settings.llm_base_url,
+                settings.llm_api_key,
+                settings.llm_model,
+                timeout=settings.llm_timeout_seconds,
+                max_attempts=settings.llm_max_attempts,
+            )
+            analyses: list[dict] = []
+            if client.configured:
+                for idx, (title, transcript) in enumerate(transcripts):
+                    self._stage(job, "analyze", 0.56 + 0.22 * idx / total, f"教研分析 {idx + 1}/{total} · {title}")
+                    target = analysis_dir / f"lesson-{idx + 1:03d}.json"
+                    artifact = VersionedJsonArtifact(target, ANALYSIS_PROMPT_VERSION)
+                    fingerprint = content_fingerprint(title, job.request.subject, transcript)
+                    analysis = artifact.load(fingerprint)
+                    if analysis is None:
+                        analysis = analyze_lesson(client, title, job.request.subject, transcript, lambda msg: self.store.event(job, msg))
+                        artifact.save(analysis, fingerprint)
+                    else:
+                        self.store.event(job, f"复用已验证的单课分析 · {title}")
+                    analyses.append(analysis)
+                self._stage(job, "distill", 0.82, "正在跨课程聚类共性教学能力")
+                checkpoint = VersionedJsonArtifact(analysis_dir / "skill-suite.checkpoint.json", DISTILL_PROMPT_VERSION)
+                distill_fingerprint = content_fingerprint(analyses)
+                suite = distill_common(
+                    client,
+                    analyses,
+                    lambda msg: self.store.event(job, msg),
+                    initial_suite=checkpoint.load(distill_fingerprint),
+                    checkpoint=lambda payload: checkpoint.save(payload, distill_fingerprint),
+                )
+            else:
+                self._stage(job, "distill", 0.82, "未配置 API，生成带低置信度标记的离线草案")
+                self.store.event(job, "配置中转 API 后重跑可获得语义级教学能力蒸馏", "warning")
+                suite = offline_draft(transcripts)
+
+            suite_file = analysis_dir / "skill-suite.json"
+            atomic_write_json(suite_file, suite)
+            self._check_cancel(job)
+            self._stage(job, "package", 0.94, "打包并验证 Skills")
+            skills_dir = settings.data_dir / "skills" / job.id
+            provenance = {
+                "job_id": job.id, "source_url": job.request.source_url,
+                "courses": [{"id": item.id, "title": item.title, "url": item.source_url} for item in job.items],
+                "whisper_model": job.request.whisper_model or settings.whisper_model,
+                "llm_model": settings.llm_model if client.configured else None,
+                "analysis_prompt_version": ANALYSIS_PROMPT_VERSION,
+                "distill_prompt_version": DISTILL_PROMPT_VERSION,
+                "analysis_file": str(suite_file),
+            }
+            built = build_skill_suite(suite, skills_dir, job.request.subject, provenance)
+            if not built:
+                raise RuntimeError("未生成任何 Skill：视频内容中缺少足够、可操作且有转写证据支持的教学方法")
+            invalid = [item for item in built if not item.get("valid")]
+            if invalid:
+                detail = "; ".join(f"{item['name']}: {', '.join(item.get('errors', []))}" for item in invalid)
+                raise RuntimeError(f"Skill 打包校验失败：{detail}")
+            if client.configured:
+                checkpoint.clear()
+            job.artifacts.update({"analysis": str(suite_file), "skills_dir": str(skills_dir), "skills": built})
+            job.status = "completed"
+            job.stage = "completed"
+            job.progress = 1
+            self.store.event(job, f"流水线完成：生成 {len(built)} 个 Skills", "success")
+            return self.store.save(job)
+        except PipelineCancelled:
+            return self.store.get(job_id)
+        except Exception as exc:
+            job.status = "failed"
+            job.stage = "failed"
+            job.error = str(exc)
+            job.artifacts["traceback"] = traceback.format_exc(limit=8)
+            self.store.event(job, f"任务失败：{exc}", "error")
+            return self.store.save(job)
+
+    def _qa_directory(self, project_id: str, settings: Settings | None = None) -> Path:
+        active_settings = settings or self.settings_loader()
+        return active_settings.data_dir / "projects" / project_id / "qa"
+
+    def _run_project_qa(self, job: JobState, settings: Settings) -> JobState:
+        if not job.project_id or not job.qa_question or not job.qa_mode:
+            raise RuntimeError("QA 任务参数不完整")
+        client = LLMClient(
+            settings.llm_base_url, settings.llm_api_key, settings.llm_model,
+            timeout=settings.llm_timeout_seconds, max_attempts=settings.llm_max_attempts,
+        )
+        if not client.configured:
+            raise RuntimeError("无法运行 Skill QA：尚未配置中转 API")
+
+        self._stage(job, "qa-retrieve", 0.08, "正在从当前项目检索候选 Skills")
+        records = collect_project_skill_records(
+            job.project_id, self.store.list(), self.library.skill_deleted,
+        )
+        if not records:
+            raise RuntimeError("当前项目没有可用 Skill，请先完成一次蒸馏")
+        parent_result: dict[str, Any] = {}
+        if job.qa_parent_id:
+            parent = self.store.get(job.qa_parent_id)
+            parent_result = dict(parent.artifacts.get("qa") or {})
+            selected_keys = {
+                str(card.get("key") or "")
+                for card in parent_result.get("selected_skills", [])
+            }
+            selected = [record for record in records if record["key"] in selected_keys]
+            if not selected:
+                raise RuntimeError("上一轮使用的 Skills 已不可用，无法继续同一教学回合")
+            selection = dict(parent_result.get("selection") or {})
+            selection["reason"] = str(selection.get("reason") or "") + "（沿用上一轮 Skills）"
+            self._stage(job, "qa-select", 0.18, "正在沿用上一轮教学 Skills")
+        else:
+            shortlist = rank_skill_records(job.qa_question, records, limit=min(8, len(records)))
+            self._check_cancel(job)
+            self._stage(job, "qa-select", 0.18, f"正在从 {len(shortlist)} 个候选中选择可组合 Skills")
+            selected, selection = select_skills(
+                client, job.qa_question, shortlist, max(1, min(job.qa_max_skills, 5)),
+            )
+        self.store.event(
+            job,
+            "已选择：" + "、".join(record["name"] for record in selected),
+            "success",
+        )
+        self._check_cancel(job)
+
+        qa_dir = self._qa_directory(job.project_id, settings)
+        qa_dir.mkdir(parents=True, exist_ok=True)
+        public_file = qa_dir / f"{job.id}.json"
+        common = {
+            "job_id": job.id,
+            "project_id": job.project_id,
+            "question": job.qa_question,
+            "mode": job.qa_mode,
+            "skill_modality": job.qa_skill_modality,
+            "model": settings.llm_model,
+            "prompt_version": QA_PROMPT_VERSION,
+            "parent_job_id": job.qa_parent_id,
+            "student_response": job.qa_student_response or "",
+            "protocol": {
+                "baseline_version": "v1-c974bac",
+                "turn_schema_version": QA_TURN_SCHEMA_VERSION,
+                "judge_version": QA_JUDGE_VERSION,
+                "model": settings.llm_model,
+                "prompt_version": QA_PROMPT_VERSION,
+                "temperature": 0.2 if job.qa_mode == "qa" else 0,
+                "max_skills": job.qa_max_skills,
+            },
+        }
+
+        if job.qa_mode == "qa":
+            if job.qa_parent_id:
+                previous_answer = parent_result.get("answer")
+                if not isinstance(previous_answer, dict) or not job.qa_student_response:
+                    raise RuntimeError("上一轮教学结果不完整，无法评估学生回答")
+                self._stage(job, "qa-assess", 0.48, "正在评估学生回答并选择下一步")
+                answer = normalize_answer(generate_followup_answer(
+                    client,
+                    job.qa_question,
+                    job.request.subject,
+                    previous_answer,
+                    job.qa_student_response,
+                    selected=selected,
+                    modality=job.qa_skill_modality,
+                    temperature=0.2,
+                ))
+            else:
+                self._stage(job, "qa-answer", 0.48, "正在使用所选 Skills 生成教学回答")
+                answer = normalize_answer(generate_answer(
+                    client,
+                    job.qa_question,
+                    job.request.subject,
+                    selected=selected,
+                    modality=job.qa_skill_modality,
+                    temperature=0.2,
+                ))
+            engine = answer.get("delivery", {}).get("engine", "direct")
+            if engine == "pi-agent":
+                tool_count = len(answer.get("delivery", {}).get("tool_calls", []))
+                self.store.event(
+                    job,
+                    f"Pi Agent 已完成教学循环，共执行 {tool_count} 次受限工具调用",
+                    "success",
+                )
+            elif answer.get("delivery", {}).get("agent_fallback_reason"):
+                self.store.event(
+                    job,
+                    "Pi Agent 未完成，本轮已回退到原有直接生成链路",
+                    "warning",
+                )
+            if answer.get("delivery", {}).get("fallback_reason"):
+                actual = answer.get("delivery", {}).get("actual")
+                self.store.event(
+                    job,
+                    (
+                        "中转 API 暂不可用，已使用本地 Skill 结构化字段完成回答"
+                        if actual == "local"
+                        else "视觉请求未被中转 API 接受，已自动回退到文本 Skill 并继续完成回答"
+                    ),
+                    "warning",
+                )
+            result = common | {
+                "answer": answer,
+                "selected_skills": public_skill_cards(selected),
+                "selection": selection,
+                "agent_runtime": engine,
+                "execution_audit": delivery_audit(answer),
+            }
+            if job.qa_parent_id:
+                result["previous_answer"] = parent_result["answer"]
+                conversation = list(parent_result.get("conversation") or [
+                    {"role": "student", "content": job.qa_question},
+                    {"role": "assistant", "answer": parent_result["answer"]},
+                ])
+                conversation.extend([
+                    {"role": "student", "content": job.qa_student_response},
+                    {"role": "assistant", "answer": answer},
+                ])
+                result["conversation"] = conversation
+            else:
+                result["conversation"] = [
+                    {"role": "student", "content": job.qa_question},
+                    {"role": "assistant", "answer": answer},
+                ]
+        else:
+            self._stage(job, "qa-baseline", 0.34, "正在生成无 Skill 基线答案")
+            baseline = normalize_answer(generate_answer(
+                client, job.qa_question, job.request.subject, temperature=0,
+            ))
+            self._check_cancel(job)
+            self._stage(job, "qa-skills", 0.57, "正在使用所选 Skills 生成实验答案")
+            skill_answer = normalize_answer(generate_answer(
+                client,
+                job.qa_question,
+                job.request.subject,
+                selected=selected,
+                modality=job.qa_skill_modality,
+                temperature=0,
+            ))
+            baseline_engine = baseline.get("delivery", {}).get("engine", "direct")
+            skill_engine = skill_answer.get("delivery", {}).get("engine", "direct")
+            if baseline_engine == skill_engine == "pi-agent":
+                self.store.event(
+                    job,
+                    "A/B 两组均已通过独立的临时 Pi AgentSession 运行",
+                    "success",
+                )
+            elif (
+                baseline.get("delivery", {}).get("agent_fallback_reason")
+                or skill_answer.get("delivery", {}).get("agent_fallback_reason")
+            ):
+                self.store.event(
+                    job,
+                    "至少一组 Pi Agent 未完成，已回退到原有直接生成链路",
+                    "warning",
+                )
+            if skill_answer.get("delivery", {}).get("fallback_reason"):
+                actual = skill_answer.get("delivery", {}).get("actual")
+                self.store.event(
+                    job,
+                    (
+                        "中转 API 暂不可用，实验组已使用本地 Skill 结构化字段"
+                        if actual == "local"
+                        else "视觉请求未被中转 API 接受，实验组已自动回退到文本 Skill"
+                    ),
+                    "warning",
+                )
+            answers, mapping = blind_answers(job.id, baseline, skill_answer)
+            self._check_cancel(job)
+            self._stage(job, "qa-judge", 0.8, "匿名自动裁判正在进行五维评分")
+            judge = judge_answers(client, job.qa_question, answers)
+            arm_audit = {
+                label: delivery_audit(answer)
+                for label, answer in answers.items()
+            }
+            skill_label = next(label for label, arm in mapping.items() if arm == "skills")
+            comparison_valid = arm_audit[skill_label]["include_in_primary_result"]
+            result = common | {
+                "answers": answers,
+                "judge_ready": True,
+                "revealed": False,
+                "execution_audit": {
+                    "arms": arm_audit,
+                    "comparison_valid": comparison_valid,
+                    "include_in_primary_result": comparison_valid,
+                    "exclusion_reasons": (
+                        [] if comparison_valid
+                        else arm_audit[skill_label]["exclusion_reasons"]
+                    ),
+                },
+                "agent_runtime": (
+                    "pi-agent"
+                    if baseline_engine == skill_engine == "pi-agent"
+                    else "mixed-or-direct"
+                ),
+            }
+            private_dir = qa_dir / ".private"
+            private_dir.mkdir(parents=True, exist_ok=True)
+            atomic_write_json(private_dir / f"{job.id}.json", {
+                "mapping": mapping,
+                "selected_skills": public_skill_cards(selected),
+                "selection": selection,
+                "judge": judge,
+            })
+
+        self._stage(job, "qa-save", 0.95, "正在保存 QA 结果")
+        atomic_write_json(public_file, result)
+        job.artifacts.update({"qa": result, "qa_file": str(public_file)})
+        job.status = "completed"
+        job.stage = "completed"
+        job.progress = 1
+        label = "匿名 A/B 实验" if job.qa_mode == "ab" else "Skill QA"
+        self.store.event(job, f"{label}完成", "success")
+        return self.store.save(job)
+
+    def reveal_qa(self, job_id: str, choice: str) -> dict[str, Any]:
+        job = self.store.get(job_id)
+        if job.kind != "qa" or job.qa_mode != "ab":
+            raise ValueError("该任务不是 A/B 实验")
+        if job.status != "completed":
+            raise ValueError("A/B 实验尚未完成")
+        result = dict(job.artifacts.get("qa") or {})
+        if result.get("revealed"):
+            return result
+        if choice not in {"A", "B", "tie", "skip"}:
+            raise ValueError("投票选项无效")
+        if not job.project_id:
+            raise ValueError("QA 任务缺少项目")
+        private_file = self._qa_directory(job.project_id) / ".private" / f"{job.id}.json"
+        if not private_file.is_file():
+            raise ValueError("A/B 私有映射不存在，无法揭盲")
+        private = json.loads(private_file.read_text("utf-8"))
+        mapping = private.get("mapping", {})
+        preferred_arm = mapping.get(choice) if choice in {"A", "B"} else choice
+        result.update({
+            "revealed": True,
+            "reveal": mapping,
+            "human_vote": {"choice": choice, "preferred_arm": preferred_arm},
+            "selected_skills": private.get("selected_skills", []),
+            "selection": private.get("selection", {}),
+            "judge": private.get("judge", {}),
+        })
+        public_file = Path(str(job.artifacts.get("qa_file", "")))
+        if public_file.is_file():
+            atomic_write_json(public_file, result)
+        job.artifacts["qa"] = result
+        self.store.event(job, "A/B 实验已揭盲", "success")
+        self.store.save(job)
+        return result
+
+    def _run_project_distill(self, job: JobState, settings: Settings) -> JobState:
+        """Distill selected, already-transcribed assets without downloading them again."""
+        client = LLMClient(
+            settings.llm_base_url, settings.llm_api_key, settings.llm_model,
+            timeout=settings.llm_timeout_seconds, max_attempts=settings.llm_max_attempts,
+        )
+        if not client.configured:
+            raise RuntimeError("无法蒸馏：尚未配置中转 API（Base URL、API Key 和模型均为必填）")
+        videos = [self.library.get_video(video_id) for video_id in job.video_ids]
+        if not videos:
+            raise RuntimeError("无法蒸馏：没有选择视频")
+        if job.distill_mode == "common" and len(videos) < 4:
+            raise RuntimeError("无法蒸馏共性 Skills：至少需要 4 个已转录视频")
+        if job.distill_mode == "single" and len(videos) != 1:
+            raise RuntimeError("无法蒸馏单视频 Skill：必须且只能选择 1 个视频")
+
+        analyses = []
+        transcripts = []
+        frame_indexes: dict[str, dict] = {}
+        analysis_dir = settings.data_dir / "analysis" / job.id
+        analysis_dir.mkdir(parents=True, exist_ok=True)
+        job.items = []
+        total = len(videos)
+        multimodal = job.distill_modality == "multimodal"
+        for index, video in enumerate(videos, 1):
+            self._check_cancel(job)
+            transcript_path = Path(video.artifacts.get("transcript_json", ""))
+            if not transcript_path.is_file():
+                raise RuntimeError(f"无法蒸馏《{video.title}》：转写文件不存在，请重新入库")
+            transcript = json.loads(transcript_path.read_text("utf-8"))
+            transcripts.append((video.title, transcript))
+            self._stage(job, "analyze", 0.08 + 0.62 * (index - 1) / total, f"教研分析 {index}/{total} · {video.title}")
+            cached_dir = settings.data_dir / "analysis" / "videos"
+            if multimodal:
+                video_path = Path(video.artifacts.get("video", ""))
+                if not video_path.is_file():
+                    raise RuntimeError(f"无法多模态蒸馏《{video.title}》：原始视频不存在，请重新入库")
+                self.store.event(job, f"提取课堂关键帧 · {video.title}")
+                frame_index = extract_keyframes(
+                    video_path,
+                    transcript,
+                    settings.data_dir / "visual" / "videos" / video.id,
+                    lambda msg: self.store.event(job, f"{msg} · {video.title}"),
+                )
+                frame_indexes[video.id] = frame_index
+                target = cached_dir / f"{video.id}.multimodal.json"
+                artifact = VersionedJsonArtifact(target, MULTIMODAL_ANALYSIS_PROMPT_VERSION)
+                text_artifact = VersionedJsonArtifact(cached_dir / f"{video.id}.json", ANALYSIS_PROMPT_VERSION)
+                text_fingerprint = content_fingerprint(video.title, job.request.subject, transcript)
+                base_analysis = text_artifact.load(text_fingerprint)
+                if base_analysis is None:
+                    self.store.event(job, f"生成多模态所需的纯文本基线 · {video.title}")
+                    base_analysis = analyze_lesson(
+                        client, video.title, job.request.subject, transcript,
+                        lambda msg: self.store.event(job, msg),
+                    )
+                    text_artifact.save(base_analysis, text_fingerprint)
+                else:
+                    self.store.event(job, f"复用纯文本教研基线 · {video.title}")
+                fingerprint = content_fingerprint(
+                    video.title, job.request.subject, transcript,
+                    FRAME_EXTRACTOR_VERSION, frame_index.get("fingerprint"),
+                    MULTIMODAL_FRAMES_PER_CHUNK, MULTIMODAL_FRAMES_PER_LESSON,
+                    base_analysis,
+                )
+            else:
+                target = cached_dir / f"{video.id}.json"
+                artifact = VersionedJsonArtifact(target, ANALYSIS_PROMPT_VERSION)
+                fingerprint = content_fingerprint(video.title, job.request.subject, transcript)
+            analysis = artifact.load(fingerprint)
+            if analysis is None:
+                if multimodal:
+                    try:
+                        analysis = analyze_lesson_multimodal(
+                            client, video.title, job.request.subject, transcript,
+                            frame_indexes[video.id].get("frames", []),
+                            lambda msg: self.store.event(job, msg),
+                            base_analysis=base_analysis,
+                        )
+                    except RuntimeError as exc:
+                        raise RuntimeError(
+                            f"《{video.title}》多模态分析失败：{exc}。"
+                            "请确认当前中转模型支持 OpenAI 兼容的 image_url 输入"
+                        ) from exc
+                else:
+                    analysis = analyze_lesson(client, video.title, job.request.subject, transcript, lambda msg: self.store.event(job, msg))
+                artifact.save(analysis, fingerprint)
+            else:
+                cache_label = "多模态单课分析" if multimodal else "单课分析"
+                self.store.event(job, f"复用{cache_label} · {video.title}")
+            analyses.append(analysis)
+
+        label = "单视频教学能力" if job.distill_mode == "single" else "跨视频共性教学能力"
+        modality_label = "多模态" if multimodal else "纯文本"
+        self._stage(job, "distill", 0.74, f"正在提炼{label} · {modality_label}")
+        checkpoint_version = MULTIMODAL_DISTILL_PROMPT_VERSION if multimodal else DISTILL_PROMPT_VERSION
+        checkpoint_name = "skill-suite.multimodal.checkpoint.json" if multimodal else "skill-suite.checkpoint.json"
+        checkpoint = VersionedJsonArtifact(analysis_dir / checkpoint_name, checkpoint_version)
+        fingerprint = (
+            content_fingerprint(job.distill_mode, job.distill_modality, analyses)
+            if multimodal else content_fingerprint(job.distill_mode, analyses)
+        )
+        distill_log = lambda msg: self.store.event(job, msg)
+        if job.distill_mode == "single":
+            distill_fn = distill_single_multimodal if multimodal else distill_single
+            suite = distill_fn(
+                client, analyses[0], distill_log,
+                initial_suite=checkpoint.load(fingerprint),
+                checkpoint=lambda payload: checkpoint.save(payload, fingerprint),
+            )
+        else:
+            distill_fn = distill_common_multimodal if multimodal else distill_common
+            suite = distill_fn(
+                client, analyses, distill_log,
+                initial_suite=checkpoint.load(fingerprint),
+                checkpoint=lambda payload: checkpoint.save(payload, fingerprint),
+            )
+        suite["distill_mode"] = job.distill_mode
+        suite["distill_modality"] = job.distill_modality
+        if multimodal:
+            _attach_visual_sources(suite, videos, frame_indexes)
+        suite_file = analysis_dir / "skill-suite.json"
+        atomic_write_json(suite_file, suite)
+        if not suite.get("capabilities"):
+            if job.distill_mode == "single":
+                raise RuntimeError("未生成任何单视频 Skill：API 已正常调用，但模型未从本课分析中返回带证据的可迁移教师行动；请检查转写和单课分析质量")
+            raise RuntimeError("未生成任何共性 Skill：API 已正常调用，但所选视频之间没有足够明确、可操作的共同教学能力证据")
+
+        code_checkpoint: VersionedJsonArtifact | None = None
+        if job.generate_executable_assets:
+            self._stage(job, "code-assets", 0.86, "正在生成可执行图示与实验示意资产")
+            code_checkpoint = VersionedJsonArtifact(
+                analysis_dir / "executable-assets.checkpoint.json", CODE_ASSET_PROMPT_VERSION,
+            )
+            code_basis = [
+                {key: value for key, value in capability.items() if key != "executable_asset"}
+                for capability in suite.get("capabilities", [])
+            ]
+            code_fingerprint = content_fingerprint(
+                job.distill_mode, job.distill_modality, analyses, code_basis,
+            )
+            restored_suite = code_checkpoint.load(code_fingerprint)
+            if restored_suite is not None:
+                suite = restored_suite
+                self.store.event(job, "复用可执行资产生成检查点")
+            suite = add_executable_assets(
+                client, suite, analyses, distill_log,
+                checkpoint=lambda payload: code_checkpoint.save(payload, code_fingerprint),
+            )
+            suite["generate_executable_assets"] = True
+            atomic_write_json(suite_file, suite)
+
+        self._stage(job, "package", 0.92, "正在打包并校验 Skills")
+        skills_dir = settings.data_dir / "projects" / str(job.project_id) / "skills" / job.id
+        provenance = {
+            "job_id": job.id, "project_id": job.project_id, "distill_mode": job.distill_mode,
+            "distill_modality": job.distill_modality,
+            "video_ids": job.video_ids,
+            "courses": [{"id": video.id, "title": video.title, "url": video.source_url} for video in videos],
+            "llm_model": settings.llm_model,
+            "analysis_prompt_version": MULTIMODAL_ANALYSIS_PROMPT_VERSION if multimodal else ANALYSIS_PROMPT_VERSION,
+            "distill_prompt_version": checkpoint_version, "analysis_file": str(suite_file),
+        }
+        if job.generate_executable_assets:
+            provenance["generate_executable_assets"] = True
+            provenance["code_asset_prompt_version"] = CODE_ASSET_PROMPT_VERSION
+        if multimodal:
+            provenance["visual_extraction"] = {
+                "version": FRAME_EXTRACTOR_VERSION,
+                "strategy": "scene_change+transcript_cue+periodic",
+                "frames_per_analysis_chunk": MULTIMODAL_FRAMES_PER_CHUNK,
+                "frames_per_lesson_visual_enrichment": MULTIMODAL_FRAMES_PER_LESSON,
+                "architecture": "cached_text_analysis+short_visual_enrichment",
+                "frame_counts": {video_id: len(index.get("frames", [])) for video_id, index in frame_indexes.items()},
+            }
+        built = build_skill_suite(suite, skills_dir, job.request.subject, provenance)
+        if not built:
+            raise RuntimeError("未生成任何 Skill：模型返回了空能力列表，可能是视频内容偏科普/闲聊，或转写证据不足")
+        invalid = [item for item in built if not item.get("valid")]
+        if invalid:
+            detail = "; ".join(f"{item['name']}: {', '.join(item.get('errors', []))}" for item in invalid)
+            raise RuntimeError(f"Skills 已生成但格式校验失败：{detail}")
+        checkpoint.clear()
+        if code_checkpoint is not None:
+            code_checkpoint.clear()
+        job.artifacts.update({"analysis": str(suite_file), "skills_dir": str(skills_dir), "skills": built})
+        job.status = "completed"
+        job.stage = "completed"
+        job.progress = 1
+        code_count = sum(bool(item.get("has_executable_asset")) for item in built)
+        code_summary = f"，其中 {code_count} 个附带可执行资产" if job.generate_executable_assets else ""
+        self.store.event(job, f"蒸馏完成：生成 {len(built)} 个 Skills{code_summary}", "success")
+        return self.store.save(job)
+
+
+class PipelineCancelled(Exception):
+    pass

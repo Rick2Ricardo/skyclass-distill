@@ -1,0 +1,6 @@
+{
+  "name": "@anyteacher/store",
+  "private": true,
+  "type": "module",
+  "exports": "./src/fileStore.ts"
+}

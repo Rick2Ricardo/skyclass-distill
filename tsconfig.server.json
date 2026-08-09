@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./dist",
+    "rootDir": ".",
+    "declaration": true,
+    "sourceMap": true,
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": ["apps/anyteacher/src/**/*.ts", "packages/**/*.ts"],
+  "exclude": ["apps/anyteacher/web/**", "node_modules", "dist", "**/*.test.ts"]
+}

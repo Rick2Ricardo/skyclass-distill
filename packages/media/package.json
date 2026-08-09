@@ -1,0 +1,6 @@
+{
+  "name": "@anyteacher/media",
+  "private": true,
+  "type": "module",
+  "exports": "./src/tools.ts"
+}

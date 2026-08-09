@@ -1,0 +1,15 @@
+{
+  "name": "anyteacher",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "main": "../../dist/apps/anyteacher/src/server.js",
+  "scripts": {
+    "build": "npm --prefix ../.. run build:server",
+    "dev": "tsx watch src/server.ts",
+    "server": "node ../../dist/apps/anyteacher/src/server.js"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

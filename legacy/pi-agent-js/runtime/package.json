@@ -1,0 +1,20 @@
+{
+  "name": "anyteacher-pi-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ephemeral Pi Agent runtime for AnyTeacher Skill execution and evaluation",
+  "scripts": {
+    "check": "node --check src/run.mjs",
+    "smoke": "node src/run.mjs --smoke",
+    "runtime-smoke": "node src/run.mjs --runtime-smoke"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.79.6",
+    "@earendil-works/pi-coding-agent": "0.79.6",
+    "typebox": "1.1.24"
+  },
+  "engines": {
+    "node": ">=20.6.0"
+  }
+}

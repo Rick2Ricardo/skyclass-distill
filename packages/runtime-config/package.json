@@ -1,0 +1,6 @@
+{
+  "name": "@anyteacher/runtime-config",
+  "private": true,
+  "type": "module",
+  "exports": "./src/settings.ts"
+}

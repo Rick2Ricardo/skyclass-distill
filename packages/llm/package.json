@@ -1,0 +1,6 @@
+{
+  "name": "@anyteacher/llm",
+  "private": true,
+  "type": "module",
+  "exports": "./src/client.ts"
+}

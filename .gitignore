@@ -3,7 +3,7 @@
 .env.*
 !.env.example
 
-# Python
+# Legacy Python tooling and caches
 .venv/
 venv/
 __pycache__/
@@ -17,6 +17,10 @@ dist/
 .coverage
 htmlcov/
 
+# Node
+node_modules/
+apps/anyteacher/web/dist/
+
 # Editors and operating systems
 .DS_Store
 .idea/
@@ -26,7 +30,15 @@ htmlcov/
 # Logs and temporary files
 *.log
 *.tmp
+.runtime/
 
 # Runtime data: never commit videos, transcripts, API settings, or generated outputs
 data/*
 !data/.gitkeep
+
+# Local speech models and generated research presentation artifacts
+models/
+*.ggml
+*.gguf
+research/papers/*.pdf
+research/resource2skill_reader/output/
