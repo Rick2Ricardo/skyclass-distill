@@ -21,6 +21,7 @@
     "web:dev": "npm --workspace anyteacher-web run dev",
     "server": "npm --workspace anyteacher run server",
     "start": "npm run build && npm run server --",
+    "data:fetch:physics": "tsx scripts/fetch-public-bilibili.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run typecheck && npm test && npm run build"

@@ -1,6 +1,6 @@
 # 高中物理“受力—平衡—牛二”首批公开视频清单
 
-核验日期：2026-08-09。机器可读清单见 [`physics_force_pilot.csv`](./physics_force_pilot.csv)。本轮没有下载任何视频，也没有把公开视频视为可训练、可缓存或可再分发的数据。
+核验日期：2026-08-09。机器可读候选清单见 [`physics_force_pilot.csv`](./physics_force_pilot.csv)，本地采集结果见 [`physics_force_downloads.csv`](./physics_force_downloads.csv)。原始视频保存在 Git 忽略的本地私有目录，不作为可再分发数据。
 
 ## 结论先行
 
@@ -91,3 +91,16 @@ CSV 采用 UTF-8，所有字段都加双引号，便于后续 TypeScript、Pytho
 4. **权利状态仍为 `yellow`。** 公开或“公益课”不等于开放许可。当前研究流程必须限制用途、保存期限和访问范围，并支持按 `source_url` 或 `teacher_key` 级联删除；论文不附原视频或可还原片段，商业化前重新进行许可审查。
 
 当第三位教师取得合格直达页后，应优先补齐“正交分解处理共点力平衡”和“牛顿第二定律基本题型”两个同单元，再决定是否做严格同题切片。
+
+## 本地采集状态
+
+2026-08-09 已从无需登录的公开播放接口获取 `recommend_observation=yes` 的 6 条 720p 研究副本：李永乐 4 条、坤哥物理 2 条，总时长 `05:13:21`，总大小 `1,262,241,064` 字节。每条均保存 FFprobe 元数据和 SHA-256；原视频与详细 `source.json` 位于 `data/raw/physics/force-pilot/{record_id}/`，由 `.gitignore` 排除。
+
+可复现命令：
+
+```bash
+npm run data:fetch:physics -- --dry-run
+npm run data:fetch:physics
+```
+
+下载器只处理 manifest 中 `green/yellow`、来源置信度不低于 `medium_high` 且标记为首轮观察的 B 站官方公开条目；不读取 Cookie，不处理登录、付费、DRM 或红色来源。
