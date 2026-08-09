@@ -11,6 +11,7 @@ import type {
   TutorMode,
   TutorResult,
 } from "../../../../packages/contracts/src/index.js";
+import { splitLearningCheck } from "../../../../packages/contracts/src/index.js";
 import { runPiAgent, type PiSkill } from "../../../../packages/pi-runtime/src/index.js";
 import type { SettingsStore } from "../../../../packages/runtime-config/src/settings.js";
 import type { JobStore } from "../../../../packages/store/src/jobStore.js";
@@ -165,7 +166,12 @@ export class TutorService {
     });
     const raw = runtime.answer as JsonObject;
     const answerText = typeof raw.answer === "string" ? raw.answer : "模型没有返回可显示的回答。";
-    const learningChecks = stringArray(raw.learning_checks);
+    const parsedChecks = stringArray(raw.learning_checks).map(splitLearningCheck).filter((item) => item.prompt);
+    const learningChecks = parsedChecks.map((item) => item.prompt);
+    const explicitCriteria = stringArray(raw.success_criteria);
+    const successCriteria = explicitCriteria.length
+      ? explicitCriteria
+      : parsedChecks.map((item) => item.successCriterion).filter(Boolean);
     const fallbackReason = parsed.modality === "multimodal" && !images.length
       ? "当前 Skill 没有可读取的视觉证据"
       : "";
@@ -180,7 +186,7 @@ export class TutorService {
       answer: {
         answer: answerText,
         assumptions: stringArray(raw.assumptions),
-        learning_check: { prompts: learningChecks, success_criteria: [] },
+        learning_check: { prompts: learningChecks, success_criteria: successCriteria },
         student_response: "",
         assessment: { status: "pending", feedback: "", evidence: [] },
         next_action: {

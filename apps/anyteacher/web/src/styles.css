@@ -242,8 +242,6 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .tool-trace i { color: #6c742e; font-size: 8px; font-style: normal; }
 .tool-icon { width: 22px; height: 22px; display: grid; place-items: center; color: #59631e; background: var(--lime); border-radius: 6px; font-size: 10px; }
 .thread-answer { max-width: 560px; padding: 0; margin: 0 auto; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
-.thread-answer .answer-title { align-items: flex-start; padding-bottom: 14px; margin-bottom: 17px; }
-.thread-answer .answer-title h2 { font-size: 20px; }
 .thread-answer .markdown { font-size: 14px; line-height: 1.85; }
 .agent-running { max-width: 560px; display: flex; align-items: center; gap: 14px; padding: 16px; margin: 0 auto; color: var(--ink); background: #eff5d9; border: 1px solid #d6e5a9; border-radius: 11px; }
 .agent-running b, .agent-running small { display: block; }.agent-running b { font-size: 11px; }.agent-running small { margin-top: 4px; color: var(--muted); font-size: 9px; }
@@ -282,7 +280,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .artifact-tabs button.active { color: #1e2a22; background: var(--lime); border-color: #c6ec58; }
 .artifact-tabs span { color: #78877c; font: 8px/1 ui-monospace, monospace; }.artifact-tabs button.active span { color: #5c672f; }
 .composer { padding: 20px; }
-.composer-head, .composer-foot, .answer-title, .compare-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.composer-head, .composer-foot, .compare-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .composer textarea { min-height: 135px; margin-top: 18px; padding: 4px 2px; background: transparent; border: 0; border-radius: 0; box-shadow: none; font: 500 21px/1.55 Georgia, "Noto Serif SC", serif; }
 .composer textarea::placeholder { color: #aaa99f; }
 .composer-foot { padding-top: 15px; border-top: 1px solid var(--line); }
@@ -297,8 +295,6 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .mini-skill small { margin-top: 4px; color: var(--muted); font-size: 9px; }
 .protocol p:last-child { margin: 13px 0 0; color: #4f5449; font: 10px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .answer-card { padding: 30px; }
-.answer-title { padding-bottom: 21px; margin-bottom: 23px; border-bottom: 1px solid var(--line); }
-.open-loop { padding: 6px 9px; color: #736f36; background: #f6f1bd; border-radius: 999px; font: 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .markdown { color: #343831; font-family: Georgia, "Noto Serif SC", serif; font-size: 15px; line-height: 1.9; }
 .markdown p { margin: 0 0 11px; }
 .markdown h2, .markdown h3, .markdown h4 { margin: 23px 0 10px; color: var(--ink); font-family: inherit; }

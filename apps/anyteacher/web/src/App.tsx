@@ -19,6 +19,7 @@ import type {
   TutorResult,
   VideoAsset,
 } from "../../../../packages/contracts/src/index.js";
+import { splitLearningCheck, studentVisibleAnswer } from "../../../../packages/contracts/src/index.js";
 import { api, uploadVideo } from "./api.js";
 import { formatDate, formatDuration, percent } from "./format.js";
 import { Markdown } from "./components/Markdown.js";
@@ -739,11 +740,16 @@ function ComparisonBlackboard({ result }: { result: TutorResult }) {
 function TutorAnswer({ result, workbench = false }: { result: TutorResult; workbench?: boolean }) {
   const audit = result.execution_audit;
   return <article className={`answer-card paper-panel ${workbench ? "thread-answer" : ""}`}>
-    <div className="answer-title"><div><p className="eyebrow">PI AGENT · {modeLabel(result.mode).toUpperCase()}</p><h2>给学生的解释</h2></div><span className="open-loop">OPEN LOOP</span></div>
-    <Markdown>{result.answer.answer}</Markdown>
-    {result.answer.learning_check.prompts.length > 0 && <div className="learning-check"><span>LEARNING CHECK</span><Markdown>{result.answer.learning_check.prompts[0]}</Markdown></div>}
+    <Markdown>{studentVisibleAnswer(result.answer.answer)}</Markdown>
+    <LearningCheck value={result.answer.learning_check.prompts[0]} />
     <div className="audit-row"><span>{audit.requested} → {audit.actual}</span><span>视觉 {audit.actual_visual_count}/{audit.attempted_visual_count}</span><span>工具 {audit.tool_call_count}</span>{audit.fallback_reason && <span className="warn">{audit.fallback_reason}</span>}</div>
   </article>;
+}
+
+function LearningCheck({ value, compact = false }: { value?: string; compact?: boolean }) {
+  const prompt = value ? splitLearningCheck(value).prompt : "";
+  if (!prompt) return null;
+  return <div className={compact ? "small-check" : "learning-check"}>{compact ? <b>检查</b> : <span>轮到你了</span>}<Markdown>{prompt}</Markdown></div>;
 }
 
 function Experiments({ project, datasetId, scenario, onRun }: {
@@ -782,7 +788,7 @@ function Experiments({ project, datasetId, scenario, onRun }: {
     {run && !busy && <div className="compare-grid">{run.modes.map((mode) => {
       const result = run.results[mode];
       return <article className="compare-card paper-panel" key={mode}><div className="compare-head"><p className="eyebrow">{modeLabel(mode)}</p>{result && <span>{result.execution_audit.tool_call_count} tool calls</span>}</div>
-        {result ? <><ComparisonBlackboard result={result} /><div className="compare-answer"><Markdown>{result.answer.answer}</Markdown>{result.answer.learning_check.prompts[0] && <div className="small-check"><b>检查</b><Markdown>{result.answer.learning_check.prompts[0]}</Markdown></div>}</div><div className="audit-row"><span>{result.execution_audit.actual}</span><span>{result.execution_audit.actual_visual_count} visuals</span></div></> : <div className="inline-error">{run.errors[mode] || "该条件未返回结果"}</div>}
+        {result ? <><ComparisonBlackboard result={result} /><div className="compare-answer"><Markdown>{studentVisibleAnswer(result.answer.answer)}</Markdown><LearningCheck value={result.answer.learning_check.prompts[0]} compact /></div><div className="audit-row"><span>{result.execution_audit.actual}</span><span>{result.execution_audit.actual_visual_count} visuals</span></div></> : <div className="inline-error">{run.errors[mode] || "该条件未返回结果"}</div>}
       </article>;
     })}</div>}
     {!run && !busy && <section className="paper-panel experiment-guide"><p className="eyebrow">EXPERIMENT MATRIX</p><div>{(["base", "text_skill", "multimodal_skill"] as TutorMode[]).map((mode, index) => <article key={mode}><span>0{index + 1}</span><b>{modeLabel(mode)}</b><p>{mode === "base" ? "不读取任何课堂 Skill" : mode === "text_skill" ? "读取结构化教学策略，不提供关键帧" : "读取教学策略并提供可追溯视觉证据"}</p></article>)}</div></section>}

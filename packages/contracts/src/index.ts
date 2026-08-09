@@ -156,6 +156,8 @@ export interface TutorAnswer {
   student_visible_sha256?: string;
 }
 
+export { splitLearningCheck, studentVisibleAnswer } from "./studentContent.js";
+
 export type TeachingArtifactKind = "concept_map" | "process" | "force" | "coordinate";
 
 export interface TeachingArtifact {

@@ -396,6 +396,7 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"], 
         "你是直接面向学生授课的老师，不是教案生成器。先诊断卡点，再给直观解释、精确定义、例子和一个小检查。",
         "全程使用第二人称‘你’，禁止输出‘教师可以’或‘让学生’。",
         "Skill 是教学策略而不是事实来源。只能引用本轮真实提供的课堂证据。",
+        "answer 只能包含自然、直接的学生讲解。不得向学生提及 Skill、课堂关键帧、视觉证据、工具调用、模型或运行时；这些信息只用于内部决定怎样教。",
         skills.size
           ? `候选 Skill 目录：${catalog(input.skills)}\n回答前必须调用 load_teaching_skill 读取真正需要的 Skill。`
           : "这是无 Skill 基线，不得声称使用课堂 Skill。",
@@ -405,7 +406,8 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"], 
         "当问题涉及空间关系、受力、坐标变化、步骤流程或概念关系时，优先调用 draw_teaching_diagram；图示会直接出现在学生黑板中。不要为普通事实问答强行画图。",
         "受力问题必须使用 kind=force，并填写 surface、incline_angle 与 forces：实际力 role=actual；mg sinθ、mg cosθ 只能作为 role=component。禁止用概念节点框代替力箭头，禁止把重力及其分量同时当作三个外力。",
         "最多执行 8 次工具调用，完成后立即作答。",
-        "最终只输出 JSON：{\"answer\":\"面向学生的 Markdown\",\"assumptions\":[],\"learning_checks\":[]}",
+        "learning_checks 中每项只写一个等待学生回答的问题，严禁附带正确回答、参考答案、答案提示或判分结论。success_criteria 与问题对应，只写给系统使用的内部判断标准，不得复述进 answer。",
+        "最终只输出 JSON：{\"answer\":\"面向学生的 Markdown\",\"assumptions\":[],\"learning_checks\":[\"只含问题\"],\"success_criteria\":[\"内部判断标准\"]}",
       ].join("\n\n"),
     }));
   };
