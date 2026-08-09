@@ -70,12 +70,24 @@ interface DiagramEdge {
   label?: string;
 }
 
+type ForceDirection = "down" | "normal_out" | "normal_in" | "up_slope" | "down_slope" | "left" | "right";
+
+interface ForceVectorInput {
+  label: string;
+  symbol?: string;
+  direction: ForceDirection;
+  role?: "actual" | "component";
+}
+
 interface DiagramInput {
   title: string;
   summary: string;
   kind: TeachingArtifactKind;
   nodes: DiagramNode[];
   edges: DiagramEdge[];
+  surface?: "incline" | "horizontal" | "free";
+  incline_angle?: number;
+  forces?: ForceVectorInput[];
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -102,7 +114,90 @@ function labelLines(value: string): string[] {
   return [text.slice(0, 10), text.slice(10, 20)];
 }
 
+function inferForceVectors(input: DiagramInput): ForceVectorInput[] {
+  if (input.forces?.length) return input.forces.slice(0, 8).map((force) => ({
+    ...force,
+    role: force.role ?? (/sin|cos|分量/i.test(`${force.symbol || ""} ${force.label}`) ? "component" : "actual"),
+  }));
+  const labels = input.nodes.map((node) => node.label);
+  const result: ForceVectorInput[] = [];
+  const add = (label: string, symbol: string, direction: ForceDirection, role: ForceVectorInput["role"] = "actual") => {
+    if (!result.some((item) => item.direction === direction && item.role === role)) result.push({ label, symbol, direction, role });
+  };
+  for (const label of labels) {
+    if (/sin|沿斜面分量/i.test(label)) add(label, "mg sin θ", "down_slope", "component");
+    else if (/cos|垂直斜面分量/i.test(label)) add(label, "mg cos θ", "normal_in", "component");
+    else if (/支持力|法向力|\bN\b/i.test(label)) add(label, "N", "normal_out");
+    else if (/摩擦力|\bf\b/i.test(label)) add(label, "f", /向下/.test(label) ? "down_slope" : "up_slope");
+    else if (/重力|\bmg\b/i.test(label)) add(label, "mg", "down");
+    else if (/拉力|牵引力|外力|\bF\b/i.test(label)) add(label, "F", /向下/.test(label) ? "down_slope" : "up_slope");
+  }
+  if (!result.some((item) => item.direction === "down" && item.role !== "component")) add("重力", "mg", "down");
+  if (!result.some((item) => item.direction === "normal_out")) add("支持力", "N", "normal_out");
+  return result;
+}
+
+function renderForceDiagram(input: DiagramInput, title: string, summary: string): TeachingArtifact {
+  const forces = inferForceVectors(input);
+  const labelText = `${title} ${summary} ${input.nodes.map((node) => node.label).join(" ")}`;
+  const incline = input.surface === "incline" || (input.surface !== "horizontal" && input.surface !== "free" && /斜面|sin|cos/i.test(labelText));
+  const angle = incline ? clamp(Number(input.incline_angle ?? 28), 15, 45) : 0;
+  const radians = angle * Math.PI / 180;
+  const tangent = { x: Math.cos(radians), y: -Math.sin(radians) };
+  const downSlope = { x: -tangent.x, y: -tangent.y };
+  const normalOut = { x: -Math.sin(radians), y: -Math.cos(radians) };
+  const normalIn = { x: -normalOut.x, y: -normalOut.y };
+  const actual = forces.filter((force) => force.role !== "component");
+  const origin = { x: 235, y: incline ? 247 : 285 };
+  const vectors: Record<ForceDirection, { x: number; y: number; color: string }> = {
+    down: { x: 0, y: 132, color: "#e8693d" },
+    normal_out: { x: normalOut.x * 130, y: normalOut.y * 130, color: "#357c96" },
+    normal_in: { x: normalIn.x * 110, y: normalIn.y * 110, color: "#d08a32" },
+    up_slope: { x: tangent.x * 125, y: tangent.y * 125, color: "#78659b" },
+    down_slope: { x: downSlope.x * 125, y: downSlope.y * 125, color: "#78659b" },
+    left: { x: -125, y: 0, color: "#78659b" },
+    right: { x: 125, y: 0, color: "#78659b" },
+  };
+  const forceArrows = actual.map((force) => {
+    const vector = vectors[force.direction];
+    const endX = origin.x + vector.x;
+    const endY = origin.y + vector.y;
+    const labelX = endX + (vector.x < -20 ? -8 : vector.x > 20 ? 8 : 15);
+    const labelY = endY + (vector.y < -20 ? -9 : 22);
+    const anchor = vector.x < -20 ? "end" : "start";
+    return `<g class="force actual"><line x1="${origin.x}" y1="${origin.y}" x2="${endX}" y2="${endY}" style="stroke:${vector.color}"/><text x="${labelX}" y="${labelY}" text-anchor="${anchor}">${escapeXml(force.symbol || force.label)}</text></g>`;
+  }).join("");
+  const slope = incline
+    ? `<path class="surface" d="M58 388L410 200L410 388Z"/><path class="surface-top" d="M58 388L410 200"/><path class="angle" d="M91 388A33 33 0 0 0 87 372"/><text class="theta" x="105" y="374">θ = ${Math.round(angle)}°</text>`
+    : input.surface === "free" ? "" : `<path class="surface-top" d="M62 330H408"/>`;
+  const blockRotation = incline ? -angle : 0;
+  const showComponents = incline && (forces.some((force) => force.role === "component") || /分解|sin|cos/i.test(labelText));
+  const componentLength = 150;
+  const tangentLength = componentLength * Math.sin(radians);
+  const normalLength = componentLength * Math.cos(radians);
+  const decomposition = showComponents ? (() => {
+    const point = { x: 590, y: 205 };
+    const tangentEnd = { x: point.x + downSlope.x * tangentLength, y: point.y + downSlope.y * tangentLength };
+    const normalEnd = { x: point.x + normalIn.x * normalLength, y: point.y + normalIn.y * normalLength };
+    const weightEnd = { x: point.x, y: point.y + componentLength };
+    return `<g class="decomposition"><text class="panel-label" x="450" y="104">② 重力分解（不是新增外力）</text><line class="axis" x1="475" y1="${point.y + 61}" x2="704" y2="${point.y - 61}"/><line class="axis" x1="${point.x - 61}" y1="118" x2="${point.x + 61}" y2="348"/><circle cx="${point.x}" cy="${point.y}" r="14"/><line class="weight" x1="${point.x}" y1="${point.y}" x2="${weightEnd.x}" y2="${weightEnd.y}"/><text class="weight-label" x="${weightEnd.x + 14}" y="${weightEnd.y - 3}">mg</text><line class="component" x1="${point.x}" y1="${point.y}" x2="${tangentEnd.x}" y2="${tangentEnd.y}"/><text class="component-label" x="${tangentEnd.x - 8}" y="${tangentEnd.y - 10}" text-anchor="end">mg sin θ</text><line class="component" x1="${point.x}" y1="${point.y}" x2="${normalEnd.x}" y2="${normalEnd.y}"/><text class="component-label" x="${normalEnd.x + 7}" y="${normalEnd.y - 4}">mg cos θ</text><path class="projection" d="M${tangentEnd.x} ${tangentEnd.y}L${weightEnd.x} ${weightEnd.y}M${normalEnd.x} ${normalEnd.y}L${weightEnd.x} ${weightEnd.y}"/></g>`;
+  })() : `<g><text class="panel-label" x="450" y="104">② 矢量自检</text><text class="guide" x="450" y="150">• 每个箭头从物块出发</text><text class="guide" x="450" y="185">• 只画外界对物块的力</text><text class="guide" x="450" y="220">• 箭头方向就是力的方向</text></g>`;
+
+  return {
+    id: randomUUID(),
+    type: "diagram",
+    kind: "force",
+    title,
+    summary,
+    created_at: new Date().toISOString(),
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-label="${escapeXml(title)}"><defs><marker id="force-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker><pattern id="force-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#dde0d7" stroke-width="1"/></pattern></defs><style>.bg{fill:#f8f7f1}.grid{fill:url(#force-grid);opacity:.34}.divider{stroke:#d8dbd2;stroke-width:1}.title{font:600 24px system-ui;fill:#20241d}.kind{font:12px ui-monospace,monospace;fill:#74786e}.panel-label{font:600 14px system-ui;fill:#4a5148}.surface{fill:#e2e1d9;stroke:none}.surface-top{fill:none;stroke:#59635d;stroke-width:5;stroke-linecap:round}.angle{fill:none;stroke:#899087;stroke-width:1.5}.theta,.guide{font:12px system-ui;fill:#747c73}.block{fill:#d7ff5e;stroke:#8ead20;stroke-width:2}.block-label{font:700 14px system-ui;fill:#26301f;text-anchor:middle}.force line,.weight,.component{fill:none;stroke-width:4;stroke-linecap:round;marker-end:url(#force-arrow)}.force text,.weight-label,.component-label{font:700 14px system-ui;fill:#273029;paint-order:stroke;stroke:#f8f7f1;stroke-width:5px;stroke-linejoin:round}.axis{stroke:#aeb5ad;stroke-width:1.5;stroke-dasharray:5 5}.decomposition circle{fill:#d7ff5e;stroke:#8ead20;stroke-width:2}.weight{stroke:#e8693d}.component{stroke:#d08a32;stroke-width:3;stroke-dasharray:7 5}.projection{fill:none;stroke:#b6bbb4;stroke-width:1.5;stroke-dasharray:4 5}</style><rect class="bg" width="800" height="480"/><rect class="grid" x="32" y="62" width="736" height="386" rx="18"/><text class="title" x="42" y="38">${escapeXml(title)}</text><text class="kind" x="758" y="36" text-anchor="end">FREE-BODY DIAGRAM</text><line class="divider" x1="430" y1="88" x2="430" y2="420"/><text class="panel-label" x="62" y="104">① 隔离物块，只画外力</text>${slope}<g transform="rotate(${blockRotation} ${origin.x} ${origin.y})"><rect class="block" x="${origin.x - 40}" y="${origin.y - 28}" width="80" height="56" rx="8"/><text class="block-label" x="${origin.x}" y="${origin.y + 5}">物块</text></g>${forceArrows}${decomposition}</svg>`,
+  };
+}
+
 export function renderTeachingDiagram(input: DiagramInput): TeachingArtifact {
+  const title = short(input.title || "教学图示", 60);
+  const summary = short(input.summary || "由教学工具生成", 140);
+  if (input.kind === "force") return renderForceDiagram(input, title, summary);
   const nodes = input.nodes.slice(0, 10).map((node, index) => ({
     id: short(node.id || `node-${index + 1}`, 32),
     label: short(node.label || `节点 ${index + 1}`, 24),
@@ -116,8 +211,6 @@ export function renderTeachingDiagram(input: DiagramInput): TeachingArtifact {
     const to = byId.get(short(edge.to, 32));
     return from && to ? [{ from, to, label: short(edge.label ?? "", 18) }] : [];
   });
-  const title = short(input.title || "教学图示", 60);
-  const summary = short(input.summary || "由教学工具生成", 140);
   const axes = input.kind === "coordinate"
     ? `<g class="axes"><path d="M72 392H740"/><path d="M92 416V70"/><text x="724" y="382">x</text><text x="104" y="84">y</text></g>`
     : "";
@@ -197,6 +290,26 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"], 
           Type.Literal("force"),
           Type.Literal("coordinate"),
         ]),
+        surface: Type.Optional(Type.Union([
+          Type.Literal("incline"),
+          Type.Literal("horizontal"),
+          Type.Literal("free"),
+        ], { description: "受力图中的接触面；斜面问题必须选 incline" })),
+        incline_angle: Type.Optional(Type.Number({ minimum: 0, maximum: 60, description: "斜面倾角（度）" })),
+        forces: Type.Optional(Type.Array(Type.Object({
+          label: Type.String({ description: "力的中文名称" }),
+          symbol: Type.Optional(Type.String({ description: "图上短符号，如 N、mg、f、mg sin θ" })),
+          direction: Type.Union([
+            Type.Literal("down"),
+            Type.Literal("normal_out"),
+            Type.Literal("normal_in"),
+            Type.Literal("up_slope"),
+            Type.Literal("down_slope"),
+            Type.Literal("left"),
+            Type.Literal("right"),
+          ]),
+          role: Type.Optional(Type.Union([Type.Literal("actual"), Type.Literal("component")], { description: "mg sinθ、mg cosθ 必须标为 component，不是新增外力" })),
+        }), { maxItems: 8, description: "受力图专用矢量；所有实际力必须从物块出发" })),
         nodes: Type.Array(Type.Object({
           id: Type.String(),
           label: Type.String(),
@@ -290,6 +403,7 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"], 
           ? "本轮附带课堂关键帧；需要引用画面时先调用 inspect_visual_evidence。"
           : "本轮没有课堂关键帧，不得虚构视觉证据。",
         "当问题涉及空间关系、受力、坐标变化、步骤流程或概念关系时，优先调用 draw_teaching_diagram；图示会直接出现在学生黑板中。不要为普通事实问答强行画图。",
+        "受力问题必须使用 kind=force，并填写 surface、incline_angle 与 forces：实际力 role=actual；mg sinθ、mg cosθ 只能作为 role=component。禁止用概念节点框代替力箭头，禁止把重力及其分量同时当作三个外力。",
         "最多执行 8 次工具调用，完成后立即作答。",
         "最终只输出 JSON：{\"answer\":\"面向学生的 Markdown\",\"assumptions\":[],\"learning_checks\":[]}",
       ].join("\n\n"),

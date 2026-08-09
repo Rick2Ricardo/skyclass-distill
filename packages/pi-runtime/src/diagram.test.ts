@@ -33,6 +33,31 @@ describe("renderTeachingDiagram", () => {
     expect(artifact.svg).toContain('class="axes"');
     expect(artifact.kind).toBe("coordinate");
   });
+
+  it("renders force diagrams as a physical free-body diagram instead of a node graph", () => {
+    const artifact = renderTeachingDiagram({
+      title: "斜面上物块的受力图",
+      summary: "区分实际外力和重力分量",
+      kind: "force",
+      surface: "incline",
+      incline_angle: 30,
+      nodes: [{ id: "block", label: "物块", x: 50, y: 50 }],
+      edges: [],
+      forces: [
+        { label: "重力", symbol: "mg", direction: "down", role: "actual" },
+        { label: "支持力", symbol: "N", direction: "normal_out", role: "actual" },
+        { label: "摩擦力", symbol: "f", direction: "up_slope", role: "actual" },
+        { label: "沿斜面分量", symbol: "mg sin θ", direction: "down_slope", role: "component" },
+        { label: "垂直斜面分量", symbol: "mg cos θ", direction: "normal_in", role: "component" },
+      ],
+    });
+
+    expect(artifact.svg).toContain("FREE-BODY DIAGRAM");
+    expect(artifact.svg).toContain("只画外力");
+    expect(artifact.svg).toContain("重力分解（不是新增外力）");
+    expect(artifact.svg).toContain("mg sin θ");
+    expect(artifact.svg).not.toContain('class="node');
+  });
 });
 
 describe("normalizePiAnswer", () => {
