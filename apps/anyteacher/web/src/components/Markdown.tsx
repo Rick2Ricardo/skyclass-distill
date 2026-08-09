@@ -33,7 +33,7 @@ function MathFormula({ value, display = false }: { value: string; display?: bool
 
 function inline(value: string): ReactNode[] {
   return value.split(/(\*\*[^*]+\*\*|`[^`]+`|\\\(.+?\\\)|\$[^$\n]+\$)/g).filter(Boolean).map((part, index) => {
-    if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{inline(part.slice(2, -2))}</strong>;
     if (part.startsWith("`") && part.endsWith("`")) return <code key={index}>{part.slice(1, -1)}</code>;
     if (part.startsWith("\\(") && part.endsWith("\\)")) return <MathFormula key={index} value={part.slice(2, -2)} />;
     if (part.startsWith("$") && part.endsWith("$")) return <MathFormula key={index} value={part.slice(1, -1)} />;

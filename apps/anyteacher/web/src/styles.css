@@ -313,8 +313,9 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .math-block .katex-display { margin: 0; }.markdown .katex { font-size: 1.06em; }
 .markdown-space { height: 6px; }
 .learning-check, .small-check { padding: 18px; margin-top: 25px; background: #eff7d4; border: 1px solid #d4e6a0; border-radius: 10px; }
-.learning-check span { color: #68732b; font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .1em; }
-.learning-check p, .small-check p { margin: 9px 0 0; color: #303629; font-family: Georgia, serif; line-height: 1.6; }
+.learning-check > span { color: #68732b; font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .1em; }
+.learning-check > .markdown, .small-check > .markdown { margin-top: 9px; color: #303629; line-height: 1.6; }
+.learning-check > .markdown p, .small-check > .markdown p { margin: 0; }
 .audit-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
 .audit-row span { padding: 6px 8px; color: #65695f; background: #e9e7de; border-radius: 999px; font: 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
 .audit-row span.warn { color: #9d4d33; background: #fde3d8; }
@@ -346,6 +347,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .compare-answer { min-height: 0; max-height: 540px; padding: 0 7px 0 0; margin-top: 18px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #c3c4bb transparent; }
 .compare-card > .audit-row { margin-top: 16px; }
 .small-check { padding: 13px; margin-top: 16px; font-size: 11px; }
+.small-check > .markdown { font-size: 11px; }
 .compare-loading { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
 .compare-loading span { min-height: 260px; background: linear-gradient(105deg, #e1dfd5 20%, #f0eee7 40%, #e1dfd5 60%); background-size: 240% 100%; border-radius: 15px; animation: shimmer 1.5s infinite linear; }
 @keyframes shimmer { to { background-position-x: -240%; } }
