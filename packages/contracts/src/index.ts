@@ -189,6 +189,34 @@ export interface TutorResult {
   artifacts: TeachingArtifact[];
 }
 
+export interface TutorTurn {
+  id: string;
+  created_at: string;
+  question: string;
+  mode: TutorMode;
+  result: TutorResult;
+}
+
+export interface TutorConversation {
+  id: string;
+  project_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  turns: TutorTurn[];
+}
+
+export interface TutorConversationSummary {
+  id: string;
+  project_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  turn_count: number;
+  artifact_count: number;
+  last_question?: string;
+}
+
 export interface ExperimentRun {
   id: string;
   project_id: string;

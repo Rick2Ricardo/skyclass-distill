@@ -14,6 +14,8 @@ import type {
   Skill,
   SkillDetail,
   TutorMode,
+  TutorConversation,
+  TutorConversationSummary,
   TutorResult,
   VideoAsset,
 } from "../../../packages/contracts/src/index.js";
@@ -24,6 +26,7 @@ import { SettingsStore } from "../../../packages/runtime-config/src/settings.js"
 import { JobStore } from "../../../packages/store/src/jobStore.js";
 import { LibraryStore } from "../../../packages/store/src/libraryStore.js";
 import { EvaluationStore } from "../../../packages/store/src/evaluationStore.js";
+import { ConversationStore } from "../../../packages/store/src/conversationStore.js";
 import { DATA_DIR, PORT, ROOT, WEB_DIST_DIR } from "./config.js";
 import { TutorService } from "./services/tutorService.js";
 
@@ -33,6 +36,7 @@ const app = Fastify({ logger: true, bodyLimit: 2 * 1024 * 1024 * 1024 });
 const library = new LibraryStore(DATA_DIR);
 const jobs = new JobStore(DATA_DIR);
 const evaluations = new EvaluationStore(ROOT, DATA_DIR);
+const conversations = new ConversationStore(DATA_DIR);
 const settings = new SettingsStore(ROOT, DATA_DIR);
 const pipeline = new PipelineEngine(ROOT, DATA_DIR, library, jobs, settings);
 const tutor = new TutorService(library, jobs, settings);
@@ -272,6 +276,59 @@ app.post("/api/tutor", async (request, reply): Promise<TutorResult | unknown> =>
     const projectId = typeof body.project_id === "string" ? body.project_id : "";
     if (!projectId) return reply.code(400).send({ detail: "缺少项目" });
     return await tutor.answer(projectId, body);
+  } catch (error) { return httpError(reply, error, 502); }
+});
+
+app.get("/api/projects/:id/conversations", async (request, reply): Promise<TutorConversationSummary[] | unknown> => {
+  try {
+    const projectId = paramsOf<{ id: string }>(request).id;
+    await library.getProject(projectId);
+    return await conversations.list(projectId);
+  } catch (error) { return httpError(reply, error); }
+});
+
+app.post("/api/projects/:id/conversations", async (request, reply): Promise<TutorConversation | unknown> => {
+  try {
+    const projectId = paramsOf<{ id: string }>(request).id;
+    await library.getProject(projectId);
+    const body = bodyOf(request);
+    return await conversations.create(projectId, typeof body.title === "string" ? body.title : undefined);
+  } catch (error) { return httpError(reply, error); }
+});
+
+app.get("/api/projects/:projectId/conversations/:conversationId", async (request, reply): Promise<TutorConversation | unknown> => {
+  try {
+    const { projectId, conversationId } = paramsOf<{ projectId: string; conversationId: string }>(request);
+    return await conversations.get(projectId, conversationId);
+  } catch (error) { return httpError(reply, error); }
+});
+
+app.patch("/api/projects/:projectId/conversations/:conversationId", async (request, reply): Promise<TutorConversation | unknown> => {
+  try {
+    const { projectId, conversationId } = paramsOf<{ projectId: string; conversationId: string }>(request);
+    const title = String(bodyOf(request).title || "");
+    return await conversations.rename(projectId, conversationId, title);
+  } catch (error) { return httpError(reply, error); }
+});
+
+app.delete("/api/projects/:projectId/conversations/:conversationId", async (request, reply) => {
+  try {
+    const { projectId, conversationId } = paramsOf<{ projectId: string; conversationId: string }>(request);
+    await conversations.delete(projectId, conversationId);
+    return { deleted: true, id: conversationId };
+  } catch (error) { return httpError(reply, error); }
+});
+
+app.post("/api/projects/:projectId/conversations/:conversationId/turns", async (request, reply): Promise<TutorConversation | unknown> => {
+  try {
+    const { projectId, conversationId } = paramsOf<{ projectId: string; conversationId: string }>(request);
+    const body = bodyOf(request);
+    const question = typeof body.question === "string" ? body.question.trim() : "";
+    const mode: TutorMode = ["base", "text_skill", "multimodal_skill"].includes(String(body.mode)) ? body.mode as TutorMode : "multimodal_skill";
+    if (question.length < 4) return reply.code(400).send({ detail: "请输入至少 4 个字符的问题" });
+    await conversations.get(projectId, conversationId);
+    const result = await tutor.answer(projectId, { ...body, question, mode });
+    return await conversations.append(projectId, conversationId, question, mode, result);
   } catch (error) { return httpError(reply, error, 502); }
 });
 

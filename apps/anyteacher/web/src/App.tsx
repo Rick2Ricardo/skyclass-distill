@@ -13,6 +13,8 @@ import type {
   Skill,
   SkillDetail,
   TeachingArtifact,
+  TutorConversation,
+  TutorConversationSummary,
   TutorMode,
   TutorResult,
   VideoAsset,
@@ -60,6 +62,9 @@ function App() {
   const [jobs, setJobs] = useState<JobState[]>([]);
   const [datasets, setDatasets] = useState<BenchmarkDataset[]>([]);
   const [experimentRuns, setExperimentRuns] = useState<ExperimentSummary[]>([]);
+  const [conversations, setConversations] = useState<TutorConversationSummary[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState("");
+  const [conversationDraft, setConversationDraft] = useState(0);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [projectDialog, setProjectDialog] = useState(false);
@@ -91,16 +96,19 @@ function App() {
       setVideos([]);
       setSkills([]);
       setExperimentRuns([]);
+      setConversations([]);
       return;
     }
-    const [nextVideos, nextSkills, nextRuns] = await Promise.all([
+    const [nextVideos, nextSkills, nextRuns, nextConversations] = await Promise.all([
       api<VideoAsset[]>(`/api/projects/${projectId}/videos`),
       api<Skill[]>(`/api/projects/${projectId}/skills`),
       api<ExperimentSummary[]>(`/api/projects/${projectId}/experiments`),
+      api<TutorConversationSummary[]>(`/api/projects/${projectId}/conversations`),
     ]);
     setVideos(nextVideos);
     setSkills(nextSkills);
     setExperimentRuns(nextRuns);
+    setConversations(nextConversations);
   }, [projectId]);
 
   const loadJobs = useCallback(async () => setJobs(await api<JobState[]>("/api/jobs")), []);
@@ -111,6 +119,11 @@ function App() {
       .then(([nextHealth]) => setHealth(nextHealth))
       .catch((cause) => flash(cause instanceof Error ? cause.message : String(cause), true));
   }, [flash, loadDatasets, loadJobs, loadProjects]);
+
+  useEffect(() => {
+    setActiveConversationId("");
+    setConversationDraft((value) => value + 1);
+  }, [projectId]);
 
   useEffect(() => {
     loadProjectData().catch((cause) => flash(cause instanceof Error ? cause.message : String(cause), true));
@@ -142,7 +155,16 @@ function App() {
 
   const content = !project && view !== "overview"
     ? <EmptyProject onCreate={() => setProjectDialog(true)} />
-    : view === "studio" ? <Tutor project={project!} skills={skills} />
+    : view === "studio" ? <Tutor
+      key={`${project!.id}:${conversationDraft}`}
+      project={project!}
+      skills={skills}
+      conversationId={activeConversationId}
+      conversationDraft={conversationDraft}
+      onConversationChange={setActiveConversationId}
+      onConversationUpdated={loadProjectData}
+      onNewConversation={() => { setActiveConversationId(""); setConversationDraft((value) => value + 1); }}
+    />
     : view === "overview" ? <Overview project={project} videos={videos} skills={skills} jobs={projectJobs} datasets={datasets} runs={experimentRuns} onNavigate={setView} onCreate={() => setProjectDialog(true)} />
     : view === "evidence" ? <EvidenceWorkspace project={project!} videos={videos} onCreated={async (job) => { setJobs((items) => [job, ...items]); flash("素材任务已开始"); }} flash={flash} />
     : view === "skills" ? <SkillWorkshop project={project!} videos={videos} skills={skills} onCreated={async (job) => { setJobs((items) => [job, ...items]); flash("蒸馏任务已开始"); }} onOpen={openSkill} onRefresh={refreshAll} flash={flash} />
@@ -167,6 +189,16 @@ function App() {
       <nav>{NAV.map((item) => <button key={item.key} className={view === item.key ? "active" : ""} onClick={() => setView(item.key)}>
         <span className="nav-number">{item.number}</span><span><b>{item.label}</b><small>{item.hint}</small></span>
       </button>)}</nav>
+
+      {view === "studio" && project && <ConversationHistory
+        projectId={project.id}
+        conversations={conversations}
+        activeId={activeConversationId}
+        onOpen={setActiveConversationId}
+        onNew={() => { setActiveConversationId(""); setConversationDraft((value) => value + 1); }}
+        onChanged={loadProjectData}
+        flash={flash}
+      />}
 
       <div className="sidebar-foot">
         <button onClick={() => setSettingsDialog(true)}>模型与运行设置</button>
@@ -206,6 +238,59 @@ function App() {
     {skillDialog && <SkillDialog detail={skillDialog} onClose={() => setSkillDialog(null)} />}
     {busy && <div className="global-busy"><span /></div>}
   </div>;
+}
+
+function ConversationHistory({ projectId, conversations, activeId, onOpen, onNew, onChanged, flash }: {
+  projectId: string;
+  conversations: TutorConversationSummary[];
+  activeId: string;
+  onOpen: (id: string) => void;
+  onNew: () => void;
+  onChanged: () => Promise<void>;
+  flash: (message: string, error?: boolean) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const filtered = conversations.filter((item) => `${item.title} ${item.last_question || ""}`.toLowerCase().includes(query.trim().toLowerCase()));
+
+  async function renameConversation(item: TutorConversationSummary): Promise<void> {
+    const title = window.prompt("输入新的会话名称", item.title)?.trim();
+    if (!title || title === item.title) return;
+    try {
+      await api(`/api/projects/${projectId}/conversations/${item.id}`, { method: "PATCH", body: JSON.stringify({ title }) });
+      await onChanged();
+      flash("会话已重命名");
+    } catch (cause) { flash(cause instanceof Error ? cause.message : String(cause), true); }
+  }
+
+  async function deleteConversation(item: TutorConversationSummary): Promise<void> {
+    if (!window.confirm(`确认删除「${item.title}」？该会话中的回答和画布产物也会被删除。`)) return;
+    try {
+      await api(`/api/projects/${projectId}/conversations/${item.id}`, { method: "DELETE" });
+      if (activeId === item.id) onNew();
+      await onChanged();
+      flash("会话已删除");
+    } catch (cause) { flash(cause instanceof Error ? cause.message : String(cause), true); }
+  }
+
+  return <section className="sidebar-conversations">
+    <div className="conversation-sidebar-head"><label>历史会话</label><button onClick={onNew}>＋</button></div>
+    {conversations.length > 0 && <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索会话…" aria-label="搜索历史会话" />}
+    <div className="sidebar-conversation-list">
+      {!activeId && <button className="conversation-draft active" onClick={onNew}><span>✦</span><b>新教学会话</b></button>}
+      {filtered.map((item) => <article key={item.id} className={activeId === item.id ? "active" : ""}>
+        <button className="conversation-open" onClick={() => onOpen(item.id)}>
+          <b>{item.title}</b>
+          <small>{item.turn_count} 轮 · {item.artifact_count} 个画布 · {formatDate(item.updated_at)}</small>
+        </button>
+        <div className="conversation-actions">
+          <button title="重命名" aria-label={`重命名 ${item.title}`} onClick={() => void renameConversation(item)}>✎</button>
+          <button title="删除" aria-label={`删除 ${item.title}`} onClick={() => void deleteConversation(item)}>×</button>
+        </div>
+      </article>)}
+      {conversations.length > 0 && filtered.length === 0 && <small className="conversation-empty">没有匹配的会话</small>}
+      {conversations.length === 0 && <small className="conversation-empty">第一次提问后，会话会自动保存在这里。</small>}
+    </div>
+  </section>;
 }
 
 function Overview({ project, videos, skills, jobs, datasets, runs, onNavigate, onCreate }: {
@@ -483,31 +568,88 @@ function Skills({ project, skills, onOpen, onRefresh, flash }: { project: Projec
   </article>) : <div className="full-empty"><Blank title="Skill 成果库为空" text="完成蒸馏后，每个教学策略都会以可验证版本出现在这里。" /></div>}</div>;
 }
 
-function Tutor({ project, skills }: { project: Project; skills: Skill[] }) {
+function Tutor({ project, skills, conversationId = "", conversationDraft = 0, onConversationChange, onConversationUpdated, onNewConversation }: {
+  project: Project;
+  skills: Skill[];
+  conversationId?: string;
+  conversationDraft?: number;
+  onConversationChange?: (id: string) => void;
+  onConversationUpdated?: () => Promise<void>;
+  onNewConversation?: () => void;
+}) {
   const [mode, setMode] = useState<TutorMode>("multimodal_skill");
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<TutorResult | null>(null);
+  const [conversation, setConversation] = useState<TutorConversation | null>(null);
   const [activeArtifactId, setActiveArtifactId] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const activeArtifact = useMemo(() => result?.artifacts.find((item) => item.id === activeArtifactId) ?? result?.artifacts.at(-1), [activeArtifactId, result]);
+  const [loading, setLoading] = useState(false);
+  const managed = Boolean(onConversationChange);
+  const turns = useMemo(() => conversation?.turns ?? (result ? [{ id: "local", created_at: "", question: result.question, mode: result.mode, result }] : []), [conversation, result]);
+  const artifacts = useMemo(() => turns.flatMap((turn) => turn.result.artifacts), [turns]);
+  const activeArtifact = useMemo(() => artifacts.find((item) => item.id === activeArtifactId) ?? artifacts.at(-1), [activeArtifactId, artifacts]);
 
   useEffect(() => {
-    const latest = result?.artifacts.at(-1);
-    if (latest) setActiveArtifactId(latest.id);
-  }, [result]);
+    if (!managed) return;
+    setQuestion("");
+    setResult(null);
+    setConversation(null);
+    setError("");
+    setActiveArtifactId("");
+    if (!conversationId) {
+      setConversation(null);
+      setLoading(false);
+      return;
+    }
+    let ignore = false;
+    setLoading(true);
+    api<TutorConversation>(`/api/projects/${project.id}/conversations/${conversationId}`)
+      .then((value) => { if (!ignore) setConversation(value); })
+      .catch((cause) => { if (!ignore) setError(cause instanceof Error ? cause.message : String(cause)); })
+      .finally(() => { if (!ignore) setLoading(false); });
+    return () => { ignore = true; };
+  }, [conversationDraft, conversationId, managed, project.id]);
+
+  useEffect(() => {
+    const latest = artifacts.at(-1);
+    setActiveArtifactId(latest?.id ?? "");
+  }, [artifacts]);
 
   async function submit(): Promise<void> {
     if (question.trim().length < 4) return;
     setBusy(true); setError("");
-    try { setResult(await api<TutorResult>("/api/tutor", { method: "POST", body: JSON.stringify({ project_id: project.id, question, mode }) })); }
+    try {
+      if (!managed) {
+        setResult(await api<TutorResult>("/api/tutor", { method: "POST", body: JSON.stringify({ project_id: project.id, question, mode }) }));
+        return;
+      }
+      let currentId = conversation?.id || conversationId;
+      if (!currentId) {
+        const created = await api<TutorConversation>(`/api/projects/${project.id}/conversations`, { method: "POST", body: JSON.stringify({}) });
+        currentId = created.id;
+      }
+      const updated = await api<TutorConversation>(`/api/projects/${project.id}/conversations/${currentId}/turns`, {
+        method: "POST",
+        body: JSON.stringify({ question, mode }),
+      });
+      setConversation(updated);
+      setQuestion("");
+      onConversationChange?.(currentId);
+      await onConversationUpdated?.();
+    }
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   }
 
   function reset(): void {
+    if (managed && onNewConversation) {
+      onNewConversation();
+      return;
+    }
     setQuestion("");
     setResult(null);
+    setConversation(null);
     setActiveArtifactId("");
     setError("");
   }
@@ -515,12 +657,12 @@ function Tutor({ project, skills }: { project: Project; skills: Skill[] }) {
   return <div className="teacher-workbench">
     <section className="teacher-thread">
       <header className="thread-head">
-        <div><span className="session-orb">T</span><div><b>新教学会话</b><small>{project.name} · {project.subject}</small></div></div>
+        <div><span className="session-orb">T</span><div><b>{conversation?.title || "新教学会话"}</b><small>{project.name} · {project.subject}{conversation ? ` · ${conversation.turns.length} 轮` : ""}</small></div></div>
         <button onClick={reset}>＋ 新会话</button>
       </header>
 
       <div className="thread-scroll">
-        {!result && !busy && <div className="thread-welcome">
+        {!turns.length && !busy && !loading && <div className="thread-welcome">
           <span className="teacher-mark">T</span>
           <p className="eyebrow">AGENTIC TEACHER</p>
           <h1>把学生卡住的那一步，交给老师。</h1>
@@ -530,17 +672,18 @@ function Tutor({ project, skills }: { project: Project; skills: Skill[] }) {
           </div>
         </div>}
 
-        {result && <>
-          <div className="student-bubble"><span>你</span><p>{result.question}</p></div>
-          {result.tool_trace.length > 0 && <div className="tool-trace">
+        {turns.map((turn) => <div className="conversation-turn" key={turn.id}>
+          <div className="student-bubble"><span>你</span><p>{turn.question}</p></div>
+          {turn.result.tool_trace.length > 0 && <div className="tool-trace">
             <p className="eyebrow">TOOL TRACE</p>
-            {result.tool_trace.map((event) => <button key={event.id} className={event.artifact_id === activeArtifact?.id ? "active" : ""} disabled={!event.artifact_id} onClick={() => event.artifact_id && setActiveArtifactId(event.artifact_id)}>
+            {turn.result.tool_trace.map((event) => <button key={`${turn.id}-${event.id}`} className={event.artifact_id === activeArtifact?.id ? "active" : ""} disabled={!event.artifact_id} onClick={() => event.artifact_id && setActiveArtifactId(event.artifact_id)}>
               <span className="tool-icon">{event.ok ? "✓" : "!"}</span><span><b>{event.label}</b><small>{event.summary}</small></span>{event.artifact_id && <i>在画布打开 ↗</i>}
             </button>)}
           </div>}
-          <TutorAnswer result={result} workbench />
-        </>}
+          <TutorAnswer result={turn.result} workbench />
+        </div>)}
 
+        {loading && <div className="agent-running"><span className="pulse" /><div><b>正在恢复会话</b><small>载入历史回答、工具轨迹和教学画布…</small></div></div>}
         {busy && <div className="agent-running"><span className="pulse" /><div><b>老师正在处理</b><small>诊断问题、选择 Skill，并判断是否需要调用画图工具…</small></div></div>}
         {error && <div className="inline-error">{error}</div>}
       </div>
@@ -550,7 +693,7 @@ function Tutor({ project, skills }: { project: Project; skills: Skill[] }) {
         <div className="workbench-composer-foot">
           <div className="mode-picker">{(["base", "text_skill", "multimodal_skill"] as TutorMode[]).map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{modeLabel(item)}</button>)}</div>
           <span>{skills.length} Skills</span>
-          <button className="send-button" aria-label="发送" disabled={busy || question.trim().length < 4} onClick={submit}>↑</button>
+          <button className="send-button" aria-label="发送" disabled={busy || loading || question.trim().length < 4} onClick={submit}>↑</button>
         </div>
       </div>
     </section>
@@ -572,9 +715,9 @@ function Tutor({ project, skills }: { project: Project; skills: Skill[] }) {
       </div>
 
       <footer className="artifact-dock">
-        <div><p className="eyebrow">SESSION ARTIFACTS</p><b>{result?.artifacts.length || 0} 个产物</b></div>
-        <div className="artifact-tabs">{result?.artifacts.map((artifact, index) => <button key={artifact.id} className={artifact.id === activeArtifact?.id ? "active" : ""} onClick={() => setActiveArtifactId(artifact.id)}><span>{String(index + 1).padStart(2, "0")}</span>{artifact.title}</button>)}</div>
-        {!result?.artifacts.length && <small>发起一个需要画图的教学问题，产物将在本轮会话中留存。</small>}
+        <div><p className="eyebrow">SESSION ARTIFACTS</p><b>{artifacts.length} 个产物</b></div>
+        <div className="artifact-tabs">{artifacts.map((artifact, index) => <button key={`${artifact.id}-${index}`} className={artifact.id === activeArtifact?.id ? "active" : ""} onClick={() => setActiveArtifactId(artifact.id)}><span>{String(index + 1).padStart(2, "0")}</span>{artifact.title}</button>)}</div>
+        {!artifacts.length && <small>发起一个需要画图的教学问题，产物将在本轮会话中留存。</small>}
       </footer>
     </aside>
   </div>;
