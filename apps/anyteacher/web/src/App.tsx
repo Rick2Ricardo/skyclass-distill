@@ -12,6 +12,7 @@ import type {
   RuntimeSettings,
   Skill,
   SkillDetail,
+  TeachingArtifact,
   TutorMode,
   TutorResult,
   VideoAsset,
@@ -20,9 +21,10 @@ import { api, uploadVideo } from "./api.js";
 import { formatDate, formatDuration, percent } from "./format.js";
 import { Markdown } from "./components/Markdown.js";
 
-type View = "overview" | "evidence" | "skills" | "evaluation";
+type View = "studio" | "overview" | "evidence" | "skills" | "evaluation";
 
 const NAV: Array<{ key: View; number: string; label: string; hint: string }> = [
+  { key: "studio", number: "↳", label: "教学会话", hint: "Teacher · Canvas" },
   { key: "overview", number: "00", label: "项目总览", hint: "Readiness" },
   { key: "evidence", number: "01", label: "课堂证据", hint: "Source · Trace" },
   { key: "skills", number: "02", label: "Skill 工坊", hint: "Distill · Review" },
@@ -30,6 +32,7 @@ const NAV: Array<{ key: View; number: string; label: string; hint: string }> = [
 ];
 
 const VIEW_COPY: Record<View, { eyebrow: string; title: string; intro: string }> = {
+  studio: { eyebrow: "SKYCLASS / TEACHER SESSION", title: "教学会话", intro: "教师调用 Skill 与可视化工具，产物在画布中持续呈现。" },
   overview: { eyebrow: "SKYCLASS DISTILL / PROJECT", title: "从课堂证据，到可复现的教学验证。", intro: "先确认素材与 Skill 是否就绪，再进入固定数据集上的对照实验。" },
   evidence: { eyebrow: "01 / CLASSROOM EVIDENCE", title: "课堂证据", intro: "管理视频、逐字稿和视觉证据，让每个教学结论都能回到真实课堂。" },
   skills: { eyebrow: "02 / SKILL WORKSHOP", title: "Skill 工坊", intro: "蒸馏、检查并调试教学 Skill；只有可追溯版本才进入评估。" },
@@ -48,7 +51,7 @@ function stageLabel(job: JobState): string {
 }
 
 function App() {
-  const [view, setView] = useState<View>("overview");
+  const [view, setView] = useState<View>("studio");
   const [health, setHealth] = useState<Health | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState("");
@@ -139,6 +142,7 @@ function App() {
 
   const content = !project && view !== "overview"
     ? <EmptyProject onCreate={() => setProjectDialog(true)} />
+    : view === "studio" ? <Tutor project={project!} skills={skills} />
     : view === "overview" ? <Overview project={project} videos={videos} skills={skills} jobs={projectJobs} datasets={datasets} runs={experimentRuns} onNavigate={setView} onCreate={() => setProjectDialog(true)} />
     : view === "evidence" ? <EvidenceWorkspace project={project!} videos={videos} onCreated={async (job) => { setJobs((items) => [job, ...items]); flash("素材任务已开始"); }} flash={flash} />
     : view === "skills" ? <SkillWorkshop project={project!} videos={videos} skills={skills} onCreated={async (job) => { setJobs((items) => [job, ...items]); flash("蒸馏任务已开始"); }} onOpen={openSkill} onRefresh={refreshAll} flash={flash} />
@@ -177,7 +181,7 @@ function App() {
       </div>
     </aside>
 
-    <main className="main-stage">
+    <main className={`main-stage ${view === "studio" ? "studio-stage" : ""}`}>
       <header className="topbar">
         <div><span className="context-dot" />{project ? `${project.subject} · ${project.grade}` : "SKYCLASS DISTILL RESEARCH SYSTEM"}</div>
         <div className="top-actions">
@@ -186,12 +190,12 @@ function App() {
         </div>
       </header>
 
-      <section className="page-head">
+      {view !== "studio" && <section className="page-head">
         <p className="eyebrow">{VIEW_COPY[view].eyebrow}</p>
         <div><h1>{VIEW_COPY[view].title}</h1><p>{VIEW_COPY[view].intro}</p></div>
-      </section>
+      </section>}
 
-      <section className="content">{content}</section>
+      <section className={`content ${view === "studio" ? "studio-content" : ""}`}>{content}</section>
     </main>
 
     <JobRail jobs={projectJobs} onCancel={async (id) => { await api(`/api/jobs/${id}/cancel`, { method: "POST" }); await loadJobs(); }} />
@@ -483,8 +487,15 @@ function Tutor({ project, skills }: { project: Project; skills: Skill[] }) {
   const [mode, setMode] = useState<TutorMode>("multimodal_skill");
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<TutorResult | null>(null);
+  const [activeArtifactId, setActiveArtifactId] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const activeArtifact = useMemo(() => result?.artifacts.find((item) => item.id === activeArtifactId) ?? result?.artifacts.at(-1), [activeArtifactId, result]);
+
+  useEffect(() => {
+    const latest = result?.artifacts.at(-1);
+    if (latest) setActiveArtifactId(latest.id);
+  }, [result]);
 
   async function submit(): Promise<void> {
     if (question.trim().length < 4) return;
@@ -494,26 +505,89 @@ function Tutor({ project, skills }: { project: Project; skills: Skill[] }) {
     finally { setBusy(false); }
   }
 
-  return <div className="tutor-layout">
-    <section className="tutor-main">
-      <div className="composer paper-panel"><div className="composer-head"><p className="eyebrow">STUDENT TURN</p><div className="segmented compact">{(["base", "text_skill", "multimodal_skill"] as TutorMode[]).map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{modeLabel(item)}</button>)}</div></div>
-        <textarea value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit(); }} placeholder="输入一个概念、题目，或者学生卡住的那一步……" />
-        <div className="composer-foot"><span>⌘ / Ctrl + Enter 发送</span><button className="primary" disabled={busy || question.trim().length < 4} onClick={submit}>{busy ? "Pi 正在读取策略…" : "开始教学"}</button></div>
+  function reset(): void {
+    setQuestion("");
+    setResult(null);
+    setActiveArtifactId("");
+    setError("");
+  }
+
+  return <div className="teacher-workbench">
+    <section className="teacher-thread">
+      <header className="thread-head">
+        <div><span className="session-orb">T</span><div><b>新教学会话</b><small>{project.name} · {project.subject}</small></div></div>
+        <button onClick={reset}>＋ 新会话</button>
+      </header>
+
+      <div className="thread-scroll">
+        {!result && !busy && <div className="thread-welcome">
+          <span className="teacher-mark">T</span>
+          <p className="eyebrow">AGENTIC TEACHER</p>
+          <h1>把学生卡住的那一步，交给老师。</h1>
+          <p>老师会先诊断问题，再按需读取课堂 Skill、检查视觉证据，并调用画图工具。生成的产物会留在右侧画布。</p>
+          <div className="starter-grid">
+            {["画一张位移与路程的对比图", "用受力图解释斜面问题", "画速度—时间图像并讲斜率"].map((item) => <button key={item} onClick={() => setQuestion(item)}>{item}<span>↗</span></button>)}
+          </div>
+        </div>}
+
+        {result && <>
+          <div className="student-bubble"><span>你</span><p>{result.question}</p></div>
+          {result.tool_trace.length > 0 && <div className="tool-trace">
+            <p className="eyebrow">TOOL TRACE</p>
+            {result.tool_trace.map((event) => <button key={event.id} className={event.artifact_id === activeArtifact?.id ? "active" : ""} disabled={!event.artifact_id} onClick={() => event.artifact_id && setActiveArtifactId(event.artifact_id)}>
+              <span className="tool-icon">{event.ok ? "✓" : "!"}</span><span><b>{event.label}</b><small>{event.summary}</small></span>{event.artifact_id && <i>在画布打开 ↗</i>}
+            </button>)}
+          </div>}
+          <TutorAnswer result={result} workbench />
+        </>}
+
+        {busy && <div className="agent-running"><span className="pulse" /><div><b>老师正在处理</b><small>诊断问题、选择 Skill，并判断是否需要调用画图工具…</small></div></div>}
+        {error && <div className="inline-error">{error}</div>}
       </div>
-      {error && <div className="inline-error">{error}</div>}
-      {busy && <div className="answer-placeholder paper-panel"><span className="pulse" /><h2>正在诊断学生状态并读取 Skill</h2><p>本轮会记录实际模态、证据数量和工具调用。</p></div>}
-      {!busy && result && <TutorAnswer result={result} />}
-      {!busy && !result && <div className="answer-placeholder paper-panel"><span className="empty-orbit">A</span><h2>从一个真实卡点开始</h2><p>例如：为什么位移是矢量？先画图解释，再出一道题检查我。</p></div>}
+
+      <div className="workbench-composer">
+        <textarea value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit(); }} placeholder="输入题目、概念，或学生卡住的步骤…" />
+        <div className="workbench-composer-foot">
+          <div className="mode-picker">{(["base", "text_skill", "multimodal_skill"] as TutorMode[]).map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{modeLabel(item)}</button>)}</div>
+          <span>{skills.length} Skills</span>
+          <button className="send-button" aria-label="发送" disabled={busy || question.trim().length < 4} onClick={submit}>↑</button>
+        </div>
+      </div>
     </section>
-    <aside className="evidence-rail"><section className="paper-panel"><p className="eyebrow">AVAILABLE SKILLS</p><h2>{skills.length} 个可执行策略</h2>{skills.slice(0, 6).map((skill) => <div className="mini-skill" key={skill.name}><b>{skill.display_name || skill.name}</b><small>{skill.distill_modality === "multimodal" ? "视觉证据" : "文本证据"} · {skill.video_ids?.length || 0} 来源</small></div>)}</section>
-      <section className="paper-panel protocol"><p className="eyebrow">RUNTIME PROTOCOL</p><p>诊断 → 选 Skill → 执行动作 → 学习检查 → 补救或继续</p></section>
+
+    <aside className="artifact-workspace">
+      <header className="artifact-head">
+        <div><span className="canvas-icon">◇</span><div><b>{activeArtifact?.title || "教学画布"}</b><small>{activeArtifact ? activeArtifact.summary : "工具产物会自动在这里打开"}</small></div></div>
+        <span className="canvas-status"><i /> LIVE CANVAS</span>
+      </header>
+
+      <div className="artifact-stage">
+        {activeArtifact ? <ArtifactPreview artifact={activeArtifact} /> : <div className="empty-canvas">
+          <div className="canvas-grid-preview"><span /><span /><span /><span /></div>
+          <p className="eyebrow">WAITING FOR A TOOL</p>
+          <h2>这里会成为老师的黑板。</h2>
+          <p>当解释需要视觉结构时，老师可以生成受力图、坐标图、概念图和步骤流程图。</p>
+          <div className="tool-capabilities">{["受力关系", "函数图像", "概念地图", "过程步骤"].map((item) => <span key={item}>◇ {item}</span>)}</div>
+        </div>}
+      </div>
+
+      <footer className="artifact-dock">
+        <div><p className="eyebrow">SESSION ARTIFACTS</p><b>{result?.artifacts.length || 0} 个产物</b></div>
+        <div className="artifact-tabs">{result?.artifacts.map((artifact, index) => <button key={artifact.id} className={artifact.id === activeArtifact?.id ? "active" : ""} onClick={() => setActiveArtifactId(artifact.id)}><span>{String(index + 1).padStart(2, "0")}</span>{artifact.title}</button>)}</div>
+        {!result?.artifacts.length && <small>发起一个需要画图的教学问题，产物将在本轮会话中留存。</small>}
+      </footer>
     </aside>
   </div>;
 }
 
-function TutorAnswer({ result }: { result: TutorResult }) {
+function ArtifactPreview({ artifact }: { artifact: TeachingArtifact }) {
+  const source = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(artifact.svg)}`;
+  return <figure className="artifact-preview"><img src={source} alt={artifact.title} /><figcaption><span>{artifact.kind.replaceAll("_", " ")}</span><b>{artifact.title}</b><small>{artifact.summary}</small></figcaption></figure>;
+}
+
+function TutorAnswer({ result, workbench = false }: { result: TutorResult; workbench?: boolean }) {
   const audit = result.execution_audit;
-  return <article className="answer-card paper-panel">
+  return <article className={`answer-card paper-panel ${workbench ? "thread-answer" : ""}`}>
     <div className="answer-title"><div><p className="eyebrow">PI AGENT · {modeLabel(result.mode).toUpperCase()}</p><h2>给学生的解释</h2></div><span className="open-loop">OPEN LOOP</span></div>
     <Markdown>{result.answer.answer}</Markdown>
     {result.answer.learning_check.prompts.length > 0 && <div className="learning-check"><span>LEARNING CHECK</span><p>{result.answer.learning_check.prompts[0]}</p></div>}

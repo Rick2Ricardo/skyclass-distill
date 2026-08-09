@@ -192,6 +192,8 @@ export class TutorService {
       },
       selected_skills: skills,
       execution_audit: delivery,
+      tool_trace: runtime.toolCalls,
+      artifacts: runtime.artifacts,
     };
   }
 

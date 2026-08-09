@@ -9,7 +9,13 @@ import {
 import { Type } from "typebox";
 import { extname, join, resolve } from "node:path";
 import { mkdir, readFile } from "node:fs/promises";
-import type { JsonObject } from "../../contracts/src/index.js";
+import { randomUUID } from "node:crypto";
+import type {
+  JsonObject,
+  TeachingArtifact,
+  TeachingArtifactKind,
+  TutorToolTrace,
+} from "../../contracts/src/index.js";
 
 export interface PiSkill {
   key: string;
@@ -41,13 +47,104 @@ export interface PiRunInput {
 
 export interface PiRunOutput {
   answer: JsonObject;
-  toolCalls: Array<{ tool: string; ok: boolean }>;
+  toolCalls: TutorToolTrace[];
   toolCallCount: number;
   visualCount: number;
   stopReason: string;
+  artifacts: TeachingArtifact[];
 }
 
 const MAX_TOOL_CALLS = 8;
+
+interface DiagramNode {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  accent?: boolean;
+}
+
+interface DiagramEdge {
+  from: string;
+  to: string;
+  label?: string;
+}
+
+interface DiagramInput {
+  title: string;
+  summary: string;
+  kind: TeachingArtifactKind;
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum));
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+function short(value: string, maximum: number): string {
+  const text = String(value).trim();
+  return text.length > maximum ? `${text.slice(0, maximum - 1)}…` : text;
+}
+
+function labelLines(value: string): string[] {
+  const text = short(value, 24);
+  if (text.length <= 10) return [text];
+  return [text.slice(0, 10), text.slice(10, 20)];
+}
+
+export function renderTeachingDiagram(input: DiagramInput): TeachingArtifact {
+  const nodes = input.nodes.slice(0, 10).map((node, index) => ({
+    id: short(node.id || `node-${index + 1}`, 32),
+    label: short(node.label || `节点 ${index + 1}`, 24),
+    x: 70 + clamp(Number(node.x), 0, 100) * 6.6,
+    y: 72 + clamp(Number(node.y), 0, 100) * 3.2,
+    accent: Boolean(node.accent),
+  }));
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const edges = input.edges.slice(0, 14).flatMap((edge) => {
+    const from = byId.get(short(edge.from, 32));
+    const to = byId.get(short(edge.to, 32));
+    return from && to ? [{ from, to, label: short(edge.label ?? "", 18) }] : [];
+  });
+  const title = short(input.title || "教学图示", 60);
+  const summary = short(input.summary || "由教学工具生成", 140);
+  const axes = input.kind === "coordinate"
+    ? `<g class="axes"><path d="M72 392H740"/><path d="M92 416V70"/><text x="724" y="382">x</text><text x="104" y="84">y</text></g>`
+    : "";
+  const edgeSvg = edges.map(({ from, to, label }) => {
+    const middleX = (from.x + to.x) / 2;
+    const middleY = (from.y + to.y) / 2;
+    return `<g class="edge"><path d="M${from.x} ${from.y} L${to.x} ${to.y}" marker-end="url(#arrow)"/>${label ? `<text x="${middleX}" y="${middleY - 8}">${escapeXml(label)}</text>` : ""}</g>`;
+  }).join("");
+  const nodeSvg = nodes.map((node) => {
+    const lines = labelLines(node.label);
+    const text = lines.map((line, index) => `<tspan x="${node.x}" dy="${index ? 16 : 0}">${escapeXml(line)}</tspan>`).join("");
+    if (input.kind === "coordinate") {
+      return `<g class="point${node.accent ? " accent" : ""}"><circle cx="${node.x}" cy="${node.y}" r="8"/><text x="${node.x + 12}" y="${node.y - 12}">${escapeXml(node.label)}</text></g>`;
+    }
+    return `<g class="node${node.accent ? " accent" : ""}"><rect x="${node.x - 76}" y="${node.y - 30}" width="152" height="60" rx="16"/><text x="${node.x}" y="${node.y - (lines.length > 1 ? 7 : -5)}">${text}</text></g>`;
+  }).join("");
+
+  return {
+    id: randomUUID(),
+    type: "diagram",
+    kind: input.kind,
+    title,
+    summary,
+    created_at: new Date().toISOString(),
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-label="${escapeXml(title)}"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker><pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none"/></pattern></defs><style>.bg{fill:#f8f7f1}.grid{fill:url(#grid);opacity:.42}.grid+rect{fill:none}.grid,path{stroke:#d7d5ca}.title{font:600 24px system-ui;fill:#20241d}.subtitle{font:13px system-ui;fill:#74786e}.edge path,.axes path{fill:none;stroke:#6d7367;stroke-width:2.2}.edge text,.axes text,.point text{font:12px system-ui;fill:#666b61;text-anchor:middle}.node rect{fill:#fffefa;stroke:#bfc2b8;stroke-width:1.5}.node.accent rect{fill:#d7ff5e;stroke:#a9d51f}.node text{font:600 13px system-ui;fill:#242820;text-anchor:middle}.point circle{fill:#fffefa;stroke:#20241d;stroke-width:3}.point.accent circle{fill:#d7ff5e}.point text{text-anchor:start}.axes path{stroke:#343831;marker-end:url(#arrow)}marker path{fill:#343831;stroke:none}</style><rect class="bg" width="800" height="480"/><rect class="grid" x="56" y="58" width="688" height="366" rx="18"/><text class="title" x="56" y="34">${escapeXml(title)}</text><text class="subtitle" x="744" y="34" text-anchor="end">${escapeXml(input.kind.replaceAll("_", " "))}</text>${axes}${edgeSvg}${nodeSvg}</svg>`,
+  };
+}
 
 function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/chat\/completions\/?$/i, "").replace(/\/+$/, "");
@@ -79,7 +176,7 @@ function catalog(skills: PiSkill[]): string {
   })));
 }
 
-function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"]): (pi: any) => void | Promise<void> {
+function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"], artifacts: TeachingArtifact[]): (pi: any) => void | Promise<void> {
   const skills = new Map(input.skills.map((skill) => [skill.key, skill]));
   const visualEvidence = input.images.map((image) => ({
     label: image.label,
@@ -87,6 +184,42 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"]):
   }));
 
   return async (pi: any) => {
+    pi.registerTool(defineTool({
+      name: "draw_teaching_diagram",
+      label: "Draw Teaching Diagram",
+      description: "把空间关系、受力关系、概念联系或过程步骤绘制成学生可见图示。只在图比纯文字更清楚时调用。坐标使用 0 到 100。",
+      parameters: Type.Object({
+        title: Type.String({ description: "简短图名" }),
+        summary: Type.String({ description: "这张图帮助学生看清什么" }),
+        kind: Type.Union([
+          Type.Literal("concept_map"),
+          Type.Literal("process"),
+          Type.Literal("force"),
+          Type.Literal("coordinate"),
+        ]),
+        nodes: Type.Array(Type.Object({
+          id: Type.String(),
+          label: Type.String(),
+          x: Type.Number({ minimum: 0, maximum: 100 }),
+          y: Type.Number({ minimum: 0, maximum: 100 }),
+          accent: Type.Optional(Type.Boolean()),
+        }), { minItems: 1, maxItems: 10 }),
+        edges: Type.Array(Type.Object({
+          from: Type.String(),
+          to: Type.String(),
+          label: Type.Optional(Type.String()),
+        }), { maxItems: 14 }),
+      }),
+      async execute(_id: string, params: DiagramInput) {
+        const artifact = renderTeachingDiagram(params);
+        artifacts.push(artifact);
+        return {
+          content: [{ type: "text", text: `已在学生画布生成「${artifact.title}」，产物编号 ${artifact.id}。请结合图示继续解释。` }],
+          details: { artifact_id: artifact.id, artifact_title: artifact.title, artifact_kind: artifact.kind },
+        };
+      },
+    }));
+
     if (skills.size) {
       pi.registerTool(defineTool({
         name: "load_teaching_skill",
@@ -118,12 +251,29 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"]):
     }
 
     pi.on("tool_call", async (event: any) => {
-      if (["load_teaching_skill", "inspect_visual_evidence"].includes(event.toolName)) return undefined;
-      return { block: true, reason: "SkyClass 教学运行时只允许读取 Skill 和课堂证据。" };
+      if (["load_teaching_skill", "inspect_visual_evidence", "draw_teaching_diagram"].includes(event.toolName)) return undefined;
+      return { block: true, reason: "SkyClass 教学运行时只允许教学专用的受控工具。" };
     });
 
     pi.on("tool_result", async (event: any) => {
-      toolEvents.push({ tool: event.toolName, ok: !event.isError });
+      const artifactId = typeof event.details?.artifact_id === "string" ? event.details.artifact_id : undefined;
+      const summaries: Record<string, string> = {
+        load_teaching_skill: event.details?.found ? "已读取教学 Skill" : "未找到教学 Skill",
+        inspect_visual_evidence: `已检查 ${Number(event.details?.count ?? 0)} 条视觉证据`,
+        draw_teaching_diagram: artifactId ? `已生成「${String(event.details?.artifact_title ?? "教学图示")}」` : "图示生成失败",
+      };
+      toolEvents.push({
+        id: String(event.toolCallId ?? randomUUID()),
+        tool: String(event.toolName),
+        label: ({
+          load_teaching_skill: "读取教学 Skill",
+          inspect_visual_evidence: "检查课堂证据",
+          draw_teaching_diagram: "绘制教学图示",
+        } as Record<string, string>)[event.toolName] ?? String(event.toolName),
+        ok: !event.isError,
+        summary: summaries[event.toolName] ?? (event.isError ? "工具执行失败" : "工具执行完成"),
+        ...(artifactId ? { artifact_id: artifactId } : {}),
+      });
     });
 
     pi.on("before_agent_start", async (event: any) => ({
@@ -139,6 +289,7 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"]):
         visualEvidence.length
           ? "本轮附带课堂关键帧；需要引用画面时先调用 inspect_visual_evidence。"
           : "本轮没有课堂关键帧，不得虚构视觉证据。",
+        "当问题涉及空间关系、受力、坐标变化、步骤流程或概念关系时，优先调用 draw_teaching_diagram；图示会直接出现在学生画布中。不要为普通事实问答强行画图。",
         "最多执行 8 次工具调用，完成后立即作答。",
         "最终只输出 JSON：{\"answer\":\"面向学生的 Markdown\",\"assumptions\":[],\"learning_checks\":[]}",
       ].join("\n\n"),
@@ -176,13 +327,14 @@ function parseJson(text: string): JsonObject {
 
 export async function runPiAgent(input: PiRunInput): Promise<PiRunOutput> {
   const toolCalls: PiRunOutput["toolCalls"] = [];
+  const artifacts: TeachingArtifact[] = [];
   const imageContent = await loadImages(input.images);
   const workDir = resolve(input.runDir ?? join(process.cwd(), ".runtime", "pi-agent"));
   await mkdir(workDir, { recursive: true });
 
   const settingsManager = SettingsManager.inMemory({ compaction: { enabled: false } });
   const sessionManager = SessionManager.inMemory(workDir);
-  const extension = makeExtension(input, toolCalls);
+  const extension = makeExtension(input, toolCalls, artifacts);
   const createRuntime = async ({ cwd, sessionManager: manager, sessionStartEvent }: any) => {
     const services = await createAgentSessionServices({
       cwd,
@@ -255,6 +407,7 @@ export async function runPiAgent(input: PiRunInput): Promise<PiRunOutput> {
       toolCallCount: toolCalls.length,
       visualCount: input.images.length,
       stopReason: String(finalMessage?.stopReason ?? ""),
+      artifacts,
     };
   } finally {
     runtime.session.dispose();

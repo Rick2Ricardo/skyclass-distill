@@ -156,6 +156,27 @@ export interface TutorAnswer {
   student_visible_sha256?: string;
 }
 
+export type TeachingArtifactKind = "concept_map" | "process" | "force" | "coordinate";
+
+export interface TeachingArtifact {
+  id: string;
+  type: "diagram";
+  kind: TeachingArtifactKind;
+  title: string;
+  summary: string;
+  svg: string;
+  created_at: string;
+}
+
+export interface TutorToolTrace {
+  id: string;
+  tool: string;
+  label: string;
+  ok: boolean;
+  summary: string;
+  artifact_id?: string;
+}
+
 export interface TutorResult {
   project_id: string;
   question: string;
@@ -164,6 +185,8 @@ export interface TutorResult {
   answer: TutorAnswer;
   selected_skills: Skill[];
   execution_audit: DeliveryAudit;
+  tool_trace: TutorToolTrace[];
+  artifacts: TeachingArtifact[];
 }
 
 export interface ExperimentRun {
