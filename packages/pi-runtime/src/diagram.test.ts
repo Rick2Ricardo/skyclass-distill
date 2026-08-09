@@ -34,6 +34,46 @@ describe("renderTeachingDiagram", () => {
     expect(artifact.kind).toBe("coordinate");
   });
 
+  it("automatically lays out a concept hierarchy without overlapping nodes", () => {
+    const artifact = renderTeachingDiagram({
+      title: "内力外力取决于系统边界",
+      summary: "先确定系统，再判断内力和外力",
+      kind: "concept_map",
+      nodes: [
+        { id: "object", label: "研究对象是谁？", x: 20, y: 20, accent: true },
+        { id: "boundary", label: "画系统边界", x: 22, y: 20, accent: true },
+        { id: "internal", label: "内力", x: 30, y: 50 },
+        { id: "change", label: "换研究对象", x: 32, y: 50 },
+        { id: "external", label: "外力", x: 34, y: 50 },
+        { id: "omit", label: "可暂不列入整体受力", x: 40, y: 75 },
+        { id: "include", label: "必须列入整体受力", x: 42, y: 75, accent: true },
+      ],
+      edges: [
+        { from: "object", to: "boundary", label: "先确定" },
+        { from: "boundary", to: "internal", label: "边界内作用" },
+        { from: "boundary", to: "change", label: "改变系统" },
+        { from: "boundary", to: "external", label: "边界外作用" },
+        { from: "internal", to: "omit", label: "整体分析" },
+        { from: "external", to: "include", label: "必须计入" },
+      ],
+    });
+
+    expect(artifact.svg).toContain('data-layout="auto-hierarchy"');
+    expect(artifact.svg).toContain('class="edge"><path d="M');
+    expect(artifact.svg).toContain(" C");
+
+    const boxes = [...artifact.svg.matchAll(/<g class="node[^"]*" data-node-id="[^"]+"><rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)]
+      .map((match) => ({ x: Number(match[1]), y: Number(match[2]), width: Number(match[3]), height: Number(match[4]) }));
+    expect(boxes).toHaveLength(7);
+    for (let left = 0; left < boxes.length; left += 1) {
+      for (let right = left + 1; right < boxes.length; right += 1) {
+        const a = boxes[left];
+        const b = boxes[right];
+        expect(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
+      }
+    }
+  });
+
   it("renders force diagrams as a physical free-body diagram instead of a node graph", () => {
     const artifact = renderTeachingDiagram({
       title: "斜面上物块的受力图",

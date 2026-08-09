@@ -59,8 +59,8 @@ const MAX_TOOL_CALLS = 8;
 interface DiagramNode {
   id: string;
   label: string;
-  x: number;
-  y: number;
+  x?: number;
+  y?: number;
   accent?: boolean;
 }
 
@@ -108,10 +108,136 @@ function short(value: string, maximum: number): string {
   return text.length > maximum ? `${text.slice(0, maximum - 1)}…` : text;
 }
 
-function labelLines(value: string): string[] {
-  const text = short(value, 24);
-  if (text.length <= 10) return [text];
-  return [text.slice(0, 10), text.slice(10, 20)];
+function labelLines(value: string, charactersPerLine = 10): string[] {
+  const text = short(value, charactersPerLine * 2);
+  if (text.length <= charactersPerLine) return [text];
+  return [text.slice(0, charactersPerLine), text.slice(charactersPerLine, charactersPerLine * 2)];
+}
+
+interface PositionedDiagramNode {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  accent: boolean;
+}
+
+interface DiagramEdgeReference {
+  from: string;
+  to: string;
+  label: string;
+}
+
+function layoutHierarchy(nodes: Array<Omit<PositionedDiagramNode, "x" | "y">>, edges: DiagramEdgeReference[]): {
+  nodes: PositionedDiagramNode[];
+  nodeWidth: number;
+  nodeHeight: number;
+} {
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const incoming = new Map(nodes.map((node) => [node.id, 0]));
+  const outgoing = new Map(nodes.map((node) => [node.id, [] as string[]]));
+  for (const edge of edges) {
+    if (edge.from === edge.to || !nodeIds.has(edge.from) || !nodeIds.has(edge.to)) continue;
+    incoming.set(edge.to, (incoming.get(edge.to) ?? 0) + 1);
+    outgoing.get(edge.from)?.push(edge.to);
+  }
+
+  const ranks = new Map(nodes.map((node) => [node.id, 0]));
+  const pending = new Map(incoming);
+  const queue = nodes.filter((node) => (pending.get(node.id) ?? 0) === 0).map((node) => node.id);
+  if (!queue.length && nodes[0]) queue.push(nodes[0].id);
+  const visited = new Set<string>();
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (visited.has(id)) continue;
+    visited.add(id);
+    for (const child of outgoing.get(id) ?? []) {
+      ranks.set(child, Math.max(ranks.get(child) ?? 0, (ranks.get(id) ?? 0) + 1));
+      pending.set(child, (pending.get(child) ?? 1) - 1);
+      if ((pending.get(child) ?? 0) <= 0) queue.push(child);
+    }
+  }
+  for (const node of nodes) {
+    if (visited.has(node.id)) continue;
+    const parentRanks = edges.filter((edge) => edge.to === node.id && visited.has(edge.from)).map((edge) => ranks.get(edge.from) ?? 0);
+    ranks.set(node.id, parentRanks.length ? Math.max(...parentRanks) + 1 : 0);
+    visited.add(node.id);
+  }
+
+  const maximumLogicalRank = Math.max(0, ...ranks.values());
+  const maximumBaseRow = Math.min(maximumLogicalRank, 4);
+  const grouped = new Map<number, typeof nodes>();
+  for (const node of nodes) {
+    const logicalRank = ranks.get(node.id) ?? 0;
+    const row = maximumLogicalRank <= 4 ? logicalRank : Math.round(logicalRank * maximumBaseRow / maximumLogicalRank);
+    grouped.set(row, [...(grouped.get(row) ?? []), node]);
+  }
+
+  const originalOrder = new Map(nodes.map((node, index) => [node.id, index]));
+  const rows: Array<typeof nodes> = [];
+  for (const [, rowNodes] of [...grouped.entries()].sort(([left], [right]) => left - right)) {
+    rowNodes.sort((left, right) => {
+      const parentOrder = (id: string) => {
+        const parents = edges.filter((edge) => edge.to === id).map((edge) => originalOrder.get(edge.from) ?? 0);
+        return parents.length ? parents.reduce((sum, value) => sum + value, 0) / parents.length : originalOrder.get(id) ?? 0;
+      };
+      return parentOrder(left.id) - parentOrder(right.id);
+    });
+    for (let index = 0; index < rowNodes.length; index += 5) rows.push(rowNodes.slice(index, index + 5));
+  }
+
+  const widestRow = Math.max(1, ...rows.map((row) => row.length));
+  const nodeWidth = clamp(Math.floor((660 - (widestRow - 1) * 18) / widestRow), 112, 156);
+  const nodeHeight = 54;
+  const positioned: PositionedDiagramNode[] = [];
+  rows.forEach((row, rowIndex) => {
+    const y = rows.length === 1 ? 242 : 102 + rowIndex * (288 / (rows.length - 1));
+    const minimumX = 70 + nodeWidth / 2;
+    const maximumX = 730 - nodeWidth / 2;
+    row.forEach((node, columnIndex) => positioned.push({
+      ...node,
+      x: row.length === 1 ? 400 : minimumX + columnIndex * ((maximumX - minimumX) / (row.length - 1)),
+      y,
+    }));
+  });
+  return { nodes: positioned, nodeWidth, nodeHeight };
+}
+
+function edgeGeometry(from: PositionedDiagramNode, to: PositionedDiagramNode, nodeWidth: number, nodeHeight: number, index: number): {
+  path: string;
+  labelX: number;
+  labelY: number;
+} {
+  if (to.y > from.y + nodeHeight * .6) {
+    const startY = from.y + nodeHeight / 2;
+    const endY = to.y - nodeHeight / 2 - 4;
+    const middleY = (startY + endY) / 2;
+    return {
+      path: `M${from.x} ${startY} C${from.x} ${middleY},${to.x} ${middleY},${to.x} ${endY}`,
+      labelX: (from.x + to.x) / 2,
+      labelY: middleY - 7,
+    };
+  }
+  if (Math.abs(to.y - from.y) < nodeHeight) {
+    const direction = to.x >= from.x ? 1 : -1;
+    const startX = from.x + direction * nodeWidth / 2;
+    const endX = to.x - direction * (nodeWidth / 2 + 4);
+    const lift = 38 + (index % 2) * 14;
+    return {
+      path: `M${startX} ${from.y} C${startX + direction * 28} ${from.y - lift},${endX - direction * 28} ${to.y - lift},${endX} ${to.y}`,
+      labelX: (startX + endX) / 2,
+      labelY: Math.min(from.y, to.y) - lift - 5,
+    };
+  }
+  const direction = to.x >= from.x ? 1 : -1;
+  const startX = from.x + direction * nodeWidth / 2;
+  const endX = to.x - direction * (nodeWidth / 2 + 4);
+  const outsideX = direction > 0 ? 752 - (index % 3) * 12 : 48 + (index % 3) * 12;
+  return {
+    path: `M${startX} ${from.y} C${outsideX} ${from.y},${outsideX} ${to.y},${endX} ${to.y}`,
+    labelX: outsideX + (direction > 0 ? -8 : 8),
+    labelY: (from.y + to.y) / 2 - 6,
+  };
 }
 
 function inferForceVectors(input: DiagramInput): ForceVectorInput[] {
@@ -198,34 +324,55 @@ export function renderTeachingDiagram(input: DiagramInput): TeachingArtifact {
   const title = short(input.title || "教学图示", 60);
   const summary = short(input.summary || "由教学工具生成", 140);
   if (input.kind === "force") return renderForceDiagram(input, title, summary);
-  const nodes = input.nodes.slice(0, 10).map((node, index) => ({
+  const sourceNodes = (input.nodes.length ? input.nodes : [{ id: "node-1", label: "教学要点", accent: true }]).slice(0, 10).map((node, index) => ({
     id: short(node.id || `node-${index + 1}`, 32),
     label: short(node.label || `节点 ${index + 1}`, 24),
-    x: 70 + clamp(Number(node.x), 0, 100) * 6.6,
-    y: 72 + clamp(Number(node.y), 0, 100) * 3.2,
     accent: Boolean(node.accent),
   }));
+  const sourceIds = new Set(sourceNodes.map((node) => node.id));
+  const edgeReferences = input.edges.slice(0, 14).flatMap((edge) => {
+    const from = short(edge.from, 32);
+    const to = short(edge.to, 32);
+    return sourceIds.has(from) && sourceIds.has(to) ? [{ from, to, label: short(edge.label ?? "", 13) }] : [];
+  });
+  const layout = input.kind === "coordinate"
+    ? {
+      nodes: sourceNodes.map((node, index) => ({
+        ...node,
+        x: 70 + clamp(Number(input.nodes[index]?.x ?? ((index + 1) * 100 / (sourceNodes.length + 1))), 0, 100) * 6.6,
+        y: 72 + clamp(Number(input.nodes[index]?.y ?? 50), 0, 100) * 3.2,
+      })),
+      nodeWidth: 152,
+      nodeHeight: 60,
+    }
+    : layoutHierarchy(sourceNodes, edgeReferences);
+  const nodes = layout.nodes;
   const byId = new Map(nodes.map((node) => [node.id, node]));
-  const edges = input.edges.slice(0, 14).flatMap((edge) => {
-    const from = byId.get(short(edge.from, 32));
-    const to = byId.get(short(edge.to, 32));
-    return from && to ? [{ from, to, label: short(edge.label ?? "", 18) }] : [];
+  const edges = edgeReferences.flatMap((edge) => {
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    return from && to ? [{ from, to, label: edge.label }] : [];
   });
   const axes = input.kind === "coordinate"
     ? `<g class="axes"><path d="M72 392H740"/><path d="M92 416V70"/><text x="724" y="382">x</text><text x="104" y="84">y</text></g>`
     : "";
-  const edgeSvg = edges.map(({ from, to, label }) => {
-    const middleX = (from.x + to.x) / 2;
-    const middleY = (from.y + to.y) / 2;
-    return `<g class="edge"><path d="M${from.x} ${from.y} L${to.x} ${to.y}" marker-end="url(#arrow)"/>${label ? `<text x="${middleX}" y="${middleY - 8}">${escapeXml(label)}</text>` : ""}</g>`;
+  const edgeSvg = edges.map(({ from, to, label }, index) => {
+    if (input.kind === "coordinate") {
+      const middleX = (from.x + to.x) / 2;
+      const middleY = (from.y + to.y) / 2;
+      return `<g class="edge"><path d="M${from.x} ${from.y} L${to.x} ${to.y}" marker-end="url(#arrow)"/>${label ? `<text x="${middleX}" y="${middleY - 8}">${escapeXml(label)}</text>` : ""}</g>`;
+    }
+    const geometry = edgeGeometry(from, to, layout.nodeWidth, layout.nodeHeight, index);
+    return `<g class="edge"><path d="${geometry.path}" marker-end="url(#arrow)"/>${label ? `<text x="${geometry.labelX}" y="${geometry.labelY}">${escapeXml(label)}</text>` : ""}</g>`;
   }).join("");
   const nodeSvg = nodes.map((node) => {
-    const lines = labelLines(node.label);
-    const text = lines.map((line, index) => `<tspan x="${node.x}" dy="${index ? 16 : 0}">${escapeXml(line)}</tspan>`).join("");
     if (input.kind === "coordinate") {
       return `<g class="point${node.accent ? " accent" : ""}"><circle cx="${node.x}" cy="${node.y}" r="8"/><text x="${node.x + 12}" y="${node.y - 12}">${escapeXml(node.label)}</text></g>`;
     }
-    return `<g class="node${node.accent ? " accent" : ""}"><rect x="${node.x - 76}" y="${node.y - 30}" width="152" height="60" rx="16"/><text x="${node.x}" y="${node.y - (lines.length > 1 ? 7 : -5)}">${text}</text></g>`;
+    const charactersPerLine = Math.max(6, Math.floor((layout.nodeWidth - 25) / 13));
+    const lines = labelLines(node.label, charactersPerLine);
+    const text = lines.map((line, index) => `<tspan x="${node.x}" dy="${index ? 15 : 0}">${escapeXml(line)}</tspan>`).join("");
+    return `<g class="node${node.accent ? " accent" : ""}" data-node-id="${escapeXml(node.id)}"><rect x="${node.x - layout.nodeWidth / 2}" y="${node.y - layout.nodeHeight / 2}" width="${layout.nodeWidth}" height="${layout.nodeHeight}" rx="15"/><text x="${node.x}" y="${node.y - (lines.length > 1 ? 6 : -4)}">${text}</text></g>`;
   }).join("");
 
   return {
@@ -235,7 +382,7 @@ export function renderTeachingDiagram(input: DiagramInput): TeachingArtifact {
     title,
     summary,
     created_at: new Date().toISOString(),
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-label="${escapeXml(title)}"><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker><pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none"/></pattern></defs><style>.bg{fill:#f8f7f1}.grid{fill:url(#grid);opacity:.42}.grid+rect{fill:none}.grid,path{stroke:#d7d5ca}.title{font:600 24px system-ui;fill:#20241d}.subtitle{font:13px system-ui;fill:#74786e}.edge path,.axes path{fill:none;stroke:#6d7367;stroke-width:2.2}.edge text,.axes text,.point text{font:12px system-ui;fill:#666b61;text-anchor:middle}.node rect{fill:#fffefa;stroke:#bfc2b8;stroke-width:1.5}.node.accent rect{fill:#d7ff5e;stroke:#a9d51f}.node text{font:600 13px system-ui;fill:#242820;text-anchor:middle}.point circle{fill:#fffefa;stroke:#20241d;stroke-width:3}.point.accent circle{fill:#d7ff5e}.point text{text-anchor:start}.axes path{stroke:#343831;marker-end:url(#arrow)}marker path{fill:#343831;stroke:none}</style><rect class="bg" width="800" height="480"/><rect class="grid" x="56" y="58" width="688" height="366" rx="18"/><text class="title" x="56" y="34">${escapeXml(title)}</text><text class="subtitle" x="744" y="34" text-anchor="end">${escapeXml(input.kind.replaceAll("_", " "))}</text>${axes}${edgeSvg}${nodeSvg}</svg>`,
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-label="${escapeXml(title)}"${input.kind === "coordinate" ? "" : ' data-layout="auto-hierarchy"'}><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker><pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none"/></pattern></defs><style>.bg{fill:#f8f7f1}.grid{fill:url(#grid);opacity:.42}.grid+rect{fill:none}.grid,path{stroke:#d7d5ca}.title{font:600 24px system-ui;fill:#20241d}.subtitle{font:13px system-ui;fill:#74786e}.edge path,.axes path{fill:none;stroke:#6d7367;stroke-width:2.2}.edge text,.axes text,.point text{font:11px system-ui;fill:#666b61;text-anchor:middle}.edge text{paint-order:stroke;stroke:#f8f7f1;stroke-width:6px;stroke-linejoin:round}.node rect{fill:#fffefa;stroke:#bfc2b8;stroke-width:1.5}.node.accent rect{fill:#d7ff5e;stroke:#a9d51f}.node text{font:600 12px system-ui;fill:#242820;text-anchor:middle}.point circle{fill:#fffefa;stroke:#20241d;stroke-width:3}.point.accent circle{fill:#d7ff5e}.point text{text-anchor:start}.axes path{stroke:#343831;marker-end:url(#arrow)}marker path{fill:#343831;stroke:none}</style><rect class="bg" width="800" height="480"/><rect class="grid" x="56" y="58" width="688" height="366" rx="18"/><text class="title" x="56" y="34">${escapeXml(title)}</text><text class="subtitle" x="744" y="34" text-anchor="end">${escapeXml(input.kind.replaceAll("_", " "))}</text>${axes}${edgeSvg}${nodeSvg}</svg>`,
   };
 }
 
@@ -280,7 +427,7 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"], 
     pi.registerTool(defineTool({
       name: "draw_teaching_diagram",
       label: "Draw Teaching Diagram",
-      description: "把空间关系、受力关系、概念联系或过程步骤绘制成学生可见图示。只在图比纯文字更清楚时调用。坐标使用 0 到 100。",
+      description: "把空间关系、受力关系、概念联系或过程步骤绘制成学生可见图示。只在图比纯文字更清楚时调用。概念图与流程图由系统根据 edges 自动排版，只有坐标图使用节点坐标。",
       parameters: Type.Object({
         title: Type.String({ description: "简短图名" }),
         summary: Type.String({ description: "这张图帮助学生看清什么" }),
@@ -313,8 +460,8 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"], 
         nodes: Type.Array(Type.Object({
           id: Type.String(),
           label: Type.String(),
-          x: Type.Number({ minimum: 0, maximum: 100 }),
-          y: Type.Number({ minimum: 0, maximum: 100 }),
+          x: Type.Optional(Type.Number({ minimum: 0, maximum: 100, description: "仅坐标图使用" })),
+          y: Type.Optional(Type.Number({ minimum: 0, maximum: 100, description: "仅坐标图使用" })),
           accent: Type.Optional(Type.Boolean()),
         }), { minItems: 1, maxItems: 10 }),
         edges: Type.Array(Type.Object({
