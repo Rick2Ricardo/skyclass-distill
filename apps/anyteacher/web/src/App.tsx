@@ -26,7 +26,7 @@ import { Markdown } from "./components/Markdown.js";
 type View = "studio" | "overview" | "evidence" | "skills" | "evaluation";
 
 const NAV: Array<{ key: View; number: string; label: string; hint: string }> = [
-  { key: "studio", number: "↳", label: "教学会话", hint: "Teacher · Canvas" },
+  { key: "studio", number: "↳", label: "教学会话", hint: "Teacher · Blackboard" },
   { key: "overview", number: "00", label: "项目总览", hint: "Readiness" },
   { key: "evidence", number: "01", label: "课堂证据", hint: "Source · Trace" },
   { key: "skills", number: "02", label: "Skill 工坊", hint: "Distill · Review" },
@@ -34,7 +34,7 @@ const NAV: Array<{ key: View; number: string; label: string; hint: string }> = [
 ];
 
 const VIEW_COPY: Record<View, { eyebrow: string; title: string; intro: string }> = {
-  studio: { eyebrow: "SKYCLASS / TEACHER SESSION", title: "教学会话", intro: "教师调用 Skill 与可视化工具，产物在画布中持续呈现。" },
+  studio: { eyebrow: "SKYCLASS / TEACHER SESSION", title: "教学会话", intro: "教师调用 Skill 与可视化工具，板书在教学黑板中持续呈现。" },
   overview: { eyebrow: "SKYCLASS DISTILL / PROJECT", title: "从课堂证据，到可复现的教学验证。", intro: "先确认素材与 Skill 是否就绪，再进入固定数据集上的对照实验。" },
   evidence: { eyebrow: "01 / CLASSROOM EVIDENCE", title: "课堂证据", intro: "管理视频、逐字稿和视觉证据，让每个教学结论都能回到真实课堂。" },
   skills: { eyebrow: "02 / SKILL WORKSHOP", title: "Skill 工坊", intro: "蒸馏、检查并调试教学 Skill；只有可追溯版本才进入评估。" },
@@ -263,7 +263,7 @@ function ConversationHistory({ projectId, conversations, activeId, onOpen, onNew
   }
 
   async function deleteConversation(item: TutorConversationSummary): Promise<void> {
-    if (!window.confirm(`确认删除「${item.title}」？该会话中的回答和画布产物也会被删除。`)) return;
+    if (!window.confirm(`确认删除「${item.title}」？该会话中的回答和黑板板书也会被删除。`)) return;
     try {
       await api(`/api/projects/${projectId}/conversations/${item.id}`, { method: "DELETE" });
       if (activeId === item.id) onNew();
@@ -280,7 +280,7 @@ function ConversationHistory({ projectId, conversations, activeId, onOpen, onNew
       {filtered.map((item) => <article key={item.id} className={activeId === item.id ? "active" : ""}>
         <button className="conversation-open" onClick={() => onOpen(item.id)}>
           <b>{item.title}</b>
-          <small>{item.turn_count} 轮 · {item.artifact_count} 个画布 · {formatDate(item.updated_at)}</small>
+          <small>{item.turn_count} 轮 · {item.artifact_count} 次板书 · {formatDate(item.updated_at)}</small>
         </button>
         <div className="conversation-actions">
           <button title="重命名" aria-label={`重命名 ${item.title}`} onClick={() => void renameConversation(item)}>✎</button>
@@ -666,7 +666,7 @@ function Tutor({ project, skills, conversationId = "", conversationDraft = 0, on
           <span className="teacher-mark">T</span>
           <p className="eyebrow">AGENTIC TEACHER</p>
           <h1>把学生卡住的那一步，交给老师。</h1>
-          <p>老师会先诊断问题，再按需读取课堂 Skill、检查视觉证据，并调用画图工具。生成的产物会留在右侧画布。</p>
+          <p>老师会先诊断问题，再按需读取课堂 Skill、检查视觉证据，并调用板书工具。生成的图示会持续留在左侧教学黑板。</p>
           <div className="starter-grid">
             {["画一张位移与路程的对比图", "用受力图解释斜面问题", "画速度—时间图像并讲斜率"].map((item) => <button key={item} onClick={() => setQuestion(item)}>{item}<span>↗</span></button>)}
           </div>
@@ -677,13 +677,13 @@ function Tutor({ project, skills, conversationId = "", conversationDraft = 0, on
           {turn.result.tool_trace.length > 0 && <div className="tool-trace">
             <p className="eyebrow">TOOL TRACE</p>
             {turn.result.tool_trace.map((event) => <button key={`${turn.id}-${event.id}`} className={event.artifact_id === activeArtifact?.id ? "active" : ""} disabled={!event.artifact_id} onClick={() => event.artifact_id && setActiveArtifactId(event.artifact_id)}>
-              <span className="tool-icon">{event.ok ? "✓" : "!"}</span><span><b>{event.label}</b><small>{event.summary}</small></span>{event.artifact_id && <i>在画布打开 ↗</i>}
+              <span className="tool-icon">{event.ok ? "✓" : "!"}</span><span><b>{event.label}</b><small>{event.summary}</small></span>{event.artifact_id && <i>在黑板打开 ↗</i>}
             </button>)}
           </div>}
           <TutorAnswer result={turn.result} workbench />
         </div>)}
 
-        {loading && <div className="agent-running"><span className="pulse" /><div><b>正在恢复会话</b><small>载入历史回答、工具轨迹和教学画布…</small></div></div>}
+        {loading && <div className="agent-running"><span className="pulse" /><div><b>正在恢复会话</b><small>载入历史回答、工具轨迹和黑板板书…</small></div></div>}
         {busy && <div className="agent-running"><span className="pulse" /><div><b>老师正在处理</b><small>诊断问题、选择 Skill，并判断是否需要调用画图工具…</small></div></div>}
         {error && <div className="inline-error">{error}</div>}
       </div>
@@ -700,32 +700,40 @@ function Tutor({ project, skills, conversationId = "", conversationDraft = 0, on
 
     <aside className="artifact-workspace">
       <header className="artifact-head">
-        <div><span className="canvas-icon">◇</span><div><b>{activeArtifact?.title || "教学画布"}</b><small>{activeArtifact ? activeArtifact.summary : "工具产物会自动在这里打开"}</small></div></div>
-        <span className="canvas-status"><i /> LIVE CANVAS</span>
+        <div><span className="canvas-icon">板</span><div><b>{activeArtifact?.title || "教学黑板"}</b><small>{activeArtifact ? activeArtifact.summary : "老师的图示与推演会自动写在这里"}</small></div></div>
+        <span className="canvas-status"><i /> LIVE BLACKBOARD</span>
       </header>
 
       <div className="artifact-stage">
         {activeArtifact ? <ArtifactPreview artifact={activeArtifact} /> : <div className="empty-canvas">
           <div className="canvas-grid-preview"><span /><span /><span /><span /></div>
-          <p className="eyebrow">WAITING FOR A TOOL</p>
-          <h2>这里会成为老师的黑板。</h2>
-          <p>当解释需要视觉结构时，老师可以生成受力图、坐标图、概念图和步骤流程图。</p>
+          <p className="eyebrow">BLACKBOARD READY</p>
+          <h2>老师会在这里边画边讲。</h2>
+          <p>当解释需要视觉结构时，老师会在黑板上生成受力图、坐标图、概念图和步骤流程图。</p>
           <div className="tool-capabilities">{["受力关系", "函数图像", "概念地图", "过程步骤"].map((item) => <span key={item}>◇ {item}</span>)}</div>
         </div>}
       </div>
 
       <footer className="artifact-dock">
-        <div><p className="eyebrow">SESSION ARTIFACTS</p><b>{artifacts.length} 个产物</b></div>
+        <div><p className="eyebrow">BLACKBOARD RECORDS</p><b>{artifacts.length} 次板书</b></div>
         <div className="artifact-tabs">{artifacts.map((artifact, index) => <button key={`${artifact.id}-${index}`} className={artifact.id === activeArtifact?.id ? "active" : ""} onClick={() => setActiveArtifactId(artifact.id)}><span>{String(index + 1).padStart(2, "0")}</span>{artifact.title}</button>)}</div>
-        {!artifacts.length && <small>发起一个需要画图的教学问题，产物将在本轮会话中留存。</small>}
+        {!artifacts.length && <small>发起一个需要画图的教学问题，板书将在本轮会话中持续保留。</small>}
       </footer>
     </aside>
   </div>;
 }
 
-function ArtifactPreview({ artifact }: { artifact: TeachingArtifact }) {
+function ArtifactPreview({ artifact, compact = false }: { artifact: TeachingArtifact; compact?: boolean }) {
   const source = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(artifact.svg)}`;
-  return <figure className="artifact-preview"><img src={source} alt={artifact.title} /><figcaption><span>{artifact.kind.replaceAll("_", " ")}</span><b>{artifact.title}</b><small>{artifact.summary}</small></figcaption></figure>;
+  return <figure className={`artifact-preview ${compact ? "compact" : ""}`}><img src={source} alt={artifact.title} /><figcaption><span>{artifact.kind.replaceAll("_", " ")}</span><b>{artifact.title}</b><small>{artifact.summary}</small></figcaption></figure>;
+}
+
+function ComparisonBlackboard({ result }: { result: TutorResult }) {
+  const artifact = result.artifacts.at(-1);
+  return <section className="comparison-blackboard">
+    <div><b>教学黑板</b><small>{result.artifacts.length ? `${result.artifacts.length} 次板书` : "本条件没有板书"}</small></div>
+    {artifact ? <ArtifactPreview artifact={artifact} compact /> : <div className="comparison-blackboard-empty"><span>板</span><p>这次回答没有调用板书工具</p></div>}
+  </section>;
 }
 
 function TutorAnswer({ result, workbench = false }: { result: TutorResult; workbench?: boolean }) {
@@ -774,7 +782,7 @@ function Experiments({ project, datasetId, scenario, onRun }: {
     {run && !busy && <div className="compare-grid">{run.modes.map((mode) => {
       const result = run.results[mode];
       return <article className="compare-card paper-panel" key={mode}><div className="compare-head"><p className="eyebrow">{modeLabel(mode)}</p>{result && <span>{result.execution_audit.tool_call_count} tool calls</span>}</div>
-        {result ? <><Markdown>{result.answer.answer}</Markdown>{result.answer.learning_check.prompts[0] && <div className="small-check"><b>检查</b><p>{result.answer.learning_check.prompts[0]}</p></div>}<div className="audit-row"><span>{result.execution_audit.actual}</span><span>{result.execution_audit.actual_visual_count} visuals</span></div></> : <div className="inline-error">{run.errors[mode] || "该条件未返回结果"}</div>}
+        {result ? <><ComparisonBlackboard result={result} /><div className="compare-answer"><Markdown>{result.answer.answer}</Markdown>{result.answer.learning_check.prompts[0] && <div className="small-check"><b>检查</b><p>{result.answer.learning_check.prompts[0]}</p></div>}</div><div className="audit-row"><span>{result.execution_audit.actual}</span><span>{result.execution_audit.actual_visual_count} visuals</span></div></> : <div className="inline-error">{run.errors[mode] || "该条件未返回结果"}</div>}
       </article>;
     })}</div>}
     {!run && !busy && <section className="paper-panel experiment-guide"><p className="eyebrow">EXPERIMENT MATRIX</p><div>{(["base", "text_skill", "multimodal_skill"] as TutorMode[]).map((mode, index) => <article key={mode}><span>0{index + 1}</span><b>{modeLabel(mode)}</b><p>{mode === "base" ? "不读取任何课堂 Skill" : mode === "text_skill" ? "读取结构化教学策略，不提供关键帧" : "读取教学策略并提供可追溯视觉证据"}</p></article>)}</div></section>}

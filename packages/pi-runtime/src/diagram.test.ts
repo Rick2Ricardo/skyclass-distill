@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderTeachingDiagram } from "./index.js";
+import { normalizePiAnswer, renderTeachingDiagram } from "./index.js";
 
 describe("renderTeachingDiagram", () => {
   it("renders a bounded diagram and escapes model-provided labels", () => {
@@ -32,5 +32,21 @@ describe("renderTeachingDiagram", () => {
 
     expect(artifact.svg).toContain('class="axes"');
     expect(artifact.kind).toBe("coordinate");
+  });
+});
+
+describe("normalizePiAnswer", () => {
+  it("unwraps a model response that encoded the answer JSON twice", () => {
+    const nested = JSON.stringify({
+      answer: "位移公式：\\[\\Delta x=x_B-x_A\\]",
+      assumptions: ["沿直线运动"],
+      learning_checks: ["位移有方向吗？"],
+    });
+
+    expect(normalizePiAnswer({ answer: nested })).toEqual({
+      answer: "位移公式：\\[\\Delta x=x_B-x_A\\]",
+      assumptions: ["沿直线运动"],
+      learning_checks: ["位移有方向吗？"],
+    });
   });
 });

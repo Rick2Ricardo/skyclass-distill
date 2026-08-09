@@ -214,7 +214,7 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"], 
         const artifact = renderTeachingDiagram(params);
         artifacts.push(artifact);
         return {
-          content: [{ type: "text", text: `已在学生画布生成「${artifact.title}」，产物编号 ${artifact.id}。请结合图示继续解释。` }],
+          content: [{ type: "text", text: `已在学生黑板生成「${artifact.title}」，产物编号 ${artifact.id}。请结合图示继续解释。` }],
           details: { artifact_id: artifact.id, artifact_title: artifact.title, artifact_kind: artifact.kind },
         };
       },
@@ -289,7 +289,7 @@ function makeExtension(input: PiRunInput, toolEvents: PiRunOutput["toolCalls"], 
         visualEvidence.length
           ? "本轮附带课堂关键帧；需要引用画面时先调用 inspect_visual_evidence。"
           : "本轮没有课堂关键帧，不得虚构视觉证据。",
-        "当问题涉及空间关系、受力、坐标变化、步骤流程或概念关系时，优先调用 draw_teaching_diagram；图示会直接出现在学生画布中。不要为普通事实问答强行画图。",
+        "当问题涉及空间关系、受力、坐标变化、步骤流程或概念关系时，优先调用 draw_teaching_diagram；图示会直接出现在学生黑板中。不要为普通事实问答强行画图。",
         "最多执行 8 次工具调用，完成后立即作答。",
         "最终只输出 JSON：{\"answer\":\"面向学生的 Markdown\",\"assumptions\":[],\"learning_checks\":[]}",
       ].join("\n\n"),
@@ -307,15 +307,33 @@ function assistantText(message: any): string {
     : "";
 }
 
+export function normalizePiAnswer(value: JsonObject): JsonObject {
+  let current = value;
+  for (let depth = 0; depth < 3; depth += 1) {
+    const answer = current.answer;
+    if (typeof answer !== "string") break;
+    const cleaned = answer.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+    if (!cleaned.startsWith("{") || !cleaned.endsWith("}")) break;
+    try {
+      const nested = JSON.parse(cleaned) as JsonObject;
+      if (typeof nested.answer !== "string") break;
+      current = { ...current, ...nested };
+    } catch {
+      break;
+    }
+  }
+  return current;
+}
+
 function parseJson(text: string): JsonObject {
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
   try {
-    return JSON.parse(cleaned) as JsonObject;
+    return normalizePiAnswer(JSON.parse(cleaned) as JsonObject);
   } catch {
     for (let start = cleaned.indexOf("{"); start >= 0; start = cleaned.indexOf("{", start + 1)) {
       for (let end = cleaned.lastIndexOf("}"); end > start; end = cleaned.lastIndexOf("}", end - 1)) {
         try {
-          return JSON.parse(cleaned.slice(start, end + 1)) as JsonObject;
+          return normalizePiAnswer(JSON.parse(cleaned.slice(start, end + 1)) as JsonObject);
         } catch {
           // Continue looking for a complete JSON object.
         }

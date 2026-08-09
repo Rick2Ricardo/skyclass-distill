@@ -209,9 +209,9 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .tutor-main { display: grid; gap: 17px; }
 .studio-stage { height: 100vh; padding-bottom: 0; overflow: hidden; background: #f3f2ed; }
 .studio-content { height: calc(100vh - 64px); padding: 0; }
-.teacher-workbench { height: 100%; display: grid; grid-template-columns: minmax(460px, .88fr) minmax(520px, 1.12fr); overflow: hidden; }
+.teacher-workbench { height: 100%; display: grid; grid-template-areas: "blackboard thread"; grid-template-columns: minmax(520px, 1.12fr) minmax(460px, .88fr); overflow: hidden; }
 .teacher-thread, .artifact-workspace { min-width: 0; min-height: 0; background: #fbfaf6; }
-.teacher-thread { display: grid; grid-template-rows: 62px minmax(0, 1fr) auto; border-right: 1px solid var(--line); }
+.teacher-thread { grid-area: thread; display: grid; grid-template-rows: 62px minmax(0, 1fr) auto; }
 .thread-head, .artifact-head { height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 20px; background: rgba(255, 254, 250, .88); border-bottom: 1px solid var(--line); }
 .thread-head > div, .artifact-head > div { min-width: 0; display: flex; align-items: center; gap: 11px; }
 .thread-head b, .thread-head small, .artifact-head b, .artifact-head small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -219,7 +219,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .thread-head small, .artifact-head small { max-width: 360px; margin-top: 4px; color: var(--muted); font-size: 9px; }
 .thread-head > button { padding: 7px 10px; color: #5d6259; background: transparent; border: 1px solid var(--line); border-radius: 8px; font-size: 9px; }
 .session-orb, .canvas-icon { flex: 0 0 auto; width: 30px; height: 30px; display: grid; place-items: center; color: var(--ink); background: var(--lime); border-radius: 9px; font: italic 16px/1 Georgia, serif; }
-.canvas-icon { color: #f7f7ef; background: var(--ink); font-style: normal; }
+.canvas-icon { color: #1b241d; background: var(--lime); font: 700 12px/1 "Noto Serif SC", serif; }
 .thread-scroll { min-height: 0; padding: 34px clamp(24px, 5vw, 66px) 28px; overflow-y: auto; scroll-behavior: smooth; }
 .thread-welcome { max-width: 580px; margin: min(7vh, 72px) auto 0; }
 .teacher-mark { width: 45px; height: 45px; display: grid; place-items: center; margin-bottom: 28px; color: #20241d; background: var(--lime); border-radius: 15px; font: italic 22px/1 Georgia, serif; transform: rotate(-3deg); }
@@ -255,30 +255,32 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .mode-picker button.active { color: var(--ink); background: #fff; box-shadow: 0 1px 5px rgba(36, 40, 32, .1); }
 .workbench-composer-foot > span { margin-left: auto; color: #94978f; font: 8px/1 ui-monospace, monospace; }
 .send-button { flex: 0 0 auto; width: 31px; height: 31px; display: grid; place-items: center; color: #fff; background: var(--ink); border: 0; border-radius: 50%; font-size: 17px; }
-.artifact-workspace { display: grid; grid-template-rows: 62px minmax(0, 1fr) auto; background: #e9e8e1; }
-.artifact-head { background: #f5f4ef; }
-.canvas-status { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 6px 8px; color: #62665d; background: #e8e7e0; border-radius: 999px; font: 8px/1 ui-monospace, monospace; }
+.artifact-workspace { grid-area: blackboard; display: grid; grid-template-rows: 62px minmax(0, 1fr) auto; color: #eef2e7; background: #223229; border-right: 1px solid #3f5147; }
+.artifact-head { background: #1d2a23; border-bottom-color: #3c4e44; }
+.artifact-head b { color: #f5f6ee; }.artifact-head small { color: #97a69b; }
+.canvas-status { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 6px 8px; color: #b8c4b9; background: #2b3c32; border: 1px solid #3e5447; border-radius: 999px; font: 8px/1 ui-monospace, monospace; }
 .canvas-status i { width: 6px; height: 6px; background: var(--lime-dark); border-radius: 50%; }
-.artifact-stage { min-height: 0; display: grid; place-items: center; padding: clamp(24px, 4vw, 58px); overflow: auto; background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.72), transparent 58%), #e9e8e1; }
+.artifact-stage { min-height: 0; display: grid; place-items: center; padding: clamp(24px, 4vw, 58px); overflow: auto; background-image: radial-gradient(circle at 50% 40%, rgba(76, 112, 90, .38), transparent 62%), linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-color: #24362c; background-size: auto, 28px 28px, 28px 28px; }
 .empty-canvas { max-width: 570px; text-align: center; }
-.canvas-grid-preview { position: relative; width: 170px; height: 120px; margin: 0 auto 29px; background-image: linear-gradient(#d7d6ce 1px, transparent 1px), linear-gradient(90deg, #d7d6ce 1px, transparent 1px); background-size: 20px 20px; border: 1px solid #cfcec6; border-radius: 15px; box-shadow: 0 18px 45px rgba(35, 38, 30, .08); }
-.canvas-grid-preview span { position: absolute; width: 16px; height: 16px; background: #fffefa; border: 2px solid var(--ink); border-radius: 50%; }
+.canvas-grid-preview { position: relative; width: 170px; height: 120px; margin: 0 auto 29px; background-image: linear-gradient(rgba(225,235,224,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(225,235,224,.1) 1px, transparent 1px); background-size: 20px 20px; border: 1px solid #52675a; border-radius: 15px; box-shadow: 0 18px 45px rgba(6, 14, 9, .22); }
+.canvas-grid-preview span { position: absolute; width: 16px; height: 16px; background: #f5f4ec; border: 2px solid #b9c8bd; border-radius: 50%; }
 .canvas-grid-preview span:nth-child(1) { left: 25px; top: 23px; }.canvas-grid-preview span:nth-child(2) { right: 28px; top: 28px; background: var(--lime); }.canvas-grid-preview span:nth-child(3) { left: 65px; bottom: 20px; }.canvas-grid-preview span:nth-child(4) { right: 43px; bottom: 16px; }
-.empty-canvas h2 { margin: 12px 0 0; font: 500 clamp(29px, 3vw, 44px)/1.08 Georgia, "Noto Serif SC", serif; letter-spacing: -.035em; }
-.empty-canvas > p:not(.eyebrow) { max-width: 500px; margin: 17px auto 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.empty-canvas h2 { margin: 12px 0 0; color: #f3f5ed; font: 500 clamp(29px, 3vw, 44px)/1.08 Georgia, "Noto Serif SC", serif; letter-spacing: -.035em; }
+.empty-canvas > p:not(.eyebrow) { max-width: 500px; margin: 17px auto 0; color: #a8b5aa; font-size: 12px; line-height: 1.7; }
 .tool-capabilities { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-top: 24px; }
-.tool-capabilities span { padding: 7px 9px; color: #676b63; background: rgba(255,255,255,.55); border: 1px solid #d5d4cc; border-radius: 999px; font-size: 9px; }
+.tool-capabilities span { padding: 7px 9px; color: #c6d0c6; background: rgba(255,255,255,.055); border: 1px solid #496054; border-radius: 999px; font-size: 9px; }
 .artifact-preview { width: min(850px, 100%); margin: 0; }
 .artifact-preview img { display: block; width: 100%; height: auto; background: #f8f7f1; border: 1px solid #d0cfc7; border-radius: 15px; box-shadow: 0 24px 60px rgba(35, 38, 30, .14); }
 .artifact-preview figcaption { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 12px; align-items: center; padding: 14px 3px 0; }
 .artifact-preview figcaption span { grid-row: 1 / 3; padding: 6px 8px; color: #59631e; background: var(--lime); border-radius: 7px; font: 8px/1 ui-monospace, monospace; text-transform: uppercase; }
 .artifact-preview figcaption b, .artifact-preview figcaption small { display: block; }.artifact-preview figcaption b { font-size: 11px; }.artifact-preview figcaption small { color: var(--muted); font-size: 9px; }
-.artifact-dock { min-height: 78px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; padding: 13px 18px; background: rgba(247, 246, 241, .94); border-top: 1px solid var(--line); }
-.artifact-dock > div:first-child b { display: block; margin-top: 4px; font-size: 10px; }.artifact-dock > small { color: var(--muted); font-size: 9px; }
+.artifact-workspace .artifact-preview figcaption b { color: #edf2e9; }.artifact-workspace .artifact-preview figcaption small { color: #9ca99f; }
+.artifact-dock { min-height: 78px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; padding: 13px 18px; background: #1c2922; border-top: 1px solid #3d5045; }
+.artifact-dock > div:first-child b { display: block; margin-top: 4px; color: #eef2e9; font-size: 10px; }.artifact-dock > small { color: #8c9a90; font-size: 9px; }
 .artifact-tabs { min-width: 0; display: flex; gap: 6px; overflow-x: auto; }
-.artifact-tabs button { flex: 0 0 auto; max-width: 190px; display: flex; align-items: center; gap: 7px; padding: 8px 10px; overflow: hidden; color: #686c64; background: #e9e8e2; border: 1px solid transparent; border-radius: 8px; font-size: 9px; white-space: nowrap; text-overflow: ellipsis; }
-.artifact-tabs button.active { color: var(--ink); background: #fff; border-color: #cfd0c7; }
-.artifact-tabs span { color: #8a8e84; font: 8px/1 ui-monospace, monospace; }
+.artifact-tabs button { flex: 0 0 auto; max-width: 190px; display: flex; align-items: center; gap: 7px; padding: 8px 10px; overflow: hidden; color: #a7b2a9; background: #293a31; border: 1px solid transparent; border-radius: 8px; font-size: 9px; white-space: nowrap; text-overflow: ellipsis; }
+.artifact-tabs button.active { color: #1e2a22; background: var(--lime); border-color: #c6ec58; }
+.artifact-tabs span { color: #78877c; font: 8px/1 ui-monospace, monospace; }.artifact-tabs button.active span { color: #5c672f; }
 .composer { padding: 20px; }
 .composer-head, .composer-foot, .answer-title, .compare-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .composer textarea { min-height: 135px; margin-top: 18px; padding: 4px 2px; background: transparent; border: 0; border-radius: 0; box-shadow: none; font: 500 21px/1.55 Georgia, "Noto Serif SC", serif; }
@@ -303,6 +305,12 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .markdown h2 { font-size: 22px; }.markdown h3 { font-size: 19px; }.markdown h4 { font-size: 16px; }
 .markdown code { padding: 2px 5px; background: #e9e7de; border-radius: 4px; font-family: ui-monospace, monospace; font-size: .85em; }
 .markdown-list { display: grid; grid-template-columns: 15px 1fr; }.markdown-list span { color: var(--orange); }.markdown-list p { margin: 0 0 7px; }
+.markdown-list.ordered { grid-template-columns: 24px 1fr; }.markdown-list.ordered span { color: #6a712f; font-weight: 700; }
+.markdown hr { height: 1px; margin: 22px 0; background: var(--line); border: 0; }
+.markdown blockquote { padding: 10px 14px; margin: 13px 0; color: #4e5549; background: #eef1e3; border-left: 3px solid var(--lime-dark); }
+.math-inline { display: inline-block; margin: 0 .08em; vertical-align: -.08em; }
+.math-block { max-width: 100%; padding: 13px 16px; margin: 15px 0 19px; overflow-x: auto; color: #26301f; background: #f0f4e5; border-left: 3px solid var(--lime-dark); border-radius: 4px 10px 10px 4px; text-align: center; }
+.math-block .katex-display { margin: 0; }.markdown .katex { font-size: 1.06em; }
 .markdown-space { height: 6px; }
 .learning-check, .small-check { padding: 18px; margin-top: 25px; background: #eff7d4; border: 1px solid #d4e6a0; border-radius: 10px; }
 .learning-check span { color: #68732b; font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .1em; }
@@ -323,11 +331,20 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .experiment-input { display: grid; gap: 10px; }
 .experiment-input textarea { min-height: 90px; }
 .experiment-input button { justify-self: end; }
-.compare-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; align-items: start; }
-.compare-card { padding: 21px; }
+.compare-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; align-items: stretch; }
+.compare-card { min-height: 760px; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; padding: 21px; }
 .compare-head { padding-bottom: 15px; margin-bottom: 17px; border-bottom: 1px solid var(--line); }
 .compare-head > span { color: var(--muted); font: 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .compare-card .markdown { font-size: 13px; line-height: 1.75; }
+.comparison-blackboard { padding: 12px; color: #eef3e9; background: #22342a; border: 1px solid #3c5145; border-radius: 11px; }
+.comparison-blackboard > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 2px 10px; }
+.comparison-blackboard > div:first-child b { font: 600 10px/1 "Noto Serif SC", serif; }.comparison-blackboard > div:first-child small { color: #92a197; font-size: 8px; }
+.artifact-preview.compact { width: 100%; }.artifact-preview.compact img { max-height: 215px; object-fit: contain; border-radius: 8px; box-shadow: none; }
+.artifact-preview.compact figcaption { padding-top: 9px; }.artifact-preview.compact figcaption b { color: #edf2e9; font-size: 9px; }.artifact-preview.compact figcaption small { display: none; }
+.comparison-blackboard-empty { min-height: 155px; display: grid; place-items: center; align-content: center; gap: 10px; color: #86968b; border: 1px dashed #496053; border-radius: 8px; }
+.comparison-blackboard-empty span { width: 31px; height: 31px; display: grid; place-items: center; color: #263329; background: var(--lime); border-radius: 8px; font: 700 11px/1 serif; }.comparison-blackboard-empty p { margin: 0; font-size: 9px; }
+.compare-answer { min-height: 0; max-height: 540px; padding: 0 7px 0 0; margin-top: 18px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #c3c4bb transparent; }
+.compare-card > .audit-row { margin-top: 16px; }
 .small-check { padding: 13px; margin-top: 16px; font-size: 11px; }
 .compare-loading { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
 .compare-loading span { min-height: 260px; background: linear-gradient(105deg, #e1dfd5 20%, #f0eee7 40%, #e1dfd5 60%); background-size: 240% 100%; border-radius: 15px; animation: shimmer 1.5s infinite linear; }
@@ -414,7 +431,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .blank p { margin-bottom: 0; }
 
 @media (max-width: 1180px) {
-  .teacher-workbench { grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); }
+  .teacher-workbench { grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); }
   .thread-scroll { padding-inline: 24px; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
   .overview-grid, .split-layout, .tutor-layout { grid-template-columns: 1fr; }
@@ -436,8 +453,9 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   .main-stage { padding-bottom: 120px; }
   .studio-stage { height: auto; padding-bottom: 0; overflow: visible; }
   .studio-content { height: auto; }
-  .teacher-workbench { min-height: 1320px; grid-template-columns: 1fr; grid-template-rows: 680px 640px; }
-  .teacher-thread { border-right: 0; border-bottom: 1px solid var(--line); }
+  .teacher-workbench { min-height: 1320px; grid-template-areas: "thread" "blackboard"; grid-template-columns: 1fr; grid-template-rows: 680px 640px; }
+  .teacher-thread { border-bottom: 1px solid var(--line); }
+  .artifact-workspace { border-right: 0; }
   .page-head { grid-template-columns: 1fr; padding: 38px 22px 30px; }
   .content { padding: 24px 22px 45px; }
   .topbar { padding: 0 22px; }
