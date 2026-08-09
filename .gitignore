@@ -41,4 +41,5 @@ models/
 *.ggml
 *.gguf
 research/papers/*.pdf
+research/papers/**/*.pdf
 research/resource2skill_reader/output/
