@@ -43,6 +43,7 @@ function formalRun(): FormalRunContractV1 {
     formal_input_manifest_sha256: "2".repeat(64),
     formal_spec_sha256: "3".repeat(64),
     schedule_sha256: "4".repeat(64),
+    execution_plan_sha256: "d".repeat(64),
     ledger_registry_sha256: "5".repeat(64),
     media_attestation_sha256: "6".repeat(64),
     speech_attestation_sha256: "7".repeat(64),

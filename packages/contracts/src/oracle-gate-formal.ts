@@ -260,7 +260,10 @@ export function validateOracleGateFormalSpec(input: unknown): OracleGateFormalVa
   if (!isRecord(input)) return { valid: false, issues: [{ path: "$", message: "必须是对象" }] };
   if (input.schema_version !== "oracle-gate-formal-spec-v1") issue("schema_version", "版本无效");
   for (const field of ["spec_sha256", "input_manifest_sha256", "signed_gold_dataset_sha256"] as const) if (!isSha256(input[field])) issue(field, "必须是 SHA-256");
-  for (const field of ["code_revision", "model"] as const) if (!isNonEmpty(input[field])) issue(field, "不能为空");
+  if (typeof input.code_revision !== "string" || !/^[a-f0-9]{40}$/.test(input.code_revision)) {
+    issue("code_revision", "必须是完整小写 Git commit");
+  }
+  if (!isNonEmpty(input.model)) issue("model", "不能为空");
   if (input.transport !== "pi" || input.cache_retention !== "none" || input.tools_policy !== "none" || input.temperature !== 0) issue("protocol", "必须冻结为 Pi、无缓存、无工具、temperature=0");
   if (!Array.isArray(input.seeds) || input.seeds.length < 3 || !input.seeds.every((seed) => Number.isSafeInteger(seed) && Number(seed) >= 0 && Number(seed) <= 0xffff_ffff) || new Set(input.seeds).size !== input.seeds.length) issue("seeds", "至少需要三个唯一的 0..2^32-1 安全整数 seed");
   if (!isRecord(input.prompt) || !isNonEmpty(input.prompt.version) || !isSha256(input.prompt.system_sha256) || !isSha256(input.prompt.user_template_sha256) || !isSha256(input.prompt.output_schema_sha256)) issue("prompt", "必须冻结完整 prompt 与 schema 哈希");

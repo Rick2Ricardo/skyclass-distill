@@ -324,7 +324,7 @@ async function buildFixture() {
     spec_sha256: "0".repeat(64),
     input_manifest_sha256: manifest.manifest_sha256,
     signed_gold_dataset_sha256: dataset.dataset_sha256,
-    code_revision: "fixture",
+    code_revision: "a".repeat(40),
     model: "vision-fixture",
     transport: "pi",
     cache_retention: "none",

@@ -195,7 +195,7 @@ function spec(input: OracleGateFormalInputManifest): OracleGateFormalSpec {
     spec_sha256: HASH,
     input_manifest_sha256: input.manifest_sha256,
     signed_gold_dataset_sha256: input.signed_gold_dataset_sha256,
-    code_revision: "a7815d3",
+    code_revision: "a".repeat(40),
     model: "vision-fixture",
     transport: "pi",
     cache_retention: "none",
@@ -311,6 +311,11 @@ describe("Formal Oracle Gate structural preflight", () => {
     frozenSpec.seeds = [1, 2];
     rehashSpec(frozenSpec);
     expect(() => prepareOracleGateFormalStructuralPreflight({ dataset: signed, manifest, spec: frozenSpec })).toThrow("0..2^32-1");
+
+    const shortRevision = spec(manifest);
+    shortRevision.code_revision = "a7815d3";
+    rehashSpec(shortRevision);
+    expect(() => prepareOracleGateFormalStructuralPreflight({ dataset: signed, manifest, spec: shortRevision })).toThrow("完整小写 Git commit");
 
     const tampered = structuredClone(signed);
     tampered.packages[0].groups[0].final_events[0].semantic_label = "被篡改";

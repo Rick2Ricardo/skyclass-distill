@@ -41,6 +41,7 @@ export interface FormalRunContractV1 {
   formal_input_manifest_sha256: string;
   formal_spec_sha256: string;
   schedule_sha256: string;
+  execution_plan_sha256: string;
   ledger_registry_sha256: string;
   media_attestation_sha256: string;
   speech_attestation_sha256: string;
@@ -492,10 +493,10 @@ export function validateFormalRunContract(input: unknown): OracleGateRunValidati
   const issues: OracleGateRunValidationIssue[] = [];
   const issue = (path: string, message: string): void => { issues.push({ path, message }); };
   if (!isRecord(input)) return report([{ path: "$", message: "必须是对象" }]);
-  const keys = ["schema_version", "run_sha256", "canonicalization", "signed_gold_dataset_sha256", "formal_input_manifest_sha256", "formal_spec_sha256", "schedule_sha256", "ledger_registry_sha256", "media_attestation_sha256", "speech_attestation_sha256", "code_revision", "build_artifact_sha256", "blinding_secret_commitment_sha256", "blinding_scheme", "rating_plan_sha256", "statistics_plan_sha256", "run_store_uri", "request_count", "directory_mode", "file_mode", "lock_scheme", "checkpoint_scheme", "remote_idempotency_mode", "api_execution_allowed"];
+  const keys = ["schema_version", "run_sha256", "canonicalization", "signed_gold_dataset_sha256", "formal_input_manifest_sha256", "formal_spec_sha256", "schedule_sha256", "execution_plan_sha256", "ledger_registry_sha256", "media_attestation_sha256", "speech_attestation_sha256", "code_revision", "build_artifact_sha256", "blinding_secret_commitment_sha256", "blinding_scheme", "rating_plan_sha256", "statistics_plan_sha256", "run_store_uri", "request_count", "directory_mode", "file_mode", "lock_scheme", "checkpoint_scheme", "remote_idempotency_mode", "api_execution_allowed"];
   if (!exactKeys(input, keys)) issue("$", "字段集合无效");
   if (input.schema_version !== "oracle-gate-formal-run-contract-v1" || input.canonicalization !== "oracle-gate-run-canonical-json-v1") issue("schema_version", "版本或规范序列化算法无效");
-  for (const field of ["run_sha256", "signed_gold_dataset_sha256", "formal_input_manifest_sha256", "formal_spec_sha256", "schedule_sha256", "ledger_registry_sha256", "media_attestation_sha256", "speech_attestation_sha256", "build_artifact_sha256", "blinding_secret_commitment_sha256", "rating_plan_sha256", "statistics_plan_sha256"] as const) if (!isSha(input[field])) issue(field, "必须是 SHA-256");
+  for (const field of ["run_sha256", "signed_gold_dataset_sha256", "formal_input_manifest_sha256", "formal_spec_sha256", "schedule_sha256", "execution_plan_sha256", "ledger_registry_sha256", "media_attestation_sha256", "speech_attestation_sha256", "build_artifact_sha256", "blinding_secret_commitment_sha256", "rating_plan_sha256", "statistics_plan_sha256"] as const) if (!isSha(input[field])) issue(field, "必须是 SHA-256");
   if (!/^[a-f0-9]{40}$/.test(String(input.code_revision))) issue("code_revision", "必须是完整小写 Git commit");
   if (input.blinding_scheme !== "hmac-sha256-run-request-v1") issue("blinding_scheme", "值无效");
   if (!isSafeUri(input.run_store_uri)) issue("run_store_uri", "必须是受控相对路径");
