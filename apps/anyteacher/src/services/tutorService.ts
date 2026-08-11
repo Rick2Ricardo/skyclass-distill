@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { readFile, realpath } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import type {
   DeliveryAudit,
@@ -10,6 +10,7 @@ import type {
   Skill,
   TutorMode,
   TutorResult,
+  TutorRuntimeEvent,
 } from "../../../../packages/contracts/src/index.js";
 import { splitLearningCheck } from "../../../../packages/contracts/src/index.js";
 import { runPiAgent, type PiSkill } from "../../../../packages/pi-runtime/src/index.js";
@@ -34,25 +35,27 @@ function parseMode(value: unknown): { mode: TutorMode; modality: Modality; skill
   };
 }
 
-function safeSkillManifest(skill: Skill): Record<string, unknown> | null {
+async function safeSkillManifest(skill: Skill): Promise<{ manifest: Record<string, unknown>; folder: string } | null> {
   if (!skill.path) return null;
-  const folder = resolve(skill.path);
-  const manifestPath = join(folder, "manifest.json");
-  if (!isInside(DATA_DIR, folder) || !existsSync(manifestPath)) return null;
   try {
-    return JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
+    const [dataRoot, folder] = await Promise.all([realpath(DATA_DIR), realpath(resolve(skill.path))]);
+    if (!isInside(dataRoot, folder)) return null;
+    const manifestPath = await realpath(join(folder, "manifest.json"));
+    if (!isInside(folder, manifestPath)) return null;
+    return { manifest: JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>, folder };
   } catch {
     return null;
   }
 }
 
-function compactSkill(skill: Skill): PiSkill {
-  const manifest = safeSkillManifest(skill);
+async function compactSkill(skill: Skill): Promise<PiSkill> {
+  const safe = await safeSkillManifest(skill);
+  const manifest = safe?.manifest;
   const capability = manifest?.capability && typeof manifest.capability === "object"
     ? manifest.capability as Record<string, unknown>
     : {};
   return {
-    key: skill.name,
+    key: `${skill.job_id ?? "skill"}:${skill.name}`,
     name: skill.display_name ?? skill.name,
     summary: String(capability.summary ?? skill.summary ?? ""),
     teaching_goal: String(capability.teaching_goal ?? ""),
@@ -65,10 +68,11 @@ function compactSkill(skill: Skill): PiSkill {
   };
 }
 
-function visualInputs(skills: Skill[]): Array<{ label: string; path: string }> {
-  const images: Array<{ label: string; path: string }> = [];
+async function visualInputs(skills: Skill[]): Promise<Array<{ label: string; path: string; root: string }>> {
+  const images: Array<{ label: string; path: string; root: string }> = [];
   for (const skill of skills) {
-    const manifest = safeSkillManifest(skill);
+    const safe = await safeSkillManifest(skill);
+    const manifest = safe?.manifest;
     const capability = manifest?.capability && typeof manifest.capability === "object"
       ? manifest.capability as Record<string, unknown>
       : {};
@@ -77,25 +81,33 @@ function visualInputs(skills: Skill[]): Array<{ label: string; path: string }> {
       if (!rawItem || typeof rawItem !== "object") continue;
       const item = rawItem as Record<string, unknown>;
       const relativeAsset = typeof item.visual_asset === "string" ? item.visual_asset : "";
-      if (!relativeAsset || !skill.path) continue;
-      const folder = resolve(skill.path);
-      const path = resolve(folder, relativeAsset);
-      if (isInside(folder, path) && existsSync(path)) {
-        images.push({ label: `${skill.name} · ${String(item.frame_id ?? "evidence")}`, path });
-      }
+      if (!relativeAsset || !safe) continue;
+      const path = await realpath(resolve(safe.folder, relativeAsset)).catch(() => "");
+      if (path && isInside(safe.folder, path)) images.push({
+        label: `${skill.name} · ${String(item.frame_id ?? "evidence")}`,
+        path,
+        root: safe.folder,
+      });
       if (images.length >= 4) return images;
     }
   }
   return images;
 }
 
-function normalizeDelivery(requested: Modality, actual: Modality, visualCount: number, toolCallCount: number, fallbackReason = ""): DeliveryAudit {
-  const actualVisual = actual === "multimodal" ? visualCount : 0;
+function normalizeDelivery(
+  requested: Modality,
+  actual: Modality,
+  candidateVisualCount: number,
+  inspectedVisualCount: number,
+  toolCallCount: number,
+  fallbackReason = "",
+): DeliveryAudit {
+  const actualVisual = actual === "multimodal" ? inspectedVisualCount : 0;
   return {
     requested,
     actual,
     actual_visual_count: actualVisual,
-    attempted_visual_count: visualCount,
+    attempted_visual_count: candidateVisualCount,
     tool_call_count: toolCallCount,
     fallback_occurred: Boolean(fallbackReason),
     fallback_reason: fallbackReason,
@@ -106,6 +118,17 @@ function normalizeDelivery(requested: Modality, actual: Modality, visualCount: n
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map(String) : [];
+}
+
+function conversationHistory(value: unknown): Array<{ question: string; answer: string }> {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-200).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const question = String(record.question ?? "").trim().slice(0, 20_000);
+    const answer = String(record.answer ?? "").trim().slice(0, 40_000);
+    return question && answer ? [{ question, answer }] : [];
+  });
 }
 
 export class TutorService {
@@ -139,7 +162,11 @@ export class TutorService {
     return result;
   }
 
-  async answer(projectId: string, body: Record<string, unknown>): Promise<TutorResult> {
+  async answer(
+    projectId: string,
+    body: Record<string, unknown>,
+    runOptions: { signal?: AbortSignal; onEvent?: (event: TutorRuntimeEvent) => void | Promise<void> } = {},
+  ): Promise<TutorResult> {
     const question = typeof body.question === "string" ? body.question.trim() : "";
     if (question.length < 4) throw new Error("请输入至少 4 个字符的问题");
 
@@ -149,22 +176,28 @@ export class TutorService {
       this.listSkills(projectId),
     ]);
     const skills = parsed.skills ? allSkills.filter((item) => item.valid !== false).slice(0, 3) : [];
-    const images = parsed.modality === "multimodal" ? visualInputs(skills) : [];
+    const images = parsed.modality === "multimodal" ? await visualInputs(skills) : [];
     const settings = await this.settings.private();
     if (!settings.llm_base_url || !settings.llm_api_key || !settings.llm_model) {
       throw new Error("尚未配置模型 API，请先在设置中完成配置");
     }
 
-    const runtime = await runPiAgent({
+    const agentRun = await runPiAgent({
       baseUrl: settings.llm_base_url,
       apiKey: settings.llm_api_key,
       modelId: settings.llm_model,
       question,
       subject: project.subject,
-      skills: skills.map(compactSkill),
+      skills: await Promise.all(skills.map(compactSkill)),
       images,
+      history: conversationHistory(body.history),
+      sessionId: typeof body.conversation_id === "string" ? body.conversation_id : undefined,
+      timeoutMs: Math.max(1, Number(settings.llm_timeout_seconds ?? 120)) * 1000,
+      maxRetries: Math.max(0, Number(settings.llm_max_attempts ?? 2) - 1),
+      signal: runOptions.signal,
+      onEvent: runOptions.onEvent,
     });
-    const raw = runtime.answer as JsonObject;
+    const raw = agentRun.answer as JsonObject;
     const answerText = typeof raw.answer === "string" ? raw.answer : "模型没有返回可显示的回答。";
     const parsedChecks = stringArray(raw.learning_checks).map(splitLearningCheck).filter((item) => item.prompt);
     const learningChecks = parsedChecks.map((item) => item.prompt);
@@ -172,11 +205,34 @@ export class TutorService {
     const successCriteria = explicitCriteria.length
       ? explicitCriteria
       : parsedChecks.map((item) => item.successCriterion).filter(Boolean);
-    const fallbackReason = parsed.modality === "multimodal" && !images.length
-      ? "当前 Skill 没有可读取的视觉证据"
+    const fallbackReason = parsed.modality === "multimodal"
+      ? !images.length
+        ? "当前 Skill 没有可读取的视觉证据"
+        : !agentRun.visualCount ? "Pi Agent 没有实际读取视觉证据" : ""
       : "";
-    const actual: Modality = images.length ? "multimodal" : "text";
-    const delivery = normalizeDelivery(parsed.modality, actual, images.length, runtime.toolCallCount, fallbackReason);
+    const actual: Modality = agentRun.visualCount > 0 ? "multimodal" : "text";
+    const delivery = normalizeDelivery(
+      parsed.modality,
+      actual,
+      agentRun.attemptedVisualCount,
+      agentRun.visualCount,
+      agentRun.toolCallCount,
+      fallbackReason,
+    );
+    Object.assign(delivery, {
+      candidate_skill_count: skills.length,
+      candidate_visual_count: agentRun.candidateVisualCount,
+      used_skill_count: agentRun.usedSkillKeys.length,
+      used_skill_keys: agentRun.usedSkillKeys,
+      stop_reason: agentRun.stopReason,
+      model: settings.llm_model,
+      provider: "anyteacher-relay",
+      duration_ms: agentRun.durationMs,
+      input_tokens: agentRun.usage.input,
+      output_tokens: agentRun.usage.output,
+      cache_read_tokens: agentRun.usage.cacheRead,
+      cache_write_tokens: agentRun.usage.cacheWrite,
+    } satisfies Partial<DeliveryAudit>);
 
     return {
       project_id: projectId,
@@ -198,8 +254,8 @@ export class TutorService {
       },
       selected_skills: skills,
       execution_audit: delivery,
-      tool_trace: runtime.toolCalls,
-      artifacts: runtime.artifacts,
+      tool_trace: agentRun.toolCalls,
+      artifacts: agentRun.artifacts,
     };
   }
 

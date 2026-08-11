@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type {
   BenchmarkDataset,
   BenchmarkScenario,
   DistillMode,
+  EvidenceMode,
   ExperimentRun,
   ExperimentSummary,
   Health,
   JobState,
-  Modality,
   Project,
   RuntimeSettings,
   Skill,
@@ -17,10 +17,12 @@ import type {
   TutorConversationSummary,
   TutorMode,
   TutorResult,
+  TutorStreamEvent,
+  TutorToolTrace,
   VideoAsset,
 } from "../../../../packages/contracts/src/index.js";
 import { splitLearningCheck, studentVisibleAnswer } from "../../../../packages/contracts/src/index.js";
-import { api, uploadVideo } from "./api.js";
+import { api, streamNdjson, uploadVideo } from "./api.js";
 import { formatDate, formatDuration, percent } from "./format.js";
 import { Markdown } from "./components/Markdown.js";
 
@@ -45,6 +47,16 @@ const VIEW_COPY: Record<View, { eyebrow: string; title: string; intro: string }>
 function modeLabel(mode: TutorMode): string {
   return ({ base: "Base", text_skill: "Text Skill", multimodal_skill: "Vision Skill" })[mode];
 }
+
+interface LiveToolTrace extends TutorToolTrace {
+  status: "running" | "done" | "error";
+}
+
+const LIVE_TOOL_LABELS: Record<string, string> = {
+  load_teaching_skill: "读取教学 Skill",
+  inspect_visual_evidence: "检查课堂证据",
+  draw_teaching_diagram: "绘制教学图示",
+};
 
 function stageLabel(job: JobState): string {
   if (job.status === "completed") return "完成";
@@ -386,7 +398,7 @@ function SkillWorkshop({ project, videos, skills, onCreated, onOpen, onRefresh, 
       { key: "debug", label: "调试运行", note: "单题查看执行 trace" },
     ]} />
     {tab === "distill"
-      ? <Distill project={project} videos={videos} onCreated={(job) => { onCreated(job); setTab("library"); }} flash={flash} />
+      ? <Distill project={project} videos={videos} onCreated={(job) => { onCreated(job); setTab("library"); }} onRefresh={onRefresh} flash={flash} />
       : tab === "library"
         ? <Skills project={project} skills={skills} onOpen={onOpen} onRefresh={onRefresh} flash={flash} />
         : <Tutor project={project} skills={skills} />}
@@ -503,17 +515,24 @@ function Sources({ project, videos, onCreated, flash }: { project: Project; vide
   </div>;
 }
 
-function Distill({ project, videos, onCreated, flash }: { project: Project; videos: VideoAsset[]; onCreated: (job: JobState) => void; flash: (message: string, error?: boolean) => void }) {
+function Distill({ project, videos, onCreated, onRefresh, flash }: { project: Project; videos: VideoAsset[]; onCreated: (job: JobState) => void; onRefresh: () => Promise<void>; flash: (message: string, error?: boolean) => void }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [mode, setMode] = useState<DistillMode>("single");
-  const [modality, setModality] = useState<Modality>("multimodal");
+  const [evidenceMode, setEvidenceMode] = useState<EvidenceMode>("static_frames");
   const [busy, setBusy] = useState(false);
+  const [binding, setBinding] = useState(false);
   const required = mode === "common" ? 4 : 1;
-  const valid = selected.length >= required && (mode !== "single" || selected.length === 1);
+  const selectedVideo = videos.find((video) => video.id === selected[0]);
+  const temporalReady = mode === "single" && selected.length === 1 && Boolean(selectedVideo?.artifacts?.board_bundle_json);
+  const valid = selected.length >= required && (mode !== "single" || selected.length === 1) && (evidenceMode !== "temporal_board" || temporalReady);
 
   useEffect(() => {
     if (mode === "single" && selected.length > 1) setSelected(selected.slice(0, 1));
   }, [mode, selected]);
+
+  useEffect(() => {
+    if (evidenceMode === "temporal_board" && !temporalReady) setEvidenceMode("static_frames");
+  }, [evidenceMode, temporalReady]);
 
   function toggle(id: string): void {
     setSelected((current) => mode === "single"
@@ -527,19 +546,35 @@ function Distill({ project, videos, onCreated, flash }: { project: Project; vide
     try {
       const job = await api<JobState>(`/api/projects/${project.id}/distill`, {
         method: "POST",
-        body: JSON.stringify({ video_ids: selected, mode, modality }),
+        body: JSON.stringify({ video_ids: selected, mode, evidence_mode: evidenceMode, modality: evidenceMode === "text" ? "text" : "multimodal" }),
       });
       onCreated(job);
     } catch (cause) { flash(cause instanceof Error ? cause.message : String(cause), true); }
     finally { setBusy(false); }
   }
 
+  async function attachBoardBundle(file: File): Promise<void> {
+    if (!selectedVideo) return;
+    setBinding(true);
+    try {
+      const bundle = JSON.parse(await file.text()) as Record<string, unknown>;
+      await api<VideoAsset>(`/api/projects/${project.id}/videos/${selectedVideo.id}/board-bundle`, {
+        method: "POST",
+        body: JSON.stringify(bundle),
+      });
+      await onRefresh();
+      flash("时序板书包已校验并绑定到这段课堂");
+    } catch (cause) { flash(cause instanceof Error ? cause.message : String(cause), true); }
+    finally { setBinding(false); }
+  }
+
   return <div className="distill-layout">
     <section className="paper-panel config-panel">
       <p className="eyebrow">DISTILLATION CONTRACT</p><h2>定义本次蒸馏</h2>
       <div className="choice-group"><label>范围</label><div className="segmented"><button className={mode === "single" ? "active" : ""} onClick={() => setMode("single")}>单课策略</button><button className={mode === "common" ? "active" : ""} onClick={() => setMode("common")}>跨课共性</button></div></div>
-      <div className="choice-group"><label>证据</label><div className="segmented"><button className={modality === "text" ? "active" : ""} onClick={() => setModality("text")}>字幕文本</button><button className={modality === "multimodal" ? "active" : ""} onClick={() => setModality("multimodal")}>文本＋视觉</button></div></div>
-      <div className="contract-note"><b>产出约束</b><p>Trigger → Teaching Action → Expected Response → Learning Check → Remediation → Evidence</p></div>
+      <div className="choice-group"><label>证据</label><div className="segmented"><button className={evidenceMode === "text" ? "active" : ""} onClick={() => setEvidenceMode("text")}>字幕文本</button><button className={evidenceMode === "static_frames" ? "active" : ""} onClick={() => setEvidenceMode("static_frames")}>文本＋抽帧</button><button className={evidenceMode === "temporal_board" ? "active" : ""} disabled={!temporalReady} title={temporalReady ? "使用已仲裁时序板书" : "需先为单段课堂附加已仲裁 board_bundle_json"} onClick={() => setEvidenceMode("temporal_board")}>时序板书 v2</button></div></div>
+      {mode === "single" && selectedVideo && <label className="bundle-import"><input type="file" accept="application/json,.json" disabled={binding} onChange={(event) => { const file = event.target.files?.[0]; if (file) void attachBoardBundle(file); event.currentTarget.value = ""; }} /><span>{binding ? "正在校验板书包…" : selectedVideo.artifacts?.board_bundle_json ? "✓ 已绑定时序板书 v2（可重新导入）" : "+ 导入已仲裁 BoardEvidenceBundle"}</span><small>导入时会验证 schema、accepted transition，并与源视频 SHA-256 严格匹配。</small></label>}
+      <div className="contract-note"><b>产出约束</b><p>Accepted Board Transition → Renderer-neutral Board Action → HTML / SVG / Ink Render Plan → Learning Check</p></div>
       <button className="primary wide" disabled={!valid || busy} onClick={start}>{busy ? "正在创建任务…" : valid ? `蒸馏 ${selected.length} 段课堂` : mode === "common" ? "至少选择 4 段课堂" : "请选择 1 段课堂"}</button>
     </section>
     <section className="paper-panel selection-panel"><div className="panel-title"><div><p className="eyebrow">EVIDENCE SCOPE</p><h2>选择课堂来源</h2></div><span>{selected.length} selected</span></div>
@@ -561,7 +596,7 @@ function Skills({ project, skills, onOpen, onRefresh, flash }: { project: Projec
   }
   return <div className="skill-grid">{skills.length ? skills.map((skill) => <article className="skill-card" key={`${skill.job_id}-${skill.name}`}>
     <div className="skill-card-top"><span className="skill-glyph">↳</span><span className={`status-pill ${skill.valid === false ? "failed" : "ready"}`}>{skill.valid === false ? "needs review" : "validated"}</span></div>
-    <p className="eyebrow">{skill.distill_mode === "common" ? "CROSS-LESSON" : "SINGLE-LESSON"} · {skill.distill_modality === "multimodal" ? "VISION" : "TEXT"}</p>
+    <p className="eyebrow">{skill.distill_mode === "common" ? "CROSS-LESSON" : "SINGLE-LESSON"} · {skill.distill_evidence_mode === "temporal_board" ? "TEMPORAL BOARD V2" : skill.distill_modality === "multimodal" ? "VISION" : "TEXT"}</p>
     <h2>{skill.display_name || skill.name}</h2><p>{skill.summary || "可追溯的教学策略 Skill"}</p>
     <div className="skill-meta"><span>{skill.video_ids?.length || 0} 个来源</span><span>{skill.visual_asset_count || 0} 个视觉证据</span></div>
     <div className="card-actions"><button onClick={() => onOpen(skill)}>查看证据</button>{skill.job_id && <a href={`/api/jobs/${skill.job_id}/skills/${skill.name}/download`} download>下载</a>}<button className="danger-link" onClick={() => remove(skill)}>移除</button></div>
@@ -585,18 +620,29 @@ function Tutor({ project, skills, conversationId = "", conversationDraft = 0, on
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pendingQuestion, setPendingQuestion] = useState("");
+  const [liveToolTrace, setLiveToolTrace] = useState<LiveToolTrace[]>([]);
+  const [liveArtifacts, setLiveArtifacts] = useState<TeachingArtifact[]>([]);
+  const [runPhase, setRunPhase] = useState("正在启动教学 Agent…");
+  const abortRef = useRef<AbortController | null>(null);
   const managed = Boolean(onConversationChange);
   const turns = useMemo(() => conversation?.turns ?? (result ? [{ id: "local", created_at: "", question: result.question, mode: result.mode, result }] : []), [conversation, result]);
-  const artifacts = useMemo(() => turns.flatMap((turn) => turn.result.artifacts), [turns]);
+  const artifacts = useMemo(() => [...turns.flatMap((turn) => turn.result.artifacts), ...liveArtifacts], [liveArtifacts, turns]);
   const activeArtifact = useMemo(() => artifacts.find((item) => item.id === activeArtifactId) ?? artifacts.at(-1), [activeArtifactId, artifacts]);
+  const blackboardStatus = busy ? (liveArtifacts.length ? "DRAWING" : "RUNNING") : activeArtifact ? "RECORDED" : "READY";
 
   useEffect(() => {
     if (!managed) return;
+    abortRef.current?.abort();
+    abortRef.current = null;
     setQuestion("");
     setResult(null);
     setConversation(null);
     setError("");
     setActiveArtifactId("");
+    setPendingQuestion("");
+    setLiveToolTrace([]);
+    setLiveArtifacts([]);
     if (!conversationId) {
       setConversation(null);
       setLoading(false);
@@ -611,6 +657,8 @@ function Tutor({ project, skills, conversationId = "", conversationDraft = 0, on
     return () => { ignore = true; };
   }, [conversationDraft, conversationId, managed, project.id]);
 
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   useEffect(() => {
     const latest = artifacts.at(-1);
     setActiveArtifactId(latest?.id ?? "");
@@ -619,9 +667,10 @@ function Tutor({ project, skills, conversationId = "", conversationDraft = 0, on
   async function submit(): Promise<void> {
     if (question.trim().length < 4) return;
     setBusy(true); setError("");
+    const submittedQuestion = question.trim();
     try {
       if (!managed) {
-        setResult(await api<TutorResult>("/api/tutor", { method: "POST", body: JSON.stringify({ project_id: project.id, question, mode }) }));
+        setResult(await api<TutorResult>("/api/tutor", { method: "POST", body: JSON.stringify({ project_id: project.id, question: submittedQuestion, mode }) }));
         return;
       }
       let currentId = conversation?.id || conversationId;
@@ -629,20 +678,81 @@ function Tutor({ project, skills, conversationId = "", conversationDraft = 0, on
         const created = await api<TutorConversation>(`/api/projects/${project.id}/conversations`, { method: "POST", body: JSON.stringify({}) });
         currentId = created.id;
       }
-      const updated = await api<TutorConversation>(`/api/projects/${project.id}/conversations/${currentId}/turns`, {
-        method: "POST",
-        body: JSON.stringify({ question, mode }),
-      });
-      setConversation(updated);
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setPendingQuestion(submittedQuestion);
       setQuestion("");
+      setLiveToolTrace([]);
+      setLiveArtifacts([]);
+      setRunPhase("正在启动教学 Agent…");
+      let completed: TutorConversation | null = null;
+      let streamError = "";
+      await streamNdjson<TutorStreamEvent>(`/api/projects/${project.id}/conversations/${currentId}/turns/stream`, {
+        method: "POST",
+        body: JSON.stringify({ question: submittedQuestion, mode }),
+        signal: controller.signal,
+      }, (message) => {
+        if (message.type === "error") {
+          streamError = message.detail;
+          return;
+        }
+        if (message.type === "complete") {
+          completed = message.conversation;
+          return;
+        }
+        const event = message.event;
+        if (event.type === "agent_start") setRunPhase("老师开始分析你的问题…");
+        if (event.type === "turn_start") setRunPhase("正在组织这一轮讲解…");
+        if (event.type === "message_update") setRunPhase("正在生成教学方案…");
+        if (event.type === "agent_end") setRunPhase("正在整理最终回答…");
+        if (event.type === "tool_execution_start" && event.tool_call_id && event.tool_name !== "submit_tutor_answer") {
+          setRunPhase(event.tool_name === "draw_teaching_diagram" ? "正在黑板上画图…" : "正在调用教学工具…");
+          setLiveToolTrace((current) => current.some((item) => item.id === event.tool_call_id) ? current : [...current, {
+            id: event.tool_call_id!,
+            tool: event.tool_name ?? "tool",
+            label: LIVE_TOOL_LABELS[event.tool_name ?? ""] ?? event.tool_name ?? "教学工具",
+            ok: true,
+            summary: "正在执行…",
+            status: "running",
+          }]);
+        }
+        if (event.type === "tool_execution_end" && event.trace) {
+          setLiveToolTrace((current) => {
+            const next: LiveToolTrace = { ...event.trace!, status: event.trace!.ok ? "done" : "error" };
+            return current.some((item) => item.id === next.id)
+              ? current.map((item) => item.id === next.id ? next : item)
+              : [...current, next];
+          });
+          if (event.artifact) {
+            setLiveArtifacts((current) => current.some((item) => item.id === event.artifact!.id) ? current : [...current, event.artifact!]);
+            setActiveArtifactId(event.artifact.id);
+            setRunPhase("板书已生成，正在结合黑板讲解…");
+          }
+        }
+      });
+      if (streamError) throw new Error(streamError);
+      if (!completed) throw new Error("教学连接提前结束，请重试");
+      setConversation(completed);
+      setPendingQuestion("");
+      setLiveToolTrace([]);
+      setLiveArtifacts([]);
       onConversationChange?.(currentId);
       await onConversationUpdated?.();
     }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { setBusy(false); }
+    catch (cause) {
+      setRunPhase(abortRef.current?.signal.aborted ? "本轮教学已停止" : "本轮教学失败");
+      setQuestion((current) => current || submittedQuestion);
+      setError(abortRef.current?.signal.aborted ? "已停止本轮教学" : cause instanceof Error ? cause.message : String(cause));
+    }
+    finally {
+      abortRef.current = null;
+      setBusy(false);
+    }
   }
 
   function reset(): void {
+    abortRef.current?.abort();
+    abortRef.current = null;
     if (managed && onNewConversation) {
       onNewConversation();
       return;
@@ -651,6 +761,9 @@ function Tutor({ project, skills, conversationId = "", conversationDraft = 0, on
     setResult(null);
     setConversation(null);
     setActiveArtifactId("");
+    setPendingQuestion("");
+    setLiveToolTrace([]);
+    setLiveArtifacts([]);
     setError("");
   }
 
@@ -683,8 +796,19 @@ function Tutor({ project, skills, conversationId = "", conversationDraft = 0, on
           <TutorAnswer result={turn.result} workbench />
         </div>)}
 
+        {pendingQuestion && <div className="conversation-turn live-turn">
+          <div className="student-bubble"><span>你</span><p>{pendingQuestion}</p></div>
+          {liveToolTrace.length > 0 && <div className="tool-trace">
+            <p className="eyebrow">LIVE TOOL TRACE</p>
+            {liveToolTrace.map((event) => <button key={event.id} className={event.artifact_id === activeArtifact?.id ? "active" : ""} disabled={!event.artifact_id} onClick={() => event.artifact_id && setActiveArtifactId(event.artifact_id)}>
+              <span className={`tool-icon ${event.status}`}>{event.status === "running" ? "…" : event.ok ? "✓" : "!"}</span><span><b>{event.label}</b><small>{event.summary}</small></span>{event.artifact_id && <i>在黑板打开 ↗</i>}
+            </button>)}
+          </div>}
+          <div className="agent-running">{busy && <span className="pulse" />}<div><b>{runPhase}</b><small>{busy ? "Pi Agent 的真实运行事件正在同步到当前会话与教学黑板。" : "已生成的工具记录和板书保留在当前页面。"}</small></div></div>
+        </div>}
+
         {loading && <div className="agent-running"><span className="pulse" /><div><b>正在恢复会话</b><small>载入历史回答、工具轨迹和黑板板书…</small></div></div>}
-        {busy && <div className="agent-running"><span className="pulse" /><div><b>老师正在处理</b><small>诊断问题、选择 Skill，并判断是否需要调用画图工具…</small></div></div>}
+        {busy && !pendingQuestion && <div className="agent-running"><span className="pulse" /><div><b>老师正在处理</b><small>正在建立教学会话…</small></div></div>}
         {error && <div className="inline-error">{error}</div>}
       </div>
 
@@ -693,7 +817,7 @@ function Tutor({ project, skills, conversationId = "", conversationDraft = 0, on
         <div className="workbench-composer-foot">
           <div className="mode-picker">{(["base", "text_skill", "multimodal_skill"] as TutorMode[]).map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{modeLabel(item)}</button>)}</div>
           <span>{skills.length} Skills</span>
-          <button className="send-button" aria-label="发送" disabled={busy || loading || question.trim().length < 4} onClick={submit}>↑</button>
+          <button className="send-button" aria-label={busy ? "停止" : "发送"} disabled={loading || (!busy && question.trim().length < 4)} onClick={() => busy ? abortRef.current?.abort() : void submit()}>{busy ? "■" : "↑"}</button>
         </div>
       </div>
     </section>
@@ -701,7 +825,7 @@ function Tutor({ project, skills, conversationId = "", conversationDraft = 0, on
     <aside className="artifact-workspace">
       <header className="artifact-head">
         <div><span className="canvas-icon">板</span><div><b>{activeArtifact?.title || "教学黑板"}</b><small>{activeArtifact ? activeArtifact.summary : "老师的图示与推演会自动写在这里"}</small></div></div>
-        <span className="canvas-status"><i /> LIVE BLACKBOARD</span>
+        <span className="canvas-status"><i /> {blackboardStatus} BLACKBOARD</span>
       </header>
 
       <div className="artifact-stage">
@@ -741,7 +865,16 @@ function TutorAnswer({ result, workbench = false }: { result: TutorResult; workb
   return <article className={`answer-card paper-panel ${workbench ? "thread-answer" : ""}`}>
     <Markdown>{studentVisibleAnswer(result.answer.answer)}</Markdown>
     <LearningCheck value={result.answer.learning_check.prompts[0]} />
-    <div className="audit-row"><span>{audit.requested} → {audit.actual}</span><span>视觉 {audit.actual_visual_count}/{audit.attempted_visual_count}</span><span>工具 {audit.tool_call_count}</span>{audit.fallback_reason && <span className="warn">{audit.fallback_reason}</span>}</div>
+    <div className="audit-row">
+      <span>{audit.requested} → {audit.actual}</span>
+      <span>视觉 {audit.actual_visual_count}/{audit.attempted_visual_count}</span>
+      {typeof audit.candidate_visual_count === "number" && audit.candidate_visual_count !== audit.attempted_visual_count && <span>候选 {audit.candidate_visual_count}</span>}
+      <span>Skill {audit.used_skill_count ?? 0}/{audit.candidate_skill_count ?? result.selected_skills.length}</span>
+      <span>工具 {audit.tool_call_count}</span>
+      {typeof audit.duration_ms === "number" && <span>{(audit.duration_ms / 1000).toFixed(1)}s</span>}
+      {typeof audit.input_tokens === "number" && <span>Token {audit.input_tokens + (audit.output_tokens ?? 0)}</span>}
+      {audit.fallback_reason && <span className="warn">{audit.fallback_reason}</span>}
+    </div>
   </article>;
 }
 

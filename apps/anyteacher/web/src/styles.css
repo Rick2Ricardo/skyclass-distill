@@ -183,6 +183,10 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .contract-note { padding: 14px; margin: 22px 0; color: #575b51; background: #edece3; border-left: 3px solid var(--orange); border-radius: 4px 9px 9px 4px; }
 .contract-note b { font-size: 10px; }
 .contract-note p { margin: 7px 0 0; font: 9px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.bundle-import { display: grid; gap: 5px; padding: 12px 14px; margin-top: 12px; color: #565b4d; background: #f4f7e9; border: 1px dashed #b5bd92; border-radius: 9px; cursor: pointer; }
+.bundle-import input { display: none; }
+.bundle-import span { font-size: 10px; font-weight: 700; }
+.bundle-import small { color: var(--muted); font-size: 9px; line-height: 1.45; }
 .video-select-list { display: grid; gap: 8px; margin-top: 22px; }
 .video-select-list > button { display: grid; grid-template-columns: 22px 28px minmax(0, 1fr); gap: 10px; align-items: center; padding: 15px; text-align: left; background: #f0eee6; border: 1px solid transparent; border-radius: 10px; }
 .video-select-list > button.selected { background: #fbfff0; border-color: #b9d858; }

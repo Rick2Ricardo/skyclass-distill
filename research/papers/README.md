@@ -7,22 +7,34 @@
 ```text
 research/papers/
 ├── README.md                     # 总索引与阅读队列
+├── _duplicates/                  # 精确重复副本和 canonical 指向
 ├── skillopt/
 │   ├── README.md                 # 论文卡片、借鉴点与边界
 │   └── skillopt-*.pdf            # 原始 PDF，仅本地保存
-└── resource2skill/
+├── resource2skill/
+│   ├── README.md
+│   └── resource2skill-*.pdf      # 原始 PDF，仅本地保存
+└── <stable-slug>/
     ├── README.md
-    └── resource2skill-*.pdf      # 原始 PDF，仅本地保存
+    └── <title>-<year>-arxiv-<id>.pdf
 ```
 
 PDF 默认不进入 Git，Markdown 论文卡片和索引进入版本管理。原始文件保持不修改；如果更换版本，使用新文件名并更新 SHA-256，不覆盖旧版本。
 
 ## 已归档论文
 
-| 论文 | 状态 | 本地材料 | 主要借鉴 | 关键边界 |
-|---|---|---|---|---|
-| SkillOpt: Executive Strategy for Self-Evolving Agent Skills | 已精读，原文已归档 | [`skillopt/README.md`](skillopt/README.md) | 数据隔离、有限文本编辑、验证闸门、拒绝缓冲、快慢两级更新 | 原论文以单领域单 Skill 为主；本项目要扩展为多教师 Skill 图谱和教育评测 |
-| Resource2Skill: Distilling Executable Agent Skills from Human-Created Multimodal Resources | 已精读，原文已归档 | [`resource2skill/README.md`](resource2skill/README.md)、[双语精读](../resource2skill_reader/paper.md) | 从多模态人类资源抽取过程知识、建立 Skill Wiki、编译为可执行能力 | 本项目更关注教学时序、板书状态、学生学习结果和多教师差异 |
+| 标题 | 年份 | 主题 | Canonical PDF | 状态 | 与 Board2Skill 的关系 |
+|---|---:|---|---|---|---|
+| [SkillOpt: Executive Strategy for Self-Evolving Agent Skills](skillopt/README.md) | 2026 | Skill 轨迹优化 | `skillopt/skillopt-2026-arxiv-2605.23904v2.pdf` | 已精读 | 借鉴数据隔离、有限编辑、验证闸门、拒绝缓冲和快慢更新；改造为教学策略进化。 |
+| [Resource2Skill: Distilling Executable Agent Skills from Human-Created Multimodal Resources](resource2skill/README.md) | 2026 | 多模态资源到 Skill | `resource2skill/resource2skill-2026-arxiv-2606.29538v4.pdf` | 已精读 | 支持从讲解、视频和图像中得到初始 Skill；需加入板书时序和学习成效验证。 |
+| [OpenSkill: Open-World Self-Evolution for LLM Agents](openskill/README.md) | 2026 | 开放世界 Skill 获取与自建验证 | `openskill/openskill-2026-arxiv-2606.06741v1.pdf` | 已精读 | 用外部证据构建无目标答案的练习任务和验证器，减少教学测试泄漏。 |
+| [Ask Only When Needed: Proactive Retrieval from Memory and Skills for Experience-Driven Lifelong Agents](proactagent/README.md) | 2026 | 主动经验检索与终身 Agent | `proactagent/ask-only-when-needed-2026-arxiv-2604.20572v2.pdf` | 已精读 | 学习“何时调用哪个 Skill”，并用有/无检索的配对分支估计增益。 |
+| [Agent-World: Scaling Real-World Environment Synthesis for Evolving General Agent Intelligence](agent-world/README.md) | 2026 | 状态化环境和自进化训练 | `agent-world/agent-world-2026-arxiv-2604.18292v1.pdf` | 已精读 | 把黑板、工具和学生状态构造成可执行环境，围绕能力缺口动态合成教学任务。 |
+| [Socratic-SWE: Self-Evolving Coding Agents via Trace-Derived Agent Skills](socratic-swe/README.md) | 2026 | 轨迹驱动的 Skill 与课程自进化 | `socratic-swe/socratic-swe-2026-arxiv-2606.07412v1.pdf` | 已精读 | 从教学失败轨迹抽取 Skill，再生成针对当前弱点的训练题。 |
+
+精确重复副本不进入上表，统一记录在 [`_duplicates/README.md`](_duplicates/README.md)。
+
+六篇核心论文与本项目方法模块的统一映射见 [`BOARD2SKILL_METHOD_MAP.md`](BOARD2SKILL_METHOD_MAP.md)。
 
 ## 相关论文阅读队列
 

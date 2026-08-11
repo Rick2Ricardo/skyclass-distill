@@ -1,7 +1,12 @@
 export type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
 export type JsonObject = { [key: string]: JsonValue | undefined };
 
+export * from "./board2skill.js";
+export * from "./skill-distillation.js";
+export * from "./temporal-board.js";
+
 export type Modality = "text" | "multimodal";
+export type EvidenceMode = "text" | "static_frames" | "temporal_board";
 export type TutorMode = "base" | "text_skill" | "multimodal_skill";
 export type DistillMode = "single" | "common";
 export type JobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
@@ -54,9 +59,12 @@ export interface Skill {
   errors?: string[];
   distill_mode?: DistillMode;
   distill_modality?: Modality;
+  distill_evidence_mode?: EvidenceMode;
   modalities?: string[];
   visual_asset_count?: number;
   has_executable_asset?: boolean;
+  board_action_count?: number;
+  render_targets?: string[];
   generate_executable_assets?: boolean;
   job_id?: string;
   video_ids?: string[];
@@ -95,6 +103,9 @@ export interface JobState {
   current_item?: number;
   distill_mode?: DistillMode | null;
   distill_modality?: Modality;
+  evidence_mode?: EvidenceMode;
+  board_bundle_uri?: string;
+  board_bundle_schema_version?: string;
   generate_executable_assets?: boolean;
   qa_mode?: "qa" | "ab" | null;
   qa_question?: string | null;
@@ -138,11 +149,23 @@ export interface DeliveryAudit {
   actual: Modality | "local" | string;
   actual_visual_count: number;
   attempted_visual_count: number;
+  candidate_visual_count?: number;
   tool_call_count: number;
   fallback_occurred: boolean;
   fallback_reason: string;
   multimodal_valid?: boolean;
   include_in_primary_result?: boolean;
+  candidate_skill_count?: number;
+  used_skill_count?: number;
+  used_skill_keys?: string[];
+  stop_reason?: string;
+  model?: string;
+  provider?: string;
+  duration_ms?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_tokens?: number;
+  cache_write_tokens?: number;
 }
 
 export interface TutorAnswer {
@@ -158,7 +181,7 @@ export interface TutorAnswer {
 
 export { splitLearningCheck, studentVisibleAnswer } from "./studentContent.js";
 
-export type TeachingArtifactKind = "concept_map" | "process" | "force" | "coordinate";
+export type TeachingArtifactKind = "concept_map" | "process" | "force" | "coordinate" | "trajectory";
 
 export interface TeachingArtifact {
   id: string;
@@ -177,6 +200,35 @@ export interface TutorToolTrace {
   ok: boolean;
   summary: string;
   artifact_id?: string;
+  skill_key?: string;
+  evidence_ids?: string[];
+  started_at?: string;
+  ended_at?: string;
+  duration_ms?: number;
+  args_summary?: string;
+}
+
+export type TutorAgentEventType =
+  | "agent_start"
+  | "agent_end"
+  | "turn_start"
+  | "turn_end"
+  | "message_start"
+  | "message_update"
+  | "message_end"
+  | "tool_execution_start"
+  | "tool_execution_update"
+  | "tool_execution_end";
+
+export interface TutorRuntimeEvent {
+  type: TutorAgentEventType;
+  timestamp: string;
+  message_role?: string;
+  tool_call_id?: string;
+  tool_name?: string;
+  is_error?: boolean;
+  trace?: TutorToolTrace;
+  artifact?: TeachingArtifact;
 }
 
 export interface TutorResult {
@@ -218,6 +270,11 @@ export interface TutorConversationSummary {
   artifact_count: number;
   last_question?: string;
 }
+
+export type TutorStreamEvent =
+  | { type: "runtime"; seq: number; run_id: string; conversation_id: string; event: TutorRuntimeEvent }
+  | { type: "complete"; seq: number; run_id: string; conversation_id: string; conversation: TutorConversation }
+  | { type: "error"; seq: number; run_id: string; conversation_id: string; detail: string };
 
 export interface ExperimentRun {
   id: string;

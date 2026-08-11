@@ -1,10 +1,12 @@
 import Fastify, { type FastifyRequest } from "fastify";
 import fastifyStatic from "@fastify/static";
+import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
-import { readFile, rm } from "node:fs/promises";
+import { readFile, realpath, rm } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import type {
   BenchmarkDataset,
+  BoardEvidenceBundle,
   ExperimentRun,
   ExperimentSummary,
   Health,
@@ -17,8 +19,10 @@ import type {
   TutorConversation,
   TutorConversationSummary,
   TutorResult,
+  TutorStreamEvent,
   VideoAsset,
 } from "../../../packages/contracts/src/index.js";
+import { canonicalBoardEvidencePayload, validateBoardEvidenceBundle } from "../../../packages/contracts/src/index.js";
 import { LlmClient } from "../../../packages/llm/src/client.js";
 import { discoverSource, runtimeStatus } from "../../../packages/media/src/tools.js";
 import { PipelineEngine } from "../../../packages/pipeline/src/engine.js";
@@ -27,6 +31,7 @@ import { JobStore } from "../../../packages/store/src/jobStore.js";
 import { LibraryStore } from "../../../packages/store/src/libraryStore.js";
 import { EvaluationStore } from "../../../packages/store/src/evaluationStore.js";
 import { ConversationStore } from "../../../packages/store/src/conversationStore.js";
+import { writeJson } from "../../../packages/store/src/fileStore.js";
 import { DATA_DIR, PORT, ROOT, WEB_DIST_DIR } from "./config.js";
 import { TutorService } from "./services/tutorService.js";
 
@@ -41,6 +46,7 @@ const settings = new SettingsStore(ROOT, DATA_DIR);
 const pipeline = new PipelineEngine(ROOT, DATA_DIR, library, jobs, settings);
 const tutor = new TutorService(library, jobs, settings);
 const webRoot = WEB_DIST_DIR;
+const activeConversationRuns = new Set<string>();
 
 app.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
 app.addContentTypeParser(/^(?:video|audio)\//, { parseAs: "buffer" }, (_request, body, done) => done(null, body));
@@ -61,6 +67,35 @@ function httpError(reply: any, error: unknown, fallback = 400): any {
 function inside(root: string, path: string): boolean {
   const value = relative(resolve(root), resolve(path));
   return value === "" || (!value.startsWith("..") && !value.startsWith("/") && !value.startsWith("\\"));
+}
+
+async function sha256File(path: string): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
+  return hash.digest("hex");
+}
+
+function tutorHistory(conversation: TutorConversation): Array<{ question: string; answer: string }> {
+  return conversation.turns.map((turn) => {
+    const blackboard = turn.result.artifacts.map((artifact) => `${artifact.kind}「${artifact.title}」：${artifact.summary}`);
+    return {
+      question: turn.question,
+      answer: [
+        turn.result.answer.answer,
+        blackboard.length ? `[本轮黑板记录]\n${blackboard.join("\n")}` : "",
+      ].filter(Boolean).join("\n\n"),
+    };
+  });
+}
+
+async function withConversationRun<T>(conversationId: string, run: () => Promise<T>): Promise<T> {
+  if (activeConversationRuns.has(conversationId)) throw new Error("当前会话已有一轮教学正在运行，请等待完成或先停止");
+  activeConversationRuns.add(conversationId);
+  try {
+    return await run();
+  } finally {
+    activeConversationRuns.delete(conversationId);
+  }
 }
 
 app.get("/api/health", async (): Promise<Health> => {
@@ -176,6 +211,30 @@ app.delete("/api/projects/:id/videos", async (request, reply) => {
   } catch (error) { return httpError(reply, error); }
 });
 
+app.post("/api/projects/:projectId/videos/:videoId/board-bundle", async (request, reply): Promise<VideoAsset | unknown> => {
+  try {
+    const { projectId, videoId } = paramsOf<{ projectId: string; videoId: string }>(request);
+    const video = await library.getVideo(videoId);
+    if (video.project_id !== projectId) throw new Error("视频不属于当前项目");
+    const bundle = bodyOf(request) as unknown as BoardEvidenceBundle;
+    const report = validateBoardEvidenceBundle(bundle);
+    if (!report.valid) throw new Error(`BoardEvidenceBundle 未通过校验：${report.issues.slice(0, 6).map((issue) => `${issue.path} ${issue.message}`).join("；")}`);
+    const actualPayloadHash = createHash("sha256").update(canonicalBoardEvidencePayload(bundle)).digest("hex");
+    if (actualPayloadHash !== bundle.payload_sha256) throw new Error("BoardEvidenceBundle payload_sha256 与规范化内容不匹配");
+    if (!bundle.transitions.some((transition) => transition.status === "accepted")) throw new Error("板书包尚无 accepted transition，不能绑定到蒸馏入口");
+    const sourceUri = video.artifacts?.video;
+    if (!sourceUri || !inside(DATA_DIR, sourceUri)) throw new Error("课堂源视频路径无效，无法校验板书包");
+    const sourcePath = await realpath(sourceUri).catch(() => { throw new Error("课堂源视频不存在，无法校验板书包"); });
+    if (!inside(await realpath(DATA_DIR).catch(() => DATA_DIR), sourcePath)) throw new Error("课堂源视频路径无效，无法校验板书包");
+    if (await sha256File(sourcePath) !== bundle.source.video.sha256) throw new Error("板书包与所选课堂的视频 SHA-256 不匹配");
+    const target = join(DATA_DIR, "projects", projectId, "evidence", videoId, `${bundle.payload_sha256}.temporal-board-v2.json`);
+    await writeJson(target, bundle);
+    video.artifacts = { ...(video.artifacts ?? {}), board_bundle_json: target };
+    await library.saveVideo(video);
+    return video;
+  } catch (error) { return httpError(reply, error); }
+});
+
 app.post("/api/uploads", async (request, reply) => {
   try {
     if (!Buffer.isBuffer(request.body)) return reply.code(400).send({ detail: "上传内容为空" });
@@ -206,6 +265,7 @@ app.post("/api/projects/:id/distill", async (request, reply): Promise<JobState |
       video_ids: Array.isArray(body.video_ids) ? body.video_ids.map(String) : [],
       mode: body.mode === "common" ? "common" : "single",
       modality: body.modality === "multimodal" ? "multimodal" : "text",
+      evidence_mode: body.evidence_mode === "temporal_board" ? "temporal_board" : body.evidence_mode === "static_frames" || body.modality === "multimodal" ? "static_frames" : "text",
     });
   } catch (error) { return httpError(reply, error); }
 });
@@ -326,10 +386,71 @@ app.post("/api/projects/:projectId/conversations/:conversationId/turns", async (
     const question = typeof body.question === "string" ? body.question.trim() : "";
     const mode: TutorMode = ["base", "text_skill", "multimodal_skill"].includes(String(body.mode)) ? body.mode as TutorMode : "multimodal_skill";
     if (question.length < 4) return reply.code(400).send({ detail: "请输入至少 4 个字符的问题" });
-    await conversations.get(projectId, conversationId);
-    const result = await tutor.answer(projectId, { ...body, question, mode });
-    return await conversations.append(projectId, conversationId, question, mode, result);
+    return await withConversationRun(conversationId, async () => {
+      const conversation = await conversations.get(projectId, conversationId);
+      const history = tutorHistory(conversation);
+      const result = await tutor.answer(projectId, { ...body, question, mode, history, conversation_id: conversationId });
+      return await conversations.append(projectId, conversationId, question, mode, result);
+    });
   } catch (error) { return httpError(reply, error, 502); }
+});
+
+app.post("/api/projects/:projectId/conversations/:conversationId/turns/stream", async (request, reply): Promise<void> => {
+  const { projectId, conversationId } = paramsOf<{ projectId: string; conversationId: string }>(request);
+  const body = bodyOf(request);
+  const question = typeof body.question === "string" ? body.question.trim() : "";
+  const mode: TutorMode = ["base", "text_skill", "multimodal_skill"].includes(String(body.mode)) ? body.mode as TutorMode : "multimodal_skill";
+  const runId = randomUUID();
+  let seq = 0;
+  const send = (event: TutorStreamEvent): void => {
+    if (!reply.raw.destroyed && !reply.raw.writableEnded) reply.raw.write(`${JSON.stringify(event)}\n`);
+  };
+
+  reply.hijack();
+  reply.raw.writeHead(200, {
+    "Content-Type": "application/x-ndjson; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  const controller = new AbortController();
+  reply.raw.on("close", () => {
+    if (!reply.raw.writableEnded) controller.abort();
+  });
+
+  try {
+    if (question.length < 4) throw new Error("请输入至少 4 个字符的问题");
+    const updated = await withConversationRun(conversationId, async () => {
+      const conversation = await conversations.get(projectId, conversationId);
+      const history = tutorHistory(conversation);
+      const result = await tutor.answer(
+        projectId,
+        { ...body, question, mode, history, conversation_id: conversationId },
+        {
+          signal: controller.signal,
+          onEvent: async (event) => send({
+            type: "runtime",
+            seq: ++seq,
+            run_id: runId,
+            conversation_id: conversationId,
+            event,
+          }),
+        },
+      );
+      return await conversations.append(projectId, conversationId, question, mode, result);
+    });
+    send({ type: "complete", seq: ++seq, run_id: runId, conversation_id: conversationId, conversation: updated });
+  } catch (error) {
+    send({
+      type: "error",
+      seq: ++seq,
+      run_id: runId,
+      conversation_id: conversationId,
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    if (!reply.raw.writableEnded) reply.raw.end();
+  }
 });
 
 app.post("/api/experiments/compare", async (request, reply): Promise<ExperimentRun | unknown> => {

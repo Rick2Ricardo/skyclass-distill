@@ -31,6 +31,7 @@ apps/anyteacher/web/dist/
 *.log
 *.tmp
 .runtime/
+tmp/
 
 # Runtime data: never commit videos, transcripts, API settings, or generated outputs
 data/*

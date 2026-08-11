@@ -1,8 +1,10 @@
-import { randomBytes } from "node:crypto";
-import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { basename, extname, join, resolve } from "node:path";
-import type { CourseItem, DistillMode, JobState, Modality, Project, Skill, VideoAsset } from "../../contracts/src/index.js";
-import { analyzeLesson, attachFramePaths, distillSkills } from "../../distillation/src/index.js";
+import { createHash, randomBytes } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { basename, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import type { BoardEvidenceBundle, CourseItem, DistillMode, EvidenceMode, JobState, Modality, Project, Skill, VideoAsset } from "../../contracts/src/index.js";
+import { canonicalBoardEvidencePayload, validateBoardEvidenceBundle } from "../../contracts/src/index.js";
+import { analyzeLesson, attachFramePaths, buildGroundedSkillSourceCatalog, distillGroundedSkills, distillSkills } from "../../distillation/src/index.js";
 import { LlmClient } from "../../llm/src/client.js";
 import { discoverSource, downloadVideo, extractAudio, extractFrames, mediaDuration, safeUploadName } from "../../media/src/tools.js";
 import { transcribeAudio, type Transcript } from "../../media/src/transcribe.js";
@@ -13,7 +15,47 @@ import { LibraryStore } from "../../store/src/libraryStore.js";
 import { ensureDir, readJson } from "../../store/src/fileStore.js";
 
 interface IngestRequest { source_url: string; limit: number; upload_id?: string; language?: string; whisper_model?: string }
-interface DistillRequest { video_ids: string[]; mode: DistillMode; modality: Modality }
+interface DistillRequest {
+  video_ids: string[];
+  mode: DistillMode;
+  modality: Modality;
+  evidence_mode?: EvidenceMode;
+  board_bundle_uri?: string;
+}
+
+function controlledRelativeUri(value: string): string | null {
+  if (!value || value.trim() !== value || value.includes("\\") || value.includes("\0") || isAbsolute(value)) return null;
+  let decoded = value;
+  let stable = false;
+  try {
+    for (let index = 0; index < 16; index += 1) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) {
+        stable = true;
+        break;
+      }
+      decoded = next;
+    }
+  } catch { return null; }
+  if (!stable || !decoded || decoded.includes("\\") || decoded.includes("\0") || isAbsolute(decoded) || /^[a-z][a-z0-9+.-]*:/i.test(decoded)) return null;
+  if (decoded.split("/").some((part) => !part || part === "." || part === "..")) return null;
+  return decoded;
+}
+
+function inside(root: string, candidate: string): boolean {
+  const path = relative(root, candidate);
+  return path === "" || (!path.startsWith(`..${sep}`) && path !== ".." && !isAbsolute(path));
+}
+
+async function sha256File(path: string): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
+  return hash.digest("hex");
+}
+
+function bundlePayloadSha256(bundle: BoardEvidenceBundle): string {
+  return createHash("sha256").update(canonicalBoardEvidencePayload(bundle)).digest("hex");
+}
 
 function stem(index: number, id: string): string {
   return `${String(index + 1).padStart(3, "0")}-${id.replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 80)}`;
@@ -82,21 +124,64 @@ export class PipelineEngine {
     if (!request.video_ids.length) throw new Error("至少选择一个视频");
     if (request.mode === "single" && request.video_ids.length !== 1) throw new Error("单课模式必须且只能选择一个视频");
     if (request.mode === "common" && request.video_ids.length < 4) throw new Error("跨课共性模式至少需要四段课堂");
+    const evidenceMode: EvidenceMode = request.evidence_mode ?? (request.modality === "multimodal" ? "static_frames" : "text");
+    if (evidenceMode === "temporal_board" && request.mode !== "single") throw new Error("时序板书 v2 首批仅支持单课模式");
+    const videos: VideoAsset[] = [];
     for (const id of request.video_ids) {
       const video = await this.library.getVideo(id);
       if (video.project_id !== projectId) throw new Error("视频不属于当前项目");
+      videos.push(video);
     }
+    const temporal = evidenceMode === "temporal_board"
+      ? request.board_bundle_uri
+        ? await this.loadBoardBundle(request.board_bundle_uri, false, videos[0])
+        : await this.loadBoardBundle(videos[0]?.artifacts?.board_bundle_json, true, videos[0])
+      : null;
+    const normalizedRequest: DistillRequest = {
+      ...request,
+      modality: evidenceMode === "text" ? "text" : "multimodal",
+      evidence_mode: evidenceMode,
+      ...(temporal ? { board_bundle_uri: temporal.uri } : {}),
+    };
     const job = await this.jobs.create({
       kind: "distill",
       project_id: projectId,
       video_ids: request.video_ids,
       distill_mode: request.mode,
-      distill_modality: request.modality,
-      request: request as unknown as Record<string, unknown>,
+      distill_modality: normalizedRequest.modality,
+      evidence_mode: evidenceMode,
+      board_bundle_uri: temporal?.uri,
+      board_bundle_schema_version: temporal?.bundle.schema_version,
+      request: normalizedRequest as unknown as Record<string, unknown>,
     });
-    await this.jobs.event(job, `蒸馏任务已创建 · ${request.modality === "multimodal" ? "文本＋视觉" : "纯文本"} · TypeScript Pipeline`);
-    this.start(job.id, () => this.runDistill(job.id, request));
+    const evidenceLabel = evidenceMode === "temporal_board" ? "时序板书 v2" : evidenceMode === "static_frames" ? "文本＋抽帧" : "纯文本";
+    await this.jobs.event(job, `蒸馏任务已创建 · ${evidenceLabel} · TypeScript Pipeline`);
+    this.start(job.id, () => this.runDistill(job.id, normalizedRequest));
     return job;
+  }
+
+  private async loadBoardBundle(uri: string | undefined, allowAbsolute = false, expectedVideo?: VideoAsset): Promise<{ uri: string; path: string; bundle: BoardEvidenceBundle }> {
+    if (!uri) throw new Error("时序板书蒸馏需要已仲裁的 board_bundle_json");
+    const controlled = isAbsolute(uri) && allowAbsolute ? uri : controlledRelativeUri(uri);
+    if (!controlled) throw new Error("board_bundle_uri 必须是数据目录内的受控路径");
+    const dataRoot = await realpath(this.dataDir).catch(() => resolve(this.dataDir));
+    const candidate = resolve(isAbsolute(controlled) ? controlled : join(this.dataDir, controlled));
+    if (!inside(resolve(this.dataDir), candidate)) throw new Error("board_bundle_uri 超出数据目录");
+    const resolvedPath = await realpath(candidate).catch(() => { throw new Error("board_bundle_json 不存在"); });
+    if (!inside(dataRoot, resolvedPath)) throw new Error("board_bundle_uri 超出数据目录");
+    const bundle = await readJson<BoardEvidenceBundle>(resolvedPath);
+    const report = validateBoardEvidenceBundle(bundle);
+    if (!report.valid) throw new Error(`BoardEvidenceBundle 未通过校验：${report.issues.slice(0, 4).map((issue) => `${issue.path} ${issue.message}`).join("；")}`);
+    if (bundlePayloadSha256(bundle) !== bundle.payload_sha256) throw new Error("BoardEvidenceBundle payload_sha256 与规范化内容不匹配");
+    if (!bundle.transitions.some((transition) => transition.status === "accepted")) throw new Error("BoardEvidenceBundle 尚无 accepted transition，不能进入 Skill 蒸馏");
+    if (expectedVideo) {
+      const videoUri = expectedVideo.artifacts?.video;
+      if (!videoUri) throw new Error("所选课堂缺少可校验的源视频文件");
+      const videoPath = await realpath(videoUri).catch(() => { throw new Error("所选课堂的源视频文件不存在"); });
+      if (!inside(dataRoot, videoPath)) throw new Error("所选课堂的源视频文件超出数据目录");
+      if (await sha256File(videoPath) !== bundle.source.video.sha256) throw new Error("BoardEvidenceBundle 与所选课堂的视频 SHA-256 不匹配");
+    }
+    return { uri: relative(dataRoot, resolvedPath).split(sep).join("/"), path: resolvedPath, bundle };
   }
 
   private start(jobId: string, task: () => Promise<void>): void {
@@ -207,6 +292,40 @@ export class PipelineEngine {
     const settings = await this.settings.private();
     const client = this.client(settings);
     if (!client.configured) throw new Error("LLM API 尚未配置");
+    if (request.evidence_mode === "temporal_board") {
+      const video = await this.library.getVideo(request.video_ids[0]);
+      const temporal = await this.loadBoardBundle(request.board_bundle_uri, false, video);
+      await this.jobs.stage(job, "evidence", .12, "正在校验已仲裁的时序板书证据");
+      jobCancelled(job);
+      await this.jobs.stage(job, "distill", .46, "正在蒸馏 renderer-neutral Board Actions");
+      const suite = await distillGroundedSkills(client, { subject: project.subject, bundle: temporal.bundle, mode: request.mode });
+      await this.jobs.stage(job, "compile", .82, "正在编译 Board Actions 与 HTML / SVG / Ink Render Plans");
+      const outputRoot = join(this.dataDir, "projects", project.id, "skills", job.id);
+      const skills = await buildSkillSuite({
+        suite: suite as unknown as Record<string, unknown>,
+        outputRoot,
+        subject: project.subject,
+        groundedSourceCatalog: buildGroundedSkillSourceCatalog(temporal.bundle),
+        provenance: {
+          job_id: job.id,
+          project_id: project.id,
+          video_ids: request.video_ids,
+          mode: request.mode,
+          modality: "multimodal",
+          evidence_mode: "temporal_board",
+          board_bundle_uri: temporal.uri,
+          board_bundle_id: temporal.bundle.bundle_id,
+          model: settings.llm_model,
+          schema_version: "grounded-skill-distillation-v2",
+        },
+      });
+      job.artifacts = { ...(job.artifacts ?? {}), skills_dir: outputRoot, skills, suite, board_bundle_uri: temporal.uri };
+      job.status = "completed";
+      job.stage = "completed";
+      job.progress = 1;
+      await this.jobs.event(job, `Grounded Skill v2 蒸馏完成 · ${skills.length} 个能力`, "success");
+      return;
+    }
     const lessons: Array<{ title: string; videoId: string; analysis: Record<string, unknown>; frames: Array<{ frame_id: string; timestamp: number; path: string }> }> = [];
     for (let index = 0; index < request.video_ids.length; index += 1) {
       Object.assign(job, await this.jobs.get(jobId));

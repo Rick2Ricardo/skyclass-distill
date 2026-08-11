@@ -1,0 +1,387 @@
+{
+  "schema_version": "temporal-board-oracle-pilot-manifest-v1",
+  "created_at": "2026-08-11",
+  "rights_policy": {
+    "rights_status": "internal_review_only",
+    "allow_public_redistribution": false,
+    "allow_commit_raw_media": false,
+    "note": "本地公开视频副本只用于内部、非商业研究复核；不得把本地持有误解为转载、再发布或公开训练授权。"
+  },
+  "review_summary": {
+    "clip_count": 8,
+    "total_duration_seconds": 1518,
+    "source_video_count": 5,
+    "teacher_count": 2,
+    "board_media": [
+      "physical_chalkboard",
+      "digital_ink_over_slides"
+    ],
+    "review_method": "先对短视频约每20秒、长视频约每120秒低频通览，再对候选窗口约每5秒视觉复核；仅 phy-force-liyongle-002 有现成带时间戳 ASR。",
+    "actual_verification_level": "coarse_visual_verified_not_delta_annotated",
+    "delta_ground_truth_complete": false
+  },
+  "clips": [
+    {
+      "clip_id": "tbv2-ly-001-01",
+      "source_record_id": "phy-force-liyongle-001",
+      "teacher_key": "li_yongle",
+      "source_url": "https://www.bilibili.com/video/BV1ZJ4m1M7hT/",
+      "source_video_path": "data/raw/physics/force-pilot/phy-force-liyongle-001/source.mp4",
+      "source_metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-001/source.json",
+      "source_sha256": "f4bcc9e2f509f1f6b94ad69015652dcbbaf8bc8f2337774dd70869c61e40b75e",
+      "board_medium": "physical_chalkboard",
+      "start_seconds": 24,
+      "end_seconds": 100,
+      "start_time": "00:00:24",
+      "end_time": "00:01:40",
+      "duration_seconds": 76,
+      "neighboring_teaching_content": "用水平杆、悬挂重物和墙上小球说明共点力与作用线交点。",
+      "observed_board_action_types": [
+        "add_scene_object",
+        "add_connector",
+        "add_force_arrow",
+        "add_force_label",
+        "point_to_existing_mark"
+      ],
+      "candidate_value": "板面起始较空，适合建立物体、连接、箭头和标签的基础事件定义。",
+      "evidence": {
+        "video_path": "data/raw/physics/force-pilot/phy-force-liyongle-001/source.mp4",
+        "metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-001/source.json",
+        "transcript_path": null,
+        "transcript_coverage": "none",
+        "visual_review_sampling_seconds": 5
+      },
+      "risks": [
+        "teacher_occlusion",
+        "low_contrast_chalk_stroke",
+        "fast_action_between_samples"
+      ],
+      "rights_status": "internal_review_only",
+      "oracle_labels": {
+        "board_state_before": null,
+        "board_deltas": [],
+        "board_state_after": null,
+        "needs_review": true,
+        "review_status": "coarse_visual_verified_not_delta_annotated"
+      }
+    },
+    {
+      "clip_id": "tbv2-ly-001-02",
+      "source_record_id": "phy-force-liyongle-001",
+      "teacher_key": "li_yongle",
+      "source_url": "https://www.bilibili.com/video/BV1ZJ4m1M7hT/",
+      "source_video_path": "data/raw/physics/force-pilot/phy-force-liyongle-001/source.mp4",
+      "source_metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-001/source.json",
+      "source_sha256": "f4bcc9e2f509f1f6b94ad69015652dcbbaf8bc8f2337774dd70869c61e40b75e",
+      "board_medium": "physical_chalkboard",
+      "start_seconds": 582,
+      "end_seconds": 690,
+      "start_time": "00:09:42",
+      "end_time": "00:11:30",
+      "duration_seconds": 108,
+      "neighboring_teaching_content": "比较正交分解中不同坐标方向，利用互补角和垂直关系选择更方便的轴。",
+      "observed_board_action_types": [
+        "add_axis_sketch",
+        "add_angle_mark",
+        "add_auxiliary_line",
+        "compare_parallel_sketches",
+        "point_to_existing_force_diagram"
+      ],
+      "candidate_value": "观察教师先画多种轴选择再决策，而不是直接列方程。",
+      "evidence": {
+        "video_path": "data/raw/physics/force-pilot/phy-force-liyongle-001/source.mp4",
+        "metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-001/source.json",
+        "transcript_path": null,
+        "transcript_coverage": "none",
+        "visual_review_sampling_seconds": 5
+      },
+      "risks": [
+        "small_board_region",
+        "dense_preexisting_board",
+        "pointing_vs_drawing_ambiguity"
+      ],
+      "rights_status": "internal_review_only",
+      "oracle_labels": {
+        "board_state_before": null,
+        "board_deltas": [],
+        "board_state_after": null,
+        "needs_review": true,
+        "review_status": "coarse_visual_verified_not_delta_annotated"
+      }
+    },
+    {
+      "clip_id": "tbv2-ly-002-01",
+      "source_record_id": "phy-force-liyongle-002",
+      "teacher_key": "li_yongle",
+      "source_url": "https://www.bilibili.com/video/BV11S421R7Ct/",
+      "source_video_path": "data/raw/physics/force-pilot/phy-force-liyongle-002/source.mp4",
+      "source_metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-002/source.json",
+      "source_sha256": "ee245b5002d12e9d0b7144ec231b934aa6e58c40d914e1f1b884db486b4f42ec",
+      "board_medium": "physical_chalkboard",
+      "start_seconds": 244,
+      "end_seconds": 442,
+      "start_time": "00:04:04",
+      "end_time": "00:07:22",
+      "duration_seconds": 198,
+      "neighboring_teaching_content": "静止斜面系统中先用整体法求地面对系统的支持力和摩擦，再隔离小物体和大物体交叉验证。",
+      "observed_board_action_types": [
+        "add_system_scene",
+        "add_whole_system_force",
+        "switch_system_boundary",
+        "add_isolated_body_diagram",
+        "add_force_arrow",
+        "add_result_equation"
+      ],
+      "candidate_value": "完整覆盖整体到隔离的研究对象切换，是系统边界与力图语义的最高优先级片段。",
+      "evidence": {
+        "video_path": "data/raw/physics/force-pilot/phy-force-liyongle-002/source.mp4",
+        "metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-002/source.json",
+        "transcript_path": "data/transcripts/dd7be5126b/001-15956a48c67d-1.json",
+        "transcript_coverage": "full_time_aligned_asr",
+        "visual_review_sampling_seconds": 5
+      },
+      "risks": [
+        "dense_preexisting_board",
+        "teacher_occlusion",
+        "asr_physics_term_errors",
+        "component_vs_external_force_confusion"
+      ],
+      "rights_status": "internal_review_only",
+      "oracle_labels": {
+        "board_state_before": null,
+        "board_deltas": [],
+        "board_state_after": null,
+        "needs_review": true,
+        "review_status": "coarse_visual_verified_not_delta_annotated"
+      }
+    },
+    {
+      "clip_id": "tbv2-ly-002-02",
+      "source_record_id": "phy-force-liyongle-002",
+      "teacher_key": "li_yongle",
+      "source_url": "https://www.bilibili.com/video/BV11S421R7Ct/",
+      "source_video_path": "data/raw/physics/force-pilot/phy-force-liyongle-002/source.mp4",
+      "source_metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-002/source.json",
+      "source_sha256": "ee245b5002d12e9d0b7144ec231b934aa6e58c40d914e1f1b884db486b4f42ec",
+      "board_medium": "physical_chalkboard",
+      "start_seconds": 602,
+      "end_seconds": 770,
+      "start_time": "00:10:02",
+      "end_time": "00:12:50",
+      "duration_seconds": 168,
+      "neighboring_teaching_content": "对称链条题中先把链条看作整体求外部拉力，再隔离左侧一小段求内部张力。",
+      "observed_board_action_types": [
+        "add_chain_scene",
+        "add_whole_system_force",
+        "add_angle_label",
+        "add_balance_equation",
+        "reuse_existing_scene",
+        "add_local_isolation_diagram"
+      ],
+      "candidate_value": "能标注板书复用、研究对象缩小以及整体方程到局部方程的迁移。",
+      "evidence": {
+        "video_path": "data/raw/physics/force-pilot/phy-force-liyongle-002/source.mp4",
+        "metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-002/source.json",
+        "transcript_path": "data/transcripts/dd7be5126b/001-15956a48c67d-1.json",
+        "transcript_coverage": "full_time_aligned_asr",
+        "visual_review_sampling_seconds": 5
+      },
+      "risks": [
+        "dense_preexisting_board",
+        "diagram_reuse_vs_new_scene_ambiguity",
+        "asr_physics_term_errors"
+      ],
+      "rights_status": "internal_review_only",
+      "oracle_labels": {
+        "board_state_before": null,
+        "board_deltas": [],
+        "board_state_after": null,
+        "needs_review": true,
+        "review_status": "coarse_visual_verified_not_delta_annotated"
+      }
+    },
+    {
+      "clip_id": "tbv2-ly-003-01",
+      "source_record_id": "phy-force-liyongle-003",
+      "teacher_key": "li_yongle",
+      "source_url": "https://www.bilibili.com/video/BV1G142187YX/",
+      "source_video_path": "data/raw/physics/force-pilot/phy-force-liyongle-003/source.mp4",
+      "source_metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-003/source.json",
+      "source_sha256": "c7e62d680e003d9e5d28305015bd409f9e6e155e67fcaba72b73f9571de39d95",
+      "board_medium": "physical_chalkboard",
+      "start_seconds": 702,
+      "end_seconds": 922,
+      "start_time": "00:11:42",
+      "end_time": "00:15:22",
+      "duration_seconds": 220,
+      "neighboring_teaching_content": "比较斜面静止与斜面运动时，小球的加速度、合外力和支持力方向。",
+      "observed_board_action_types": [
+        "add_incline_scene",
+        "add_force_arrow",
+        "add_resultant_arrow",
+        "add_equation",
+        "modify_motion_condition",
+        "modify_resultant_direction"
+      ],
+      "candidate_value": "同一底图随条件变化而修订，适合标注 modify 而非只标 add。",
+      "evidence": {
+        "video_path": "data/raw/physics/force-pilot/phy-force-liyongle-003/source.mp4",
+        "metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-003/source.json",
+        "transcript_path": null,
+        "transcript_coverage": "none",
+        "visual_review_sampling_seconds": 5
+      },
+      "risks": [
+        "dense_preexisting_board",
+        "requires_board_state_before",
+        "motion_arrow_vs_force_arrow_confusion"
+      ],
+      "rights_status": "internal_review_only",
+      "oracle_labels": {
+        "board_state_before": null,
+        "board_deltas": [],
+        "board_state_after": null,
+        "needs_review": true,
+        "review_status": "coarse_visual_verified_not_delta_annotated"
+      }
+    },
+    {
+      "clip_id": "tbv2-ly-004-01",
+      "source_record_id": "phy-force-liyongle-004",
+      "teacher_key": "li_yongle",
+      "source_url": "https://www.bilibili.com/video/BV1Qf421q7Bb/",
+      "source_video_path": "data/raw/physics/force-pilot/phy-force-liyongle-004/source.mp4",
+      "source_metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-004/source.json",
+      "source_sha256": "3811c42fb32f36e27754926062a1280b0b576edee91adca0d0a8f9a5362ad6d9",
+      "board_medium": "physical_chalkboard",
+      "start_seconds": 12,
+      "end_seconds": 240,
+      "start_time": "00:00:12",
+      "end_time": "00:04:00",
+      "duration_seconds": 228,
+      "neighboring_teaching_content": "牛顿第二定律习题中，从斜面情境和三个力出发，利用合力几何求加速度与未知力。",
+      "observed_board_action_types": [
+        "add_incline_scene",
+        "add_motion_arrow",
+        "add_force_arrow",
+        "add_force_label",
+        "construct_resultant_triangle",
+        "add_equation"
+      ],
+      "candidate_value": "接近空白板起步，情境图、受力图、合力几何和列式动作链闭合。",
+      "evidence": {
+        "video_path": "data/raw/physics/force-pilot/phy-force-liyongle-004/source.mp4",
+        "metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-004/source.json",
+        "transcript_path": null,
+        "transcript_coverage": "none",
+        "visual_review_sampling_seconds": 5
+      },
+      "risks": [
+        "teacher_occlusion",
+        "motion_arrow_vs_force_arrow_confusion",
+        "auxiliary_line_vs_physical_quantity_confusion"
+      ],
+      "rights_status": "internal_review_only",
+      "oracle_labels": {
+        "board_state_before": null,
+        "board_deltas": [],
+        "board_state_after": null,
+        "needs_review": true,
+        "review_status": "coarse_visual_verified_not_delta_annotated"
+      }
+    },
+    {
+      "clip_id": "tbv2-kg-003-01",
+      "source_record_id": "phy-force-kunge-003",
+      "teacher_key": "kunge_bilibili",
+      "source_url": "https://www.bilibili.com/video/BV1fChAzBE2r/?p=7",
+      "source_video_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.mp4",
+      "source_metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.json",
+      "source_sha256": "e4409e94aab76ed26501ebd24e51b09d3454944a09d4a6b37365a75fb9d080e4",
+      "board_medium": "digital_ink_over_slides",
+      "start_seconds": 2640,
+      "end_seconds": 2880,
+      "start_time": "00:44:00",
+      "end_time": "00:48:00",
+      "duration_seconds": 240,
+      "neighboring_teaching_content": "两个斜面物体的平衡与摩擦比较，在题图上完成受力和两个方向的平衡关系。",
+      "observed_board_action_types": [
+        "annotate_preexisting_diagram",
+        "add_force_arrow",
+        "add_force_label",
+        "add_axis_relation",
+        "add_balance_equation",
+        "begin_second_object_diagram"
+      ],
+      "candidate_value": "跨到数字墨迹域，检验恢复算法能否区分预置题图与教师增量批注。",
+      "evidence": {
+        "video_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.mp4",
+        "metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.json",
+        "transcript_path": null,
+        "transcript_coverage": "none",
+        "visual_review_sampling_seconds": 5
+      },
+      "risks": [
+        "picture_in_picture_occlusion",
+        "slide_change_not_erase",
+        "preexisting_diagram_not_teacher_delta",
+        "digital_viewport_change"
+      ],
+      "rights_status": "internal_review_only",
+      "oracle_labels": {
+        "board_state_before": null,
+        "board_deltas": [],
+        "board_state_after": null,
+        "needs_review": true,
+        "review_status": "coarse_visual_verified_not_delta_annotated"
+      }
+    },
+    {
+      "clip_id": "tbv2-kg-003-02",
+      "source_record_id": "phy-force-kunge-003",
+      "teacher_key": "kunge_bilibili",
+      "source_url": "https://www.bilibili.com/video/BV1fChAzBE2r/?p=7",
+      "source_video_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.mp4",
+      "source_metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.json",
+      "source_sha256": "e4409e94aab76ed26501ebd24e51b09d3454944a09d4a6b37365a75fb9d080e4",
+      "board_medium": "digital_ink_over_slides",
+      "start_seconds": 3260,
+      "end_seconds": 3540,
+      "start_time": "00:54:20",
+      "end_time": "00:59:00",
+      "duration_seconds": 280,
+      "neighboring_teaching_content": "楔块上的物体在斜向外力作用下保持不滑，按斜面和垂直斜面方向列平衡方程。",
+      "observed_board_action_types": [
+        "annotate_preexisting_diagram",
+        "add_force_arrow",
+        "add_force_label",
+        "add_component_line",
+        "add_balance_equation",
+        "add_conclusion"
+      ],
+      "candidate_value": "数字墨迹中力图与方程按时间增量出现，可用于实体绿板/数字课件跨媒介一致性检验。",
+      "evidence": {
+        "video_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.mp4",
+        "metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.json",
+        "transcript_path": null,
+        "transcript_coverage": "none",
+        "visual_review_sampling_seconds": 5
+      },
+      "risks": [
+        "picture_in_picture_occlusion",
+        "preexisting_diagram_not_teacher_delta",
+        "slide_change_not_erase",
+        "digital_viewport_change",
+        "component_vs_external_force_confusion"
+      ],
+      "rights_status": "internal_review_only",
+      "oracle_labels": {
+        "board_state_before": null,
+        "board_deltas": [],
+        "board_state_after": null,
+        "needs_review": true,
+        "review_status": "coarse_visual_verified_not_delta_annotated"
+      }
+    }
+  ]
+}

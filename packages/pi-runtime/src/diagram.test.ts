@@ -34,6 +34,110 @@ describe("renderTeachingDiagram", () => {
     expect(artifact.kind).toBe("coordinate");
   });
 
+  it("renders a continuous motion path separately from displacement", () => {
+    const artifact = renderTeachingDiagram({
+      title: "位移与路程的区别",
+      summary: "蓝色曲线路径表示路程，橙色虚线表示位移",
+      kind: "trajectory",
+      nodes: [
+        { id: "a", label: "起点 A", x: 12, y: 72, accent: true },
+        { id: "c", label: "经过 C", x: 38, y: 18 },
+        { id: "d", label: "经过 D", x: 68, y: 75 },
+        { id: "b", label: "终点 B", x: 90, y: 32, accent: true },
+      ],
+      edges: [
+        { from: "a", to: "c", label: "实际路径", role: "route" },
+        { from: "c", to: "d", role: "route" },
+        { from: "d", to: "b", role: "route" },
+        { from: "a", to: "b", label: "位移", role: "displacement" },
+      ],
+    });
+
+    expect(artifact.kind).toBe("trajectory");
+    expect(artifact.svg).toContain('data-layout="motion-trajectory"');
+    expect(artifact.svg).toContain('class="route"');
+    expect(artifact.svg).toContain('class="displacement"');
+    expect(artifact.svg).not.toContain('class="axes"');
+  });
+
+  it("shows zero displacement when a closed route returns to its start", () => {
+    const artifact = renderTeachingDiagram({
+      title: "绕操场一圈",
+      summary: "实际路径闭合，起点与终点重合",
+      kind: "trajectory",
+      nodes: [
+        { id: "a", label: "起点也是终点 A", x: 20, y: 70, accent: true },
+        { id: "b", label: "B", x: 50, y: 15 },
+        { id: "c", label: "C", x: 82, y: 70 },
+      ],
+      edges: [
+        { from: "a", to: "b", role: "route" },
+        { from: "b", to: "c", role: "route" },
+        { from: "c", to: "a", role: "route" },
+        { from: "a", to: "a", label: "位移", role: "displacement" },
+      ],
+    });
+
+    expect(artifact.svg).toContain('class="zero-displacement"');
+    expect(artifact.svg).toContain("位移 = 0");
+    expect(artifact.svg).not.toContain(">位移</text>");
+  });
+
+  it("rejects disconnected or mislabeled motion diagrams", () => {
+    expect(() => renderTeachingDiagram({
+      title: "绕操场一圈",
+      summary: "错误地只画散点",
+      kind: "trajectory",
+      nodes: [{ id: "a", label: "A" }, { id: "b", label: "B" }],
+      edges: [],
+    })).toThrow("role=route");
+
+    expect(() => renderTeachingDiagram({
+      title: "位移与路程",
+      summary: "不能退化为坐标散点图",
+      kind: "coordinate",
+      nodes: [{ id: "a", label: "A", x: 20, y: 50 }],
+      edges: [],
+    })).toThrow("kind=trajectory");
+
+    expect(() => renderTeachingDiagram({
+      title: "看似移动但坐标重合",
+      summary: "两个不同名称的点不能位于同一像素位置",
+      kind: "trajectory",
+      nodes: [
+        { id: "a", label: "A", x: 50, y: 50 },
+        { id: "b", label: "B", x: 50, y: 50 },
+      ],
+      edges: [
+        { from: "a", to: "b", role: "route" },
+        { from: "a", to: "b", role: "displacement" },
+      ],
+    })).toThrow("可见距离");
+  });
+
+  it("preserves arrow direction when two valid trajectory points are close", () => {
+    const artifact = renderTeachingDiagram({
+      title: "短距离向右运动",
+      summary: "箭头仍需从 A 指向 B",
+      kind: "trajectory",
+      nodes: [
+        { id: "a", label: "A", x: 50, y: 50 },
+        { id: "b", label: "B", x: 52, y: 50 },
+      ],
+      edges: [
+        { from: "a", to: "b", role: "route" },
+        { from: "a", to: "b", role: "displacement" },
+      ],
+    });
+    const routePath = artifact.svg.match(/class="route"><path d="M([\d.]+) [\d.]+ Q[\d.]+ [\d.]+ ([\d.]+) [\d.]+"/);
+    const displacementPath = artifact.svg.match(/class="displacement"><path d="M([\d.]+) [\d.]+L([\d.]+) [\d.]+"/);
+
+    expect(routePath).not.toBeNull();
+    expect(displacementPath).not.toBeNull();
+    expect(Number(routePath![1])).toBeLessThan(Number(routePath![2]));
+    expect(Number(displacementPath![1])).toBeLessThan(Number(displacementPath![2]));
+  });
+
   it("automatically lays out a concept hierarchy without overlapping nodes", () => {
     const artifact = renderTeachingDiagram({
       title: "内力外力取决于系统边界",

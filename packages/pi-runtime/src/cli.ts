@@ -1,4 +1,3 @@
-import { rm } from "node:fs/promises";
 import { runPiAgent, type PiRunInput } from "./index.js";
 
 const RESULT_PREFIX = "PI_AGENT_RESULT=";
@@ -31,7 +30,6 @@ async function run(): Promise<void> {
     skills: Array.isArray(raw.skills) ? raw.skills as PiRunInput["skills"] : [],
     images: Array.isArray(raw.images) ? raw.images as PiRunInput["images"] : [],
     temperature: Number(raw.temperature ?? 0),
-    runDir: typeof raw.run_dir === "string" ? raw.run_dir : undefined,
   };
   const output = await runPiAgent(input);
   writeResult({
@@ -45,7 +43,6 @@ async function run(): Promise<void> {
       stop_reason: output.stopReason,
     },
   });
-  if (input.runDir) await rm(input.runDir, { recursive: true, force: true }).catch(() => undefined);
 }
 
 run().catch((error) => {
