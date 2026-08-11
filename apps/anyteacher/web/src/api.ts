@@ -69,3 +69,13 @@ export async function uploadVideo(file: File, uploadId?: string): Promise<{ uplo
     body: file,
   });
 }
+
+export async function uploadEvidenceFile(file: File, relativePath: string, stagingId?: string): Promise<{ staging_id: string; relative_path: string }> {
+  const query = new URLSearchParams({ relative_path: relativePath });
+  if (stagingId) query.set("staging_id", stagingId);
+  return api<{ staging_id: string; relative_path: string }>(`/api/evidence-staging?${query}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: file,
+  });
+}

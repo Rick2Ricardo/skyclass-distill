@@ -1,10 +1,10 @@
 # Board2Skill 执行路线图与 Agent 验收协议
 
-> 状态：执行计划；尚未生成 Board2Skill 实验结果
-> 当前阶段：Temporal Board v2 Oracle pilot 已启动；契约、候选片段与四条件配对输入生成器已落地，真实 delta 仍待双标仲裁
+> 状态：执行中；已完成 2 个事件的工程 Gold-dev 多模态闭环，但尚未生成四条件实验结果
+> 当前阶段：Temporal Board v2 Oracle pilot 已完成首段 A/B 独立标注与分歧表；2 个低争议事件已作为 `requires_human_signoff` 的工程 Gold-dev 跑通真实 API，不能冒充论文 Gold
 > 核心问题：时序板书演化能否提供字幕、最终板书和均匀抽帧之外的独立证据，从而蒸馏出更忠实、可执行的教师能力？
 
-> 2026-08-11 补充：`grounded-skill-distillation-v2` 第一薄片已接入产品的单课蒸馏入口。新链路把 Board Action IR 与 Render Plan 分离：教学动作不绑定渲染器，HTML / SVG / Ink 仅由独立计划选择；teacher replay、counterfactual、repair、merged 来源显式区分。导入的 bundle 必须通过完整校验、含 accepted transition，并与所选源视频 SHA-256 一致。跨课 temporal common 仍等待多 bundle 契约，禁止用单 bundle 冒充。
+> 2026-08-11 补充：`grounded-skill-distillation-v2` 第一薄片已接入产品的单课蒸馏入口。新链路把 Board Action IR 与 Render Plan 分离：教学动作不绑定渲染器，HTML / SVG / Ink 仅由独立计划选择；teacher replay、counterfactual、repair、merged 来源显式区分。每个 accepted delta 的 before/delta/after montage 现按精确 evidence ID 校验并实际提交多模态 API，单请求最多 4 个事件，更多事件稳定分批，视觉请求和 usage 进入独立 audit。产品导入单位改为 Bundle JSON + montage 的完整 evidence package 目录，裸 JSON 不再绑定为可运行包。跨课 temporal common 仍等待多 bundle 契约，禁止用单 bundle 冒充。
 
 ## 1. 项目决策
 
@@ -170,14 +170,16 @@ STOP    中心假设、数据许可或关键门槛失败，按预注册路线转
 | Temporal Board v2 contract | PASS first slice | `temporal-board-v2` 的 Surface/Frame/Object/State/Delta/Speech/Transition/Bundle 及 validator 已落地；29 项专项测试覆盖稳定时长与对象生命周期、teacher-only、证据等级、同板面、擦除持久性、CONNECT 双锚点关系、MODIFY old→new 语义槽与路径安全；纯契约层只校验摘要格式，不替代资产重算与人工仲裁 |
 | Oracle pilot clip manifest | PASS for annotation intake | 已粗粒度视觉核验 8 个片段、5 个源视频、2 位教师、两种板书媒介；全部为 `internal_review_only` 和 `needs_review`，尚无 accepted delta |
 | Oracle four-arm input builder | PASS as harness slice | 可从 accepted bundle 生成 Transcript / Static-Final / Uniform / Oracle Delta 四个配对条件，重算配对指纹、限制均匀帧窗口并隔离私有 answer key 与盲评模板；6 项专项测试通过，尚未运行 LLM 或产生结果 |
-| Grounded Skill distillation v2 | PASS first slice（single） | 已实现 renderer-neutral Board Action IR、独立 HTML/SVG/Ink Render Plan、源 transition/delta/evidence 约束、teacher replay 与设计动作分层、schema repair 和 v2 Skill builder；产品可导入并绑定已仲裁 bundle 后显式选择“时序板书 v2”；跨课 temporal common 在多 bundle 契约完成前保持关闭 |
+| A/B first annotation | PASS for adjudication intake | `tbv2-ly-004-01` 已有两份独立标注和逐事件分歧表；B 标出 15 个候选 delta，所有未仲裁项继续保持 `needs_review`，其中摩擦力箭头身份/时序与 ADD/CONNECT 划分仍是高优先级争议 |
+| Engineering Gold-dev compile | PASS for pipeline smoke only | 仅接受 B-DELTA-05、B-DELTA-06 两个 A/B 与语音一致的低争议事件；编译时间已冻结进仲裁台账，同一输入连续两次得到稳定 payload SHA-256 `266415d4f9d67d96b4d743140f6d162197454bf5cfdbf4d86ee18386e2f27f20`。编译器将状态帧生成真正的 before / 高亮 delta / after 三联图，并把未仲裁的 pedagogical role 清回 unknown；明确标记 `engineering_gold_dev_not_paper_gold` 与 `requires_human_signoff` |
+| Grounded Skill distillation v2 | PASS first real single-lesson smoke | 已实现 renderer-neutral Board Action IR、独立 HTML/SVG/Ink Render Plan、源 transition/delta/evidence 约束、teacher replay 与设计动作分层、schema repair 和 v2 Skill builder。真实 `gpt-5.5` run-005 实际提交 2 张 1920×360 三联 montage，单次通过并生成 1 个 capability / 1 个 Skill，视觉 SHA、正常 stop 与 usage 均进入 audit。产物正确把实例系数 1.2 参数化为 λ、没有补写学生事实。该结果只证明闭环可运行，不构成 Oracle 价值门结果；跨课 temporal common 在多 bundle 契约完成前保持关闭 |
 
 ## 8. 下一次实际执行入口
 
 下一波不直接写完整恢复算法，而是继续 Phase 0：
 
-1. 对已筛选的 8 个视频片段完成双人独立 BoardDelta 标注与仲裁；第一遍从 `tbv2-ly-004-01` 开始，任何单标结果均保持 `needs_review`；
-2. 将 30–50 个 accepted 事件编译为 `temporal-board-v2` bundle，并重算源文件与派生资产摘要；
+1. 完成 `tbv2-ly-004-01` 剩余分歧的人工签字，再对其余候选片段执行双人独立 BoardDelta 标注；任何单标或 Agent 辅助裁决结果均保持 `needs_review`；
+2. 将 30–50 个真正完成双人仲裁的 accepted 事件编译为 `temporal-board-v2` bundle，并重算源文件与派生资产摘要；当前 2 条工程 Gold-dev 只用于闭环测试；
 3. 运行四条件 Oracle harness，生成逐样本盲评包，所有结果继续保持 `TBD` 直到真实运行完成；
 4. 并行把已冻结的 8 个问题家族写成 24 条受控 Tutor 场景及物理锚点，冻结 train/selection/locked-test manifest；
 5. 给当前 v1 分析增加显式 Observation adapter，禁止把学生预期回应写入观察层；

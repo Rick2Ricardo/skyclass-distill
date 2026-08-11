@@ -2,8 +2,8 @@ import Fastify, { type FastifyRequest } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
-import { readFile, realpath, rm } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve } from "node:path";
 import type {
   BenchmarkDataset,
   BoardEvidenceBundle,
@@ -23,15 +23,16 @@ import type {
   VideoAsset,
 } from "../../../packages/contracts/src/index.js";
 import { canonicalBoardEvidencePayload, validateBoardEvidenceBundle } from "../../../packages/contracts/src/index.js";
+import { prepareGroundedVisualEvidence } from "../../../packages/distillation/src/index.js";
 import { LlmClient } from "../../../packages/llm/src/client.js";
 import { discoverSource, runtimeStatus } from "../../../packages/media/src/tools.js";
+import { decodeControlledAssetUri } from "../../../packages/media/src/imageEvidence.js";
 import { PipelineEngine } from "../../../packages/pipeline/src/engine.js";
 import { SettingsStore } from "../../../packages/runtime-config/src/settings.js";
 import { JobStore } from "../../../packages/store/src/jobStore.js";
 import { LibraryStore } from "../../../packages/store/src/libraryStore.js";
 import { EvaluationStore } from "../../../packages/store/src/evaluationStore.js";
 import { ConversationStore } from "../../../packages/store/src/conversationStore.js";
-import { writeJson } from "../../../packages/store/src/fileStore.js";
 import { DATA_DIR, PORT, ROOT, WEB_DIST_DIR } from "./config.js";
 import { TutorService } from "./services/tutorService.js";
 
@@ -73,6 +74,18 @@ async function sha256File(path: string): Promise<string> {
   const hash = createHash("sha256");
   for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
   return hash.digest("hex");
+}
+
+async function stagingUsage(root: string): Promise<{ files: number; bytes: number }> {
+  const entries = await readdir(root, { recursive: true, withFileTypes: true }).catch(() => []);
+  let files = 0;
+  let bytes = 0;
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    files += 1;
+    bytes += (await stat(resolve(entry.parentPath, entry.name))).size;
+  }
+  return { files, bytes };
 }
 
 function tutorHistory(conversation: TutorConversation): Array<{ question: string; answer: string }> {
@@ -211,12 +224,50 @@ app.delete("/api/projects/:id/videos", async (request, reply) => {
   } catch (error) { return httpError(reply, error); }
 });
 
+app.post("/api/evidence-staging", { bodyLimit: 12 * 1024 * 1024 }, async (request, reply): Promise<{ staging_id: string; relative_path: string } | unknown> => {
+  try {
+    if (!Buffer.isBuffer(request.body)) throw new Error("证据文件内容为空");
+    if (request.body.byteLength > 12 * 1024 * 1024) throw new Error("单个证据文件不得超过 12 MB");
+    const query = request.query as Record<string, unknown>;
+    const relativePath = decodeControlledAssetUri(String(query.relative_path || ""));
+    const suppliedId = String(query.staging_id || "");
+    const stagingId = suppliedId || randomUUID().replace(/-/g, "").slice(0, 20);
+    if (!/^[a-f0-9]{20}$/.test(stagingId)) throw new Error("evidence staging id 无效");
+    const stagingRoot = join(DATA_DIR, "evidence-staging", stagingId);
+    const target = resolve(stagingRoot, relativePath);
+    if (!inside(stagingRoot, target)) throw new Error("证据文件路径超出 staging 目录");
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, request.body, { flag: "wx" }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "EEXIST") throw new Error(`证据包包含重复路径：${relativePath}`);
+      throw error;
+    });
+    const usage = await stagingUsage(stagingRoot);
+    if (usage.files > 256 || usage.bytes > 200 * 1024 * 1024) {
+      await rm(stagingRoot, { recursive: true, force: true });
+      throw new Error("证据包超过 256 个文件或 200 MB 总限制，临时上传已清理");
+    }
+    return { staging_id: stagingId, relative_path: relativePath };
+  } catch (error) { return httpError(reply, error); }
+});
+
 app.post("/api/projects/:projectId/videos/:videoId/board-bundle", async (request, reply): Promise<VideoAsset | unknown> => {
+  let stagingRootToClean: string | null = null;
   try {
     const { projectId, videoId } = paramsOf<{ projectId: string; videoId: string }>(request);
     const video = await library.getVideo(videoId);
     if (video.project_id !== projectId) throw new Error("视频不属于当前项目");
-    const bundle = bodyOf(request) as unknown as BoardEvidenceBundle;
+    const body = bodyOf(request);
+    const stagingId = String(body.staging_id || "");
+    if (!/^[a-f0-9]{20}$/.test(stagingId)) throw new Error("必须上传完整 evidence package；不再接受会丢失图片路径的裸 JSON");
+    const bundlePath = decodeControlledAssetUri(String(body.bundle_path || "bundle.json"));
+    const stagingRoot = join(DATA_DIR, "evidence-staging", stagingId);
+    stagingRootToClean = stagingRoot;
+    const stagedBundlePath = resolve(stagingRoot, bundlePath);
+    if (!inside(stagingRoot, stagedBundlePath)) throw new Error("bundle_path 超出 staging 目录");
+    const resolvedStaging = await realpath(stagingRoot).catch(() => { throw new Error("evidence staging 不存在"); });
+    const resolvedBundlePath = await realpath(stagedBundlePath).catch(() => { throw new Error("evidence package 中找不到 bundle JSON"); });
+    if (!inside(resolvedStaging, resolvedBundlePath)) throw new Error("bundle_path 超出 staging 目录");
+    const bundle = JSON.parse(await readFile(resolvedBundlePath, "utf8")) as BoardEvidenceBundle;
     const report = validateBoardEvidenceBundle(bundle);
     if (!report.valid) throw new Error(`BoardEvidenceBundle 未通过校验：${report.issues.slice(0, 6).map((issue) => `${issue.path} ${issue.message}`).join("；")}`);
     const actualPayloadHash = createHash("sha256").update(canonicalBoardEvidencePayload(bundle)).digest("hex");
@@ -227,12 +278,31 @@ app.post("/api/projects/:projectId/videos/:videoId/board-bundle", async (request
     const sourcePath = await realpath(sourceUri).catch(() => { throw new Error("课堂源视频不存在，无法校验板书包"); });
     if (!inside(await realpath(DATA_DIR).catch(() => DATA_DIR), sourcePath)) throw new Error("课堂源视频路径无效，无法校验板书包");
     if (await sha256File(sourcePath) !== bundle.source.video.sha256) throw new Error("板书包与所选课堂的视频 SHA-256 不匹配");
-    const target = join(DATA_DIR, "projects", projectId, "evidence", videoId, `${bundle.payload_sha256}.temporal-board-v2.json`);
-    await writeJson(target, bundle);
-    video.artifacts = { ...(video.artifacts ?? {}), board_bundle_json: target };
+    await prepareGroundedVisualEvidence(bundle, resolvedBundlePath);
+    const targetRoot = join(DATA_DIR, "projects", projectId, "evidence", videoId, bundle.payload_sha256);
+    const targetBundle = join(targetRoot, bundlePath);
+    if (existsSync(targetRoot)) {
+      const existingBundle = await realpath(targetBundle).catch(() => { throw new Error("同 hash 证据包目录已存在但内容不完整"); });
+      const existing = JSON.parse(await readFile(existingBundle, "utf8")) as BoardEvidenceBundle;
+      if (existing.payload_sha256 !== bundle.payload_sha256) throw new Error("同 hash 证据包的 payload_sha256 声明冲突");
+      if (createHash("sha256").update(canonicalBoardEvidencePayload(existing)).digest("hex") !== bundle.payload_sha256) {
+        throw new Error("同 hash 证据包目录内容冲突");
+      }
+      await prepareGroundedVisualEvidence(existing, existingBundle);
+      await rm(stagingRoot, { recursive: true, force: true });
+      stagingRootToClean = null;
+    } else {
+      await mkdir(dirname(targetRoot), { recursive: true });
+      await rename(stagingRoot, targetRoot);
+      stagingRootToClean = null;
+    }
+    video.artifacts = { ...(video.artifacts ?? {}), board_bundle_json: targetBundle };
     await library.saveVideo(video);
     return video;
-  } catch (error) { return httpError(reply, error); }
+  } catch (error) {
+    if (stagingRootToClean) await rm(stagingRootToClean, { recursive: true, force: true }).catch(() => undefined);
+    return httpError(reply, error);
+  }
 });
 
 app.post("/api/uploads", async (request, reply) => {

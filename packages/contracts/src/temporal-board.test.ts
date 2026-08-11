@@ -271,6 +271,14 @@ describe("validateBoardEvidenceBundle", () => {
     expect(validateBoardEvidenceBundle(validBundle())).toEqual({ valid: true, issues: [] });
   });
 
+  it("requires accepted board_delta evidence to name the exact comparison asset", () => {
+    const bundle = validBundle();
+    const evidence = bundle.evidence.find((item) => item.evidence_id === "ev-delta")!;
+    evidence.asset = asset("deltas/different-comparison.png", HASH_B);
+    expect(validateBoardEvidenceBundle(bundle).issues.map((issue) => issue.code))
+      .toContain("transition.accepted_delta_asset");
+  });
+
   it("rejects a version-only shell", () => {
     const report = validateBoardEvidenceBundle({ schema_version: "temporal-board-v2" });
     expect(report.valid).toBe(false);

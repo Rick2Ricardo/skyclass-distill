@@ -1094,8 +1094,17 @@ export function validateBoardEvidenceBundle(input: unknown): TemporalBoardValida
       });
       const acceptedEvidence = transitionEvidenceRefs.map((id) => evidenceById.get(id)).filter(Boolean);
       transitionDeltaIds.forEach((id) => {
-        if (!acceptedEvidence.some((ref) => ref?.kind === "board_delta" && ref.target_id === id)) {
+        const deltaEvidence = acceptedEvidence.filter((ref) => ref?.kind === "board_delta" && ref.target_id === id);
+        if (!deltaEvidence.length) {
           error("transition.accepted_delta_evidence", `${path}.evidence_refs`, `accepted transition 缺少 delta ${id} 的证据引用。`);
+        } else {
+          const delta = deltaById.get(id);
+          const comparison = delta && isObject(delta.comparison_asset) ? delta.comparison_asset : null;
+          if (!comparison || !deltaEvidence.some((ref) => isObject(ref?.asset)
+            && ref.asset.asset_uri === comparison.asset_uri
+            && ref.asset.sha256 === comparison.sha256)) {
+            error("transition.accepted_delta_asset", `${path}.evidence_refs`, `delta ${id} 的 board_delta evidence asset 必须与 comparison_asset URI 和 SHA-256 完全一致。`);
+          }
         }
       });
       transitionSpeechIds.forEach((id) => {

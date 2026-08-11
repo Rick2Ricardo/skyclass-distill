@@ -2,5 +2,12 @@
   "name": "@anyteacher/media",
   "private": true,
   "type": "module",
-  "exports": "./src/tools.ts"
+  "exports": "./src/tools.ts",
+  "dependencies": {
+    "jpeg-js": "0.4.4",
+    "pngjs": "7.0.0"
+  },
+  "devDependencies": {
+    "@types/pngjs": "6.0.5"
+  }
 }

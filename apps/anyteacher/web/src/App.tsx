@@ -22,7 +22,7 @@ import type {
   VideoAsset,
 } from "../../../../packages/contracts/src/index.js";
 import { splitLearningCheck, studentVisibleAnswer } from "../../../../packages/contracts/src/index.js";
-import { api, streamNdjson, uploadVideo } from "./api.js";
+import { api, streamNdjson, uploadEvidenceFile, uploadVideo } from "./api.js";
 import { formatDate, formatDuration, percent } from "./format.js";
 import { Markdown } from "./components/Markdown.js";
 
@@ -553,17 +553,35 @@ function Distill({ project, videos, onCreated, onRefresh, flash }: { project: Pr
     finally { setBusy(false); }
   }
 
-  async function attachBoardBundle(file: File): Promise<void> {
+  async function attachBoardBundle(fileList: FileList): Promise<void> {
     if (!selectedVideo) return;
     setBinding(true);
     try {
-      const bundle = JSON.parse(await file.text()) as Record<string, unknown>;
+      const files = [...fileList];
+      if (!files.length) throw new Error("请选择包含 bundle JSON 与板书 montage 的目录");
+      const rawPaths = files.map((file) => file.webkitRelativePath || file.name);
+      const roots = new Set(rawPaths.map((path) => path.split("/")[0]));
+      const paths = rawPaths.map((path) => roots.size === 1 && path.includes("/") ? path.split("/").slice(1).join("/") : path);
+      const bundleCandidates: Array<{ index: number; path: string }> = [];
+      for (const [index, file] of files.entries()) {
+        if (!paths[index].toLowerCase().endsWith(".json")) continue;
+        try {
+          const parsed = JSON.parse(await file.text()) as Record<string, unknown>;
+          if (parsed.schema_version === "temporal-board-v2") bundleCandidates.push({ index, path: paths[index] });
+        } catch { /* non-bundle JSON may be an auxiliary asset */ }
+      }
+      if (bundleCandidates.length !== 1) throw new Error("证据包目录必须且只能包含一个 temporal-board-v2 Bundle JSON");
+      let stagingId: string | undefined;
+      for (const [index, file] of files.entries()) {
+        const uploaded = await uploadEvidenceFile(file, paths[index], stagingId);
+        stagingId = uploaded.staging_id;
+      }
       await api<VideoAsset>(`/api/projects/${project.id}/videos/${selectedVideo.id}/board-bundle`, {
         method: "POST",
-        body: JSON.stringify(bundle),
+        body: JSON.stringify({ staging_id: stagingId, bundle_path: bundleCandidates[0].path }),
       });
       await onRefresh();
-      flash("时序板书包已校验并绑定到这段课堂");
+      flash("完整时序板书证据包已逐图校验并绑定到这段课堂");
     } catch (cause) { flash(cause instanceof Error ? cause.message : String(cause), true); }
     finally { setBinding(false); }
   }
@@ -573,7 +591,7 @@ function Distill({ project, videos, onCreated, onRefresh, flash }: { project: Pr
       <p className="eyebrow">DISTILLATION CONTRACT</p><h2>定义本次蒸馏</h2>
       <div className="choice-group"><label>范围</label><div className="segmented"><button className={mode === "single" ? "active" : ""} onClick={() => setMode("single")}>单课策略</button><button className={mode === "common" ? "active" : ""} onClick={() => setMode("common")}>跨课共性</button></div></div>
       <div className="choice-group"><label>证据</label><div className="segmented"><button className={evidenceMode === "text" ? "active" : ""} onClick={() => setEvidenceMode("text")}>字幕文本</button><button className={evidenceMode === "static_frames" ? "active" : ""} onClick={() => setEvidenceMode("static_frames")}>文本＋抽帧</button><button className={evidenceMode === "temporal_board" ? "active" : ""} disabled={!temporalReady} title={temporalReady ? "使用已仲裁时序板书" : "需先为单段课堂附加已仲裁 board_bundle_json"} onClick={() => setEvidenceMode("temporal_board")}>时序板书 v2</button></div></div>
-      {mode === "single" && selectedVideo && <label className="bundle-import"><input type="file" accept="application/json,.json" disabled={binding} onChange={(event) => { const file = event.target.files?.[0]; if (file) void attachBoardBundle(file); event.currentTarget.value = ""; }} /><span>{binding ? "正在校验板书包…" : selectedVideo.artifacts?.board_bundle_json ? "✓ 已绑定时序板书 v2（可重新导入）" : "+ 导入已仲裁 BoardEvidenceBundle"}</span><small>导入时会验证 schema、accepted transition，并与源视频 SHA-256 严格匹配。</small></label>}
+      {mode === "single" && selectedVideo && <label className="bundle-import"><input type="file" multiple {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} disabled={binding} onChange={(event) => { const files = event.target.files; if (files?.length) void attachBoardBundle(files); event.currentTarget.value = ""; }} /><span>{binding ? "正在上传并逐图校验证据包…" : selectedVideo.artifacts?.board_bundle_json ? "✓ 已绑定时序板书 v2（可重新导入）" : "+ 导入完整时序板书证据包目录"}</span><small>目录需同时包含 Bundle JSON 与相对路径下的 montage；服务端校验 schema、视频 SHA、图片 SHA、真实格式和尺寸后才会绑定。</small></label>}
       <div className="contract-note"><b>产出约束</b><p>Accepted Board Transition → Renderer-neutral Board Action → HTML / SVG / Ink Render Plan → Learning Check</p></div>
       <button className="primary wide" disabled={!valid || busy} onClick={start}>{busy ? "正在创建任务…" : valid ? `蒸馏 ${selected.length} 段课堂` : mode === "common" ? "至少选择 4 段课堂" : "请选择 1 段课堂"}</button>
     </section>

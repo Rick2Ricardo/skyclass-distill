@@ -2,5 +2,8 @@
   "name": "@anyteacher/llm",
   "private": true,
   "type": "module",
-  "exports": "./src/client.ts"
+  "exports": "./src/client.ts",
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.84.1"
+  }
 }

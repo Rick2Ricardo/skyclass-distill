@@ -83,6 +83,7 @@ export interface GroundedSkillSourceTransition {
   transition_id: string;
   delta_ids: string[];
   evidence_refs: string[];
+  visual_evidence_by_delta: Record<string, string[]>;
 }
 
 export interface GroundedSkillSourceCatalog {
@@ -90,6 +91,7 @@ export interface GroundedSkillSourceCatalog {
   teacher_only_recording: boolean;
   accepted_transitions: GroundedSkillSourceTransition[];
   evidence_ids: string[];
+  submitted_visual_evidence_ids: string[];
 }
 
 export interface GroundedSkillValidationIssue {
@@ -178,6 +180,7 @@ export function validateGroundedSkillDistillationSuite(
 
   const sourceTransitions = new Map((source?.accepted_transitions ?? []).map((item) => [item.transition_id, item]));
   const sourceEvidence = new Set(source?.evidence_ids ?? []);
+  const submittedVisualEvidence = new Set(source?.submitted_visual_evidence_ids ?? []);
   if (source) {
     if (input.source_bundle_id !== source.source_bundle_id) error("suite.source_bundle", "$.source_bundle_id", "蒸馏结果必须绑定输入 BoardEvidenceBundle。");
     if (input.teacher_only_recording !== source.teacher_only_recording) error("suite.teacher_only_mismatch", "$.teacher_only_recording", "teacher_only_recording 与源 bundle 不一致。");
@@ -289,6 +292,21 @@ export function validateGroundedSkillDistillationSuite(
             if (!sourceEvidence.has(id)) error("source.evidence_ref", `${actionPath}.evidence_refs[${index}]`, `源证据不存在：${id}`);
             else if (!permittedEvidence.has(id)) error("source.evidence_scope", `${actionPath}.evidence_refs[${index}]`, `证据不属于本动作引用的 transition：${id}`);
           });
+          if (rawAction.origin === "teacher_replay" || rawAction.origin === "merged") {
+            deltaIds.forEach((deltaId, index) => {
+              const exactVisualRefs = [...new Set(transitionIds.flatMap((transitionId) => {
+                const transition = sourceTransitions.get(transitionId);
+                return transition?.delta_ids.includes(deltaId) ? transition.visual_evidence_by_delta[deltaId] ?? [] : [];
+              }))];
+              if (!exactVisualRefs.length) {
+                error("source.delta_visual_missing", `${actionPath}.source_delta_ids[${index}]`, `accepted delta 缺少规范 board_delta 视觉证据：${deltaId}`);
+              } else if (!exactVisualRefs.some((id) => evidenceIds.includes(id))) {
+                error("action.delta_visual_ref", `${actionPath}.evidence_refs`, `replay/merged 动作必须为 delta ${deltaId} 引用其精确 board_delta 视觉证据。`);
+              } else if (!exactVisualRefs.some((id) => submittedVisualEvidence.has(id))) {
+                error("action.delta_visual_not_submitted", `${actionPath}.evidence_refs`, `delta ${deltaId} 的视觉证据没有进入成功的模型请求。`);
+              }
+            });
+          }
         }
       }
 

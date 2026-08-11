@@ -69,8 +69,9 @@ function catalog(): GroundedSkillSourceCatalog {
   return {
     source_bundle_id: "bundle-1",
     teacher_only_recording: true,
-    accepted_transitions: [{ transition_id: "transition-1", delta_ids: ["delta-1"], evidence_refs: ["ev-1"] }],
+    accepted_transitions: [{ transition_id: "transition-1", delta_ids: ["delta-1"], evidence_refs: ["ev-1"], visual_evidence_by_delta: { "delta-1": ["ev-1"] } }],
     evidence_ids: ["ev-1"],
+    submitted_visual_evidence_ids: ["ev-1"],
   };
 }
 

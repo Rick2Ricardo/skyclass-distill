@@ -420,12 +420,23 @@ LLM 输出必须经过结构验证；解析失败、未知 ID、越界时间或�
 
 当前新入口为 `packages/distillation/src/groundedSkills.ts::distillGroundedSkills`。它只接收通过 `validateBoardEvidenceBundle` 且至少包含一个 `accepted` transition 的 bundle，并在返回前执行来源约束和严格 schema 校验；连续失败时终止，不将部分 JSON 交给 builder。
 
+视觉传输不是“附带若干截图”，而是固定的可审计链：
+
+`accepted transition → accepted delta → board_delta evidence_id → comparison_asset SHA-256 → 成功模型请求`
+
+- 每个 delta 只提交一张人工仲裁的 before/delta/after comparison montage，标签中显式写入 `transition_id / delta_id / evidence_ids`；
+- montage 以 Bundle JSON 所在 evidence package 目录为基准解析，提交前校验 realpath containment、普通文件、字节 SHA-256、PNG/JPEG 完整像素解码、尺寸、像素和字节预算；当前不把只验证容器头的 WebP 宣称为可信输入；
+- 图片只读取一次并持有 bytes，provider 重试和 schema repair 复用同一视觉集合；
+- 单请求最多四个事件且最多 20 MB，超过时按事件时间稳定分批，先逐批生成视觉 grounded candidates，再进行无图文本合并；禁止静默截断第 5 张图；
+- `visual_audit` 独立记录每批视觉集合、请求摘要、尝试次数、usage 和成功响应中实际提交的视觉引用。这里的“实际”仅表示像素进入成功请求，不声称模型认知上必然理解；
+- `teacher_replay / merged` 动作引用的每个 delta 都必须同时引用其精确且已成功提交的视觉 evidence，只有 speech evidence 时校验失败。
+
 新蒸馏输出拆成两层：
 
 1. `GroundedBoardActionIR` 只保存教学目标、语义操作、参数化内容、表示类型、空间约束、渐进呈现及 transition/delta/evidence 来源；禁止携带 HTML、SVG、Canvas 代码或 renderer 字段。
 2. `GroundedSkillRenderPlan` 独立选择 `html / svg / ink`，记录允许目标、首选路由、降级顺序、布局、交互方式和理由。一个 Board Action 必须且只能由一个 Render Plan 覆盖。
 
-动作另带 `origin = teacher_replay | counterfactual | repair | merged`。`teacher_replay` 与含课堂回放成分的 `merged` 必须引用实际 BoardDelta；纯设计动作只能标为 `counterfactual` 或 `repair`。产品已提供单课 bundle 导入和“时序板书 v2”显式入口，导入时会校验源视频 SHA-256，并对排除 `payload_sha256` 字段后的规范化 bundle 内容重算摘要；内容与声明摘要不一致时拒绝导入和运行。legacy `distillSkills` 继续保留为 text/static_frames 基线。跨课 temporal common 必须接收多个独立 bundle，在该契约完成前拒绝运行。
+动作另带 `origin = teacher_replay | counterfactual | repair | merged`。`teacher_replay` 与含课堂回放成分的 `merged` 必须引用实际 BoardDelta；纯设计动作只能标为 `counterfactual` 或 `repair`。产品已提供单课 evidence package 目录导入和“时序板书 v2”显式入口。裸 JSON 会丢失图片相对路径，因此不再允许绑定为可运行包；目录中的 Bundle 与 montage 先进入受限 staging，经 schema、源视频 SHA-256、规范化 payload SHA-256 以及逐图校验后才原子绑定到 content-addressed 目录。legacy `distillSkills` 继续保留为 text/static_frames 基线。跨课 temporal common 必须接收多个独立 bundle，在该契约完成前拒绝运行。
 
 ### 4.4 `packages/pipeline`
 

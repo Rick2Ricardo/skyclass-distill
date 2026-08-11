@@ -13,8 +13,10 @@ function sourceCatalog(): GroundedSkillSourceCatalog {
       transition_id: "transition-1",
       delta_ids: ["delta-1"],
       evidence_refs: ["ev-delta", "ev-speech"],
+      visual_evidence_by_delta: { "delta-1": ["ev-delta"] },
     }],
     evidence_ids: ["ev-delta", "ev-speech"],
+    submitted_visual_evidence_ids: ["ev-delta"],
   };
 }
 
@@ -122,12 +124,26 @@ describe("validateGroundedSkillDistillationSuite", () => {
   it("requires every capability-level transition to support at least one action", () => {
     const suite = validSuite();
     const catalog = sourceCatalog();
-    catalog.accepted_transitions.push({ transition_id: "transition-2", delta_ids: ["delta-2"], evidence_refs: ["ev-other"] });
+    catalog.accepted_transitions.push({ transition_id: "transition-2", delta_ids: ["delta-2"], evidence_refs: ["ev-other"], visual_evidence_by_delta: { "delta-2": ["ev-other"] } });
     catalog.evidence_ids.push("ev-other");
+    catalog.submitted_visual_evidence_ids.push("ev-other");
     suite.capabilities[0].source_transition_ids.push("transition-2");
     suite.capabilities[0].evidence_refs.push("ev-other");
     expect(validateGroundedSkillDistillationSuite(suite, catalog).issues.map((issue) => issue.code))
       .toContain("capability.unused_transition");
+  });
+
+  it("requires replay actions to cite the exact successfully submitted visual for every delta", () => {
+    const speechOnly = validSuite();
+    speechOnly.capabilities[0].variants[0].board_actions[0].evidence_refs = ["ev-speech"];
+    speechOnly.capabilities[0].evidence_refs = ["ev-speech"];
+    expect(validateGroundedSkillDistillationSuite(speechOnly, sourceCatalog()).issues.map((issue) => issue.code))
+      .toContain("action.delta_visual_ref");
+
+    const notSubmitted = sourceCatalog();
+    notSubmitted.submitted_visual_evidence_ids = [];
+    expect(validateGroundedSkillDistillationSuite(validSuite(), notSubmitted).issues.map((issue) => issue.code))
+      .toContain("action.delta_visual_not_submitted");
   });
 
   it("requires exactly one render-plan owner for every Board Action", () => {
@@ -209,7 +225,12 @@ describe("validateGroundedSkillDistillationSuite", () => {
     const suite = validSuite();
     const catalog = sourceCatalog();
     catalog.evidence_ids.push("ev-other");
-    catalog.accepted_transitions.push({ transition_id: "transition-2", delta_ids: ["delta-2"], evidence_refs: ["ev-other"] });
+    catalog.accepted_transitions.push({
+      transition_id: "transition-2",
+      delta_ids: ["delta-2"],
+      evidence_refs: ["ev-other"],
+      visual_evidence_by_delta: { "delta-2": ["ev-other"] },
+    });
     suite.capabilities[0].evidence_refs.push("ev-other");
     expect(validateGroundedSkillDistillationSuite(suite, catalog).issues.map((issue) => issue.code))
       .toContain("source.evidence_scope");

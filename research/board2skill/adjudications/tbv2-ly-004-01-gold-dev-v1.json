@@ -1,0 +1,45 @@
+{
+  "schema_version": "temporal-board-adjudication-v1",
+  "adjudication_id": "tbv2-ly-004-01-gold-dev-v1",
+  "scope": "engineering_gold_dev_not_paper_gold",
+  "source_bundle_path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b.json",
+  "source_annotator_a_path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-a.json",
+  "asr_path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/asr/clip-12-240.json",
+  "asr_sha256": "d53b23e1e0156c3d36db7d98dd3131b876d777e13ab25999fab769a85c45177f",
+  "asr_clip_offset_seconds": 12,
+  "frozen_created_at": "2026-08-11T11:00:00.000Z",
+  "output_directory": "data/board2skill/gold-dev/tbv2-ly-004-01-gold-dev-v1",
+  "adjudication_method": "agent-assisted visual review of original-resolution before/after montages plus timestamped ASR; requires final human sign-off before paper Gold freeze",
+  "decisions": [
+    {
+      "delta_id": "B-DELTA-05",
+      "transition_id": "B-TRANSITION-05",
+      "decision": "accept_for_engineering",
+      "final_semantic_label": "写出已知条件：支持力 N = 1.2mg",
+      "registration_confidence": 0.99,
+      "asr_segment_indexes": [25],
+      "normalized_speech": "这个人所受到的支持力等于 1.2 个重力 mg。",
+      "teaching_action": "给出支持力等于 1.2mg 的已知条件。",
+      "notes": "A/B 均识别到同一 ADD 公式事件；原分辨率 montage 与同期语音相互支持。N 字形是否带撇不影响本工程闭环，参数化 Skill 不固化该题常数。"
+    },
+    {
+      "delta_id": "B-DELTA-06",
+      "transition_id": "B-TRANSITION-06",
+      "decision": "accept_for_engineering",
+      "final_semantic_label": "列出两个待求量：摩擦力 f 与加速度 a",
+      "registration_confidence": 0.99,
+      "asr_segment_indexes": [26, 27, 28, 29],
+      "normalized_speech": "这个时候我问两个问题：第一，这个人所受的摩擦力是多大？第二，这个人的加速度有多大？",
+      "teaching_action": "把摩擦力和加速度并列为两个待求问题。",
+      "notes": "A/B 均识别到同一 ADD 待求量事件；同期 ASR 明确说出两个问题，视觉与语音边界重叠。"
+    }
+  ],
+  "held_disputes": [
+    "B-DELTA-01/02：事件粒度仍需稳定中间态规则仲裁",
+    "B-DELTA-03/A-d006/A-d010：约 70 秒画面只有 N 与 mg，B 把后出现的 f 合并到早期 force group，暂不接受",
+    "B-DELTA-04：箭头 a 可见，但教学语义和精确边界仍待复核",
+    "B-DELTA-07/08：B 的文字转写与画面不够一致",
+    "B-DELTA-09..15：只有单标，公式和 CONNECT 关系尚未双标"
+  ],
+  "paper_gold_status": "requires_human_signoff"
+}

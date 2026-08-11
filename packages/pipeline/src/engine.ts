@@ -4,7 +4,7 @@ import { mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs
 import { basename, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { BoardEvidenceBundle, CourseItem, DistillMode, EvidenceMode, JobState, Modality, Project, Skill, VideoAsset } from "../../contracts/src/index.js";
 import { canonicalBoardEvidencePayload, validateBoardEvidenceBundle } from "../../contracts/src/index.js";
-import { analyzeLesson, attachFramePaths, buildGroundedSkillSourceCatalog, distillGroundedSkills, distillSkills } from "../../distillation/src/index.js";
+import { analyzeLesson, attachFramePaths, distillGroundedSkills, distillSkills } from "../../distillation/src/index.js";
 import { LlmClient } from "../../llm/src/client.js";
 import { discoverSource, downloadVideo, extractAudio, extractFrames, mediaDuration, safeUploadName } from "../../media/src/tools.js";
 import { transcribeAudio, type Transcript } from "../../media/src/transcribe.js";
@@ -298,14 +298,19 @@ export class PipelineEngine {
       await this.jobs.stage(job, "evidence", .12, "正在校验已仲裁的时序板书证据");
       jobCancelled(job);
       await this.jobs.stage(job, "distill", .46, "正在蒸馏 renderer-neutral Board Actions");
-      const suite = await distillGroundedSkills(client, { subject: project.subject, bundle: temporal.bundle, mode: request.mode });
+      const grounded = await distillGroundedSkills(client, {
+        subject: project.subject,
+        bundle: temporal.bundle,
+        bundlePath: temporal.path,
+        mode: request.mode,
+      });
       await this.jobs.stage(job, "compile", .82, "正在编译 Board Actions 与 HTML / SVG / Ink Render Plans");
       const outputRoot = join(this.dataDir, "projects", project.id, "skills", job.id);
       const skills = await buildSkillSuite({
-        suite: suite as unknown as Record<string, unknown>,
+        suite: grounded.suite as unknown as Record<string, unknown>,
         outputRoot,
         subject: project.subject,
-        groundedSourceCatalog: buildGroundedSkillSourceCatalog(temporal.bundle),
+        groundedSourceCatalog: grounded.source_catalog,
         provenance: {
           job_id: job.id,
           project_id: project.id,
@@ -317,9 +322,19 @@ export class PipelineEngine {
           board_bundle_id: temporal.bundle.bundle_id,
           model: settings.llm_model,
           schema_version: "grounded-skill-distillation-v2",
+          visual_audit_schema_version: grounded.visual_audit.schema_version,
+          submitted_visual_evidence_ids: grounded.visual_audit.submitted_visual_evidence_ids,
+          submitted_delta_ids: grounded.visual_audit.submitted_delta_ids,
         },
       });
-      job.artifacts = { ...(job.artifacts ?? {}), skills_dir: outputRoot, skills, suite, board_bundle_uri: temporal.uri };
+      job.artifacts = {
+        ...(job.artifacts ?? {}),
+        skills_dir: outputRoot,
+        skills,
+        suite: grounded.suite,
+        visual_audit: grounded.visual_audit,
+        board_bundle_uri: temporal.uri,
+      };
       job.status = "completed";
       job.stage = "completed";
       job.progress = 1;
