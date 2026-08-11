@@ -9,6 +9,9 @@ import type {
   BoardEvidenceBundle,
   ExperimentRun,
   ExperimentSummary,
+  GoldReviewDecisionInput,
+  GoldReviewPackageSignoffInput,
+  GoldReviewQueue,
   Health,
   JobState,
   Project,
@@ -33,6 +36,7 @@ import { JobStore } from "../../../packages/store/src/jobStore.js";
 import { LibraryStore } from "../../../packages/store/src/libraryStore.js";
 import { EvaluationStore } from "../../../packages/store/src/evaluationStore.js";
 import { ConversationStore } from "../../../packages/store/src/conversationStore.js";
+import { GoldReviewStore } from "../../../packages/store/src/goldReviewStore.js";
 import { DATA_DIR, PORT, ROOT, WEB_DIST_DIR } from "./config.js";
 import { TutorService } from "./services/tutorService.js";
 
@@ -43,6 +47,7 @@ const library = new LibraryStore(DATA_DIR);
 const jobs = new JobStore(DATA_DIR);
 const evaluations = new EvaluationStore(ROOT, DATA_DIR);
 const conversations = new ConversationStore(DATA_DIR);
+const goldReviews = new GoldReviewStore(ROOT, DATA_DIR);
 const settings = new SettingsStore(ROOT, DATA_DIR);
 const pipeline = new PipelineEngine(ROOT, DATA_DIR, library, jobs, settings);
 const tutor = new TutorService(library, jobs, settings);
@@ -154,6 +159,31 @@ app.get("/api/sources", async () => ({
   sites: ["bilibili.com", "youtube.com", "youtu.be", "公开的 yt-dlp 兼容站点"],
   notice: "仅处理公开、无 DRM 且用户有权使用的课堂素材。",
 }));
+
+app.get("/api/gold-review", async (_request, reply): Promise<GoldReviewQueue | unknown> => {
+  try { return await goldReviews.queue(); }
+  catch (error) { return httpError(reply, error, 500); }
+});
+
+app.get("/api/gold-review/evidence", async (request, reply) => {
+  try {
+    const query = request.query as Record<string, unknown>;
+    const item = await goldReviews.evidence(String(query.package_id || ""), String(query.group_id || ""), Number(query.index));
+    reply.header("Cache-Control", "private, no-store");
+    reply.type(item.mime);
+    return reply.send(item.bytes);
+  } catch (error) { return httpError(reply, error); }
+});
+
+app.post("/api/gold-review/decisions", async (request, reply) => {
+  try { return await goldReviews.decide(bodyOf(request) as unknown as GoldReviewDecisionInput); }
+  catch (error) { return httpError(reply, error); }
+});
+
+app.post("/api/gold-review/package-signoffs", async (request, reply) => {
+  try { return await goldReviews.signPackage(bodyOf(request) as unknown as GoldReviewPackageSignoffInput); }
+  catch (error) { return httpError(reply, error); }
+});
 app.post("/api/discover", async (request, reply) => {
   try {
     const body = bodyOf(request);

@@ -5,6 +5,8 @@
 > 核心问题：时序板书演化能否提供字幕、最终板书和均匀抽帧之外的独立证据，从而蒸馏出更忠实、可执行的教师能力？
 
 > 2026-08-11 补充：`grounded-skill-distillation-v2` 第一薄片已接入产品的单课蒸馏入口。新链路把 Board Action IR 与 Render Plan 分离：教学动作不绑定渲染器，HTML / SVG / Ink 仅由独立计划选择；teacher replay、counterfactual、repair、merged 来源显式区分。每个 accepted delta 的 before/delta/after montage 现按精确 evidence ID 校验并实际提交多模态 API，单请求最多 4 个事件，更多事件稳定分批，视觉请求和 usage 进入独立 audit。产品导入单位改为 Bundle JSON + montage 的完整 evidence package 目录，裸 JSON 不再绑定为可运行包。跨课 temporal common 仍等待多 bundle 契约，禁止用单 bundle 冒充。
+>
+> 2026-08-12 补充：产品新增 `Gold 仲裁` 中心，直接读取 canonical clip manifest 中登记的 5 个 A/B 仲裁输入并统一为 49 组、51 个候选事件的评审队列。每组展示全部冻结 A/B 事件、全部原始视觉证据、ASR 上下文与未决字段；人工决策以 append-only 修订链保存，绑定 intake SHA-256、父版本和记录哈希。只有包内每组都有决策后才能开始包级签字；第一位视觉仲裁人签字即锁定决策，第二位不同人员以物理复核角色签字后整包正式冻结。证据按登记索引、真实图片解码与 SHA-256 fail-closed 提供。当前仍是 `0/49` 已裁决、`0/5` 双签冻结，不能生成或宣称论文 Gold。
 
 ## 1. 项目决策
 
@@ -176,6 +178,7 @@ STOP    中心假设、数据许可或关键门槛失败，按预注册路线转
 | False-MODIFY hard negative | PASS for human review only | `ly-003 / 702–922 s` 的 A16/B17 全部只支持 ADD，现对齐为 17 组；相似第二幅图、公式续写和新增箭头均保留旧对象，因此不能自动判 MODIFY。17/17 均 pending，accepted=0 |
 | Same-slot rewrite hard negative | PASS for human review only | `kg005 / 2134–2166 s` 已完成 A4/B8 双标并对齐为 5 组；两侧均未标 MODIFY。证据支持 ERASE、ADD、atomic ERASE+ADD 或 unknown；同槽等号/`F r²` 重写没有实质语义变化，5/5 pending，accepted=0 |
 | Strict-blind ERASE intake | PASS for human review only | `kg003 / 4422–4428 s` 的 A 与严格盲标 B2 均识别同一 ERASE，tIoU `0.876788`、region IoU `0.816532`；before 左删失与边界仍待裁决。旧 B 因 scout 元数据暴露被隔离，不参与一致性、仲裁或 Gold。1/1 pending，accepted=0 |
+| Human Gold review workflow | PASS as unsigned review infrastructure | `/api/gold-review` 与产品 `Gold 仲裁` 中心已统一载入 5 个包/49 组/51 个候选事件；355/355 份图像按冻结 hash 解码并全部展示，组决策 append-only、按包串行写入且父链可验。全组裁决后由视觉仲裁与物理复核两名不同人员双签；首次签字锁定决策，双签才正式冻结。当前无人工决策或签字，因此仅证明评审基础设施可用，不证明 Gold 已完成 |
 | Operation-gap scouting | PASS for next annotation queue | `kg005 2134–2166 s` 的初始 MODIFY 假设已被双标否定并转为困难负例；`kg003 4422–4428 s` 已形成严格 A/B2 ERASE 仲裁输入；`kg005 1888–1905 s` ERASE+ADD 困难负例尚待双标。本地 ASR 已生成，均未进入 Gold |
 | Engineering Gold-dev compile | PASS for pipeline smoke only | 仅接受 B-DELTA-05、B-DELTA-06 两个 A/B 与语音一致的低争议事件；编译时间已冻结进仲裁台账，同一输入连续两次得到稳定 payload SHA-256 `266415d4f9d67d96b4d743140f6d162197454bf5cfdbf4d86ee18386e2f27f20`。编译器将状态帧生成真正的 before / 高亮 delta / after 三联图，并把未仲裁的 pedagogical role 清回 unknown；明确标记 `engineering_gold_dev_not_paper_gold` 与 `requires_human_signoff` |
 | Engineering Gold-dev v2 for Oracle smoke | PASS for wiring smoke only | 保持 v1 及 run-005 不变，另建不可变 v2，增加冻结的 90 s / 99 s 独立 Uniform 帧；payload SHA-256 `23e8ce456c302a82c0ad2dfd9c105943bc7f2f91288cac0acaba0d1dc3758b1f`。Static-Final 与 Uniform 不再复用同一帧，仍明确不是 paper Gold |
@@ -185,7 +188,7 @@ STOP    中心假设、数据许可或关键门槛失败，按预注册路线转
 
 下一波不直接写完整恢复算法，而是继续 Phase 0：
 
-1. 对当前五个仲裁包的 49 个 review groups（51 个候选事件）执行逐组人工签字；任何 proposal、单标或 Agent 对齐结果均保持 `needs_review`，不能用“候选数超过 50”冒充“50 条 Gold”；
+1. 在产品 `Gold 仲裁` 中心对当前五个仲裁包的 49 个 review groups（51 个候选事件）逐组裁决并执行包级签字；任何 proposal、单标或 Agent 对齐结果均保持 `needs_review`，不能用“候选数超过 50”冒充“50 条 Gold”；
 2. 双标 `kg005 1888–1905 s` 的 ERASE+ADD 困难负例，把最后一个操作长尾纳入人工仲裁；随后只用真正签字的事件编译 `temporal-board-v2` bundle并重算全部摘要；当前 2 条工程 Gold-dev 只用于闭环测试；
 3. 运行四条件 Oracle harness，生成逐样本盲评包，所有结果继续保持 `TBD` 直到真实运行完成；
 4. 并行把已冻结的 8 个问题家族写成 24 条受控 Tutor 场景及物理锚点，冻结 train/selection/locked-test manifest；

@@ -6,6 +6,11 @@ import type {
   EvidenceMode,
   ExperimentRun,
   ExperimentSummary,
+  GoldReviewDecisionInput,
+  GoldReviewEvent,
+  GoldReviewGroup,
+  GoldReviewPackage,
+  GoldReviewQueue,
   Health,
   JobState,
   Project,
@@ -26,22 +31,24 @@ import { api, streamNdjson, uploadEvidenceFile, uploadVideo } from "./api.js";
 import { formatDate, formatDuration, percent } from "./format.js";
 import { Markdown } from "./components/Markdown.js";
 
-type View = "studio" | "overview" | "evidence" | "skills" | "evaluation";
+type View = "studio" | "overview" | "evidence" | "gold" | "skills" | "evaluation";
 
 const NAV: Array<{ key: View; number: string; label: string; hint: string }> = [
   { key: "studio", number: "↳", label: "教学会话", hint: "Teacher · Blackboard" },
   { key: "overview", number: "00", label: "项目总览", hint: "Readiness" },
   { key: "evidence", number: "01", label: "课堂证据", hint: "Source · Trace" },
-  { key: "skills", number: "02", label: "Skill 工坊", hint: "Distill · Review" },
-  { key: "evaluation", number: "03", label: "评估中心", hint: "Dataset · Compare" },
+  { key: "gold", number: "02", label: "Gold 仲裁", hint: "Review · Signoff" },
+  { key: "skills", number: "03", label: "Skill 工坊", hint: "Distill · Review" },
+  { key: "evaluation", number: "04", label: "评估中心", hint: "Dataset · Compare" },
 ];
 
 const VIEW_COPY: Record<View, { eyebrow: string; title: string; intro: string }> = {
   studio: { eyebrow: "SKYCLASS / TEACHER SESSION", title: "教学会话", intro: "教师调用 Skill 与可视化工具，板书在教学黑板中持续呈现。" },
   overview: { eyebrow: "SKYCLASS DISTILL / PROJECT", title: "从课堂证据，到可复现的教学验证。", intro: "先确认素材与 Skill 是否就绪，再进入固定数据集上的对照实验。" },
   evidence: { eyebrow: "01 / CLASSROOM EVIDENCE", title: "课堂证据", intro: "管理视频、逐字稿和视觉证据，让每个教学结论都能回到真实课堂。" },
-  skills: { eyebrow: "02 / SKILL WORKSHOP", title: "Skill 工坊", intro: "蒸馏、检查并调试教学 Skill；只有可追溯版本才进入评估。" },
-  evaluation: { eyebrow: "03 / EVALUATION CENTER", title: "评估中心", intro: "用版本化数据集、固定实验条件和运行历史验证 Skill 的真实增益。" },
+  gold: { eyebrow: "02 / GOLD ADJUDICATION", title: "Gold 仲裁", intro: "逐组核对 A/B 视觉证据，记录人工裁决并在完整签字后冻结研究数据。" },
+  skills: { eyebrow: "03 / SKILL WORKSHOP", title: "Skill 工坊", intro: "蒸馏、检查并调试教学 Skill；只有可追溯版本才进入评估。" },
+  evaluation: { eyebrow: "04 / EVALUATION CENTER", title: "评估中心", intro: "用版本化数据集、固定实验条件和运行历史验证 Skill 的真实增益。" },
 };
 
 function modeLabel(mode: TutorMode): string {
@@ -166,7 +173,7 @@ function App() {
     }
   }
 
-  const content = !project && view !== "overview"
+  const content = !project && view !== "overview" && view !== "gold"
     ? <EmptyProject onCreate={() => setProjectDialog(true)} />
     : view === "studio" ? <Tutor
       key={`${project!.id}:${conversationDraft}`}
@@ -180,6 +187,7 @@ function App() {
     />
     : view === "overview" ? <Overview project={project} videos={videos} skills={skills} jobs={projectJobs} datasets={datasets} runs={experimentRuns} onNavigate={setView} onCreate={() => setProjectDialog(true)} />
     : view === "evidence" ? <EvidenceWorkspace project={project!} videos={videos} onCreated={async (job) => { setJobs((items) => [job, ...items]); flash("素材任务已开始"); }} flash={flash} />
+    : view === "gold" ? <GoldReviewCenter flash={flash} />
     : view === "skills" ? <SkillWorkshop project={project!} videos={videos} skills={skills} onCreated={async (job) => { setJobs((items) => [job, ...items]); flash("蒸馏任务已开始"); }} onOpen={openSkill} onRefresh={refreshAll} flash={flash} />
     : <EvaluationCenter project={project!} datasets={datasets} runs={experimentRuns} onRun={loadProjectData} />;
 
@@ -900,6 +908,192 @@ function LearningCheck({ value, compact = false }: { value?: string; compact?: b
   const prompt = value ? splitLearningCheck(value).prompt : "";
   if (!prompt) return null;
   return <div className={compact ? "small-check" : "learning-check"}>{compact ? <b>检查</b> : <span>轮到你了</span>}<Markdown>{prompt}</Markdown></div>;
+}
+
+function GoldReviewCenter({ flash }: { flash: (message: string, error?: boolean) => void }) {
+  const [queue, setQueue] = useState<GoldReviewQueue | null>(null);
+  const [packageId, setPackageId] = useState("");
+  const [groupId, setGroupId] = useState("");
+  const [disposition, setDisposition] = useState<GoldReviewDecisionInput["disposition"]>("unknown");
+  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
+  const [finalEventDrafts, setFinalEventDrafts] = useState<Record<string, { operation: GoldReviewEvent["operation"]; start: string; end: string; semantic_label: string }>>({});
+  const [adjudicatorId, setAdjudicatorId] = useState(() => window.localStorage.getItem("gold-adjudicator-id") || "");
+  const [adjudicatorRole, setAdjudicatorRole] = useState(() => window.localStorage.getItem("gold-adjudicator-role") || "物理与视觉仲裁员");
+  const [rationale, setRationale] = useState("");
+  const [signoffStatement, setSignoffStatement] = useState("我确认本包全部 review groups 已逐项核对，决策与可见证据一致，可以冻结当前版本。");
+  const [signoffRole, setSignoffRole] = useState<"visual_adjudicator" | "physics_reviewer">("visual_adjudicator");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const next = await api<GoldReviewQueue>("/api/gold-review");
+    setQueue(next);
+    setPackageId((current) => next.packages.some((item) => item.package_id === current) ? current : next.packages[0]?.package_id ?? "");
+  }, []);
+
+  useEffect(() => { load().catch((cause) => flash(cause instanceof Error ? cause.message : String(cause), true)); }, [load, flash]);
+
+  const activePackage = queue?.packages.find((item) => item.package_id === packageId) ?? null;
+  const packageGroups = queue?.groups.filter((item) => item.package_id === packageId) ?? [];
+  const activeGroup = packageGroups.find((item) => item.group_id === groupId) ?? packageGroups[0] ?? null;
+
+  useEffect(() => {
+    if (!activePackage) return;
+    setSignoffRole(activePackage.package_signoffs.some((item) => item.signoff_role === "visual_adjudicator") ? "physics_reviewer" : "visual_adjudicator");
+  }, [activePackage?.package_id, activePackage?.package_signoffs.length]);
+
+  useEffect(() => {
+    if (!activeGroup) return;
+    setGroupId(activeGroup.group_id);
+    setDisposition(activeGroup.current_decision?.disposition ?? "unknown");
+    setSelectedCandidates(activeGroup.current_decision?.selected_candidate_ids ?? []);
+    setRationale(activeGroup.current_decision?.rationale ?? "");
+    const decidedById = new Map(activeGroup.current_decision?.final_events.map((item) => [item.event_id, item]));
+    setFinalEventDrafts(Object.fromEntries(activeGroup.candidates.map((item) => {
+      const decided = decidedById.get(item.event_id);
+      return [item.candidate_id, {
+        operation: decided?.operation ?? item.operation,
+        start: String(decided?.time.start ?? (item.time.end > item.time.start ? item.time.start : "")),
+        end: String(decided?.time.end ?? (item.time.end > item.time.start ? item.time.end : "")),
+        semantic_label: decided?.semantic_label ?? item.semantic_label,
+      }];
+    })));
+  }, [activeGroup?.package_id, activeGroup?.group_id, activeGroup?.current_decision?.signature_sha256]);
+
+  async function saveDecision(): Promise<void> {
+    if (!activeGroup) return;
+    setBusy(true);
+    try {
+      window.localStorage.setItem("gold-adjudicator-id", adjudicatorId.trim());
+      window.localStorage.setItem("gold-adjudicator-role", adjudicatorRole.trim());
+      await api("/api/gold-review/decisions", {
+        method: "POST",
+        body: JSON.stringify({
+          package_id: activeGroup.package_id,
+          group_id: activeGroup.group_id,
+          disposition,
+          selected_candidate_ids: disposition === "accept" ? selectedCandidates : [],
+          final_events: disposition === "accept" ? selectedCandidates.map((candidateId) => {
+            const candidate = activeGroup.candidates.find((item) => item.candidate_id === candidateId)!;
+            const draft = finalEventDrafts[candidateId];
+            return {
+              event_id: candidate.event_id,
+              source_event_refs: candidate.source_event_refs,
+              operation: draft.operation,
+              time: { start: Number(draft.start), end: Number(draft.end) },
+              semantic_label: draft.semantic_label,
+              region: candidate.region,
+              relation: candidate.relation,
+              modification: candidate.modification,
+            };
+          }) : [],
+          adjudicator_id: adjudicatorId,
+          adjudicator_role: adjudicatorRole,
+          rationale,
+        }),
+      });
+      await load();
+      flash(`已记录 ${activeGroup.group_id} 的不可变仲裁版本`);
+    } catch (cause) { flash(cause instanceof Error ? cause.message : String(cause), true); }
+    finally { setBusy(false); }
+  }
+
+  async function signPackage(): Promise<void> {
+    if (!activePackage || !window.confirm("签字后本包将冻结，不能继续修改组决策。确认继续？")) return;
+    setBusy(true);
+    try {
+      await api("/api/gold-review/package-signoffs", {
+        method: "POST",
+        body: JSON.stringify({ package_id: activePackage.package_id, signoff_role: signoffRole, adjudicator_id: adjudicatorId, adjudicator_role: adjudicatorRole, statement: signoffStatement }),
+      });
+      await load();
+      flash("仲裁包已签字冻结");
+    } catch (cause) { flash(cause instanceof Error ? cause.message : String(cause), true); }
+    finally { setBusy(false); }
+  }
+
+  if (!queue) return <div className="agent-running"><span className="pulse" /><div><b>正在建立 Gold 评审队列</b><small>校验 5 个 A/B 仲裁包与当前决策账本…</small></div></div>;
+  if (!activePackage || !activeGroup) return <Blank title="暂无待审 Gold 数据" text="先完成独立 A/B 标注与对齐，再进入人工仲裁。" />;
+
+  const packageComplete = activePackage.decided_count === activePackage.group_count;
+  return <div className="gold-review-stack">
+    <section className="gold-metrics">
+      <Metric value={queue.summary.group_count} label="评审组" note={`${queue.summary.package_count} 个仲裁包`} />
+      <Metric value={queue.summary.decided_count} label="已裁决" note={`剩余 ${queue.summary.group_count - queue.summary.decided_count}`} />
+      <Metric value={queue.summary.accepted_event_count} label="接受事件" note={`正式门槛至少 ${queue.summary.minimum_required_event_count}`} />
+      <Metric value={queue.summary.signed_package_count} label="已冻结包" note={queue.summary.paper_gold_ready ? "Paper Gold 可编译" : "不得冒充 Gold"} accent={queue.summary.paper_gold_ready} />
+    </section>
+
+    <div className="gold-package-tabs">{queue.packages.map((item) => <button key={item.package_id} className={item.package_id === activePackage.package_id ? "active" : ""} onClick={() => { setPackageId(item.package_id); setGroupId(""); }}>
+      <span>{item.fully_signed ? "✓" : `${item.decided_count}/${item.group_count}`}</span><b>{item.source_video_id}</b><small>{item.fully_signed ? "双签冻结" : `${item.package_signoffs.length}/2 签字`}</small>
+    </button>)}</div>
+
+    <div className="gold-review-layout">
+      <aside className="gold-group-list paper-panel">
+        <div className="panel-title"><div><p className="eyebrow">REVIEW QUEUE</p><h2>{activePackage.group_count} 组</h2></div><span>{activePackage.accepted_event_count} ACCEPTED</span></div>
+        <div>{packageGroups.map((item) => <button key={item.group_id} className={item.group_id === activeGroup.group_id ? "active" : ""} onClick={() => setGroupId(item.group_id)}>
+          <i className={item.current_decision ? item.current_decision.disposition : "pending"} />
+          <span><b>{item.group_id}</b><small>{item.time ? `${item.time.start.toFixed(2)}–${item.time.end.toFixed(2)}s` : "边界待定"}</small></span>
+          <em>{item.current_decision?.disposition ?? "pending"}</em>
+        </button>)}</div>
+        <section className={`gold-freeze ${activePackage.fully_signed ? "signed" : ""}`}>
+          <p className="eyebrow">PACKAGE SIGNOFF</p>
+          {activePackage.fully_signed ? <><b>双人签字已冻结</b>{activePackage.package_signoffs.map((item) => <small key={item.signoff_role}>{item.signoff_role} · {item.adjudicator_id} · {formatDate(item.signed_at)}</small>)}</> : <>
+            <div className="gold-signoff-progress">{(["visual_adjudicator", "physics_reviewer"] as const).map((role) => <span className={activePackage.package_signoffs.some((item) => item.signoff_role === role) ? "done" : ""} key={role}>{role === "visual_adjudicator" ? "视觉仲裁" : "物理复核"}</span>)}</div>
+            <select value={signoffRole} disabled={!packageComplete} onChange={(event) => setSignoffRole(event.target.value as typeof signoffRole)}>{(["visual_adjudicator", "physics_reviewer"] as const).map((role) => <option key={role} value={role} disabled={activePackage.package_signoffs.some((item) => item.signoff_role === role)}>{role === "visual_adjudicator" ? "视觉仲裁签字" : "物理复核签字"}</option>)}</select>
+            <textarea value={signoffStatement} onChange={(event) => setSignoffStatement(event.target.value)} disabled={!packageComplete} />
+            <button className="secondary wide" disabled={busy || !packageComplete} onClick={() => void signPackage()}>{packageComplete ? activePackage.package_signoffs.length ? "完成第二角色签字并冻结" : "记录第一角色签字" : `还需裁决 ${activePackage.group_count - activePackage.decided_count} 组`}</button>
+          </>}
+        </section>
+      </aside>
+
+      <main className="gold-review-main">
+        <section className="gold-group-head paper-panel">
+          <div><p className="eyebrow">{activeGroup.alignment_class}</p><h2>{activeGroup.group_id}</h2></div>
+          <div><span>{activeGroup.source_events.length} 个 A/B 事件</span><span>{activeGroup.evidence.length} 份视觉证据</span><span>{activeGroup.unresolved_fields.length} 个待核项</span></div>
+        </section>
+
+        <section className="gold-evidence-grid">{activeGroup.evidence.map((item, index) => <figure className="paper-panel" key={`${item.path}-${item.sha256}`}>
+          <img src={`/api/gold-review/evidence?package_id=${encodeURIComponent(activeGroup.package_id)}&group_id=${encodeURIComponent(activeGroup.group_id)}&index=${index}`} alt={`${item.side} ${item.label}`} />
+          <figcaption><span>{item.side}</span><b>{item.label}</b><small>{item.kind} · {item.sha256.slice(0, 10)}</small></figcaption>
+        </figure>)}</section>
+
+        <section className="gold-detail-grid">
+          <article className="paper-panel gold-source-events"><p className="eyebrow">FROZEN A/B EVENTS</p>{activeGroup.source_events.map((item) => <div key={`${item.side}-${item.event_id}`}><span>{item.side}</span><section><b>{item.operation} · {item.semantic_label}</b><small>{item.time ? `${item.time.start.toFixed(3)}–${item.time.end.toFixed(3)}s` : "时间待定"} · {item.event_id}</small></section></div>)}</article>
+          <article className="paper-panel gold-speech"><p className="eyebrow">ASR CONTEXT · NOT GOLD</p><p>{activeGroup.speech_context || "本组没有独立时间戳语音；不得据此补写教学意图。"}</p></article>
+        </section>
+
+        {activeGroup.unresolved_fields.length > 0 && <section className="gold-unresolved paper-panel"><p className="eyebrow">必须人工核对</p><ol>{activeGroup.unresolved_fields.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ol></section>}
+
+        <section className="gold-decision paper-panel">
+          <div className="panel-title"><div><p className="eyebrow">HUMAN DECISION</p><h2>{activeGroup.current_decision ? `修订 v${activeGroup.current_decision.revision}` : "首次裁决"}</h2></div><span>{activeGroup.package_signed ? "FROZEN" : activeGroup.package_locked ? "SIGNOFF LOCK" : "APPEND ONLY"}</span></div>
+          <div className="gold-dispositions">{(["accept", "reject", "not_an_event", "unknown"] as const).map((item) => <button key={item} className={disposition === item ? "active" : ""} disabled={activeGroup.package_locked} onClick={() => setDisposition(item)}>{({ accept: "接受事件", reject: "拒绝候选", not_an_event: "不是事件", unknown: "证据不足" })[item]}</button>)}</div>
+          {disposition === "accept" && <div className="gold-candidates"><p>选择最终事件；系统会保留其 A/B 来源，而不会重新编造板书事实。黄色警告项必须由你补齐后才能保存。</p>{activeGroup.candidates.map((item) => {
+            const selected = selectedCandidates.includes(item.candidate_id);
+            const draft = finalEventDrafts[item.candidate_id];
+            return <div className={`gold-candidate ${item.acceptance_ready ? "" : "blocked"}`} key={item.candidate_id}>
+              <label>
+                <input type="checkbox" disabled={!item.source_event_refs.length || activeGroup.package_locked} checked={selected} onChange={(event) => setSelectedCandidates((values) => event.target.checked ? [...values, item.candidate_id] : values.filter((id) => id !== item.candidate_id))} />
+                <span><b>{item.operation} · {item.semantic_label}</b><small>{item.time.end > item.time.start ? `${item.time.start.toFixed(3)}–${item.time.end.toFixed(3)}s` : "时间待定"} · {item.source_event_refs.join(" + ")}</small>{item.acceptance_blockers.length > 0 && <em>{item.acceptance_blockers.join("；")}</em>}</span>
+              </label>
+              {selected && draft && <div className="gold-event-editor">
+                <select aria-label="最终操作" value={draft.operation} onChange={(event) => setFinalEventDrafts((values) => ({ ...values, [item.candidate_id]: { ...draft, operation: event.target.value as GoldReviewEvent["operation"] } }))}>{["ADD", "ERASE", "MODIFY", "CONNECT", "atomic_ERASE+ADD", "unknown"].map((value) => <option key={value}>{value}</option>)}</select>
+                <input aria-label="开始时间" type="number" step="0.001" value={draft.start} onChange={(event) => setFinalEventDrafts((values) => ({ ...values, [item.candidate_id]: { ...draft, start: event.target.value } }))} placeholder="start s" />
+                <input aria-label="结束时间" type="number" step="0.001" value={draft.end} onChange={(event) => setFinalEventDrafts((values) => ({ ...values, [item.candidate_id]: { ...draft, end: event.target.value } }))} placeholder="end s" />
+                <input aria-label="可见语义" value={draft.semantic_label} onChange={(event) => setFinalEventDrafts((values) => ({ ...values, [item.candidate_id]: { ...draft, semantic_label: event.target.value } }))} placeholder="只写可见板书变化" />
+              </div>}
+            </div>;
+          })}</div>}
+          <div className="gold-review-form">
+            <label>仲裁人 ID<input value={adjudicatorId} disabled={activeGroup.package_locked} onChange={(event) => setAdjudicatorId(event.target.value)} placeholder="例如 expert-physics-01" /></label>
+            <label>仲裁角色<input value={adjudicatorRole} disabled={activeGroup.package_locked} onChange={(event) => setAdjudicatorRole(event.target.value)} /></label>
+            <label className="wide">判定依据<textarea value={rationale} disabled={activeGroup.package_locked} onChange={(event) => setRationale(event.target.value)} placeholder="只描述可见证据、边界规则和为何接受/拒绝，不推测学生效果。" /></label>
+          </div>
+          <button className="primary wide" disabled={busy || activeGroup.package_locked || rationale.trim().length < 8 || adjudicatorId.trim().length < 2 || (disposition === "accept" && selectedCandidates.length === 0)} onClick={() => void saveDecision()}>{busy ? "正在写入审计账本…" : activeGroup.package_locked ? "包已进入签字锁定" : "保存新的不可变裁决版本"}</button>
+          {activeGroup.current_decision && <p className="gold-signature">当前记录 {activeGroup.current_decision.signature_sha256.slice(0, 16)} · {formatDate(activeGroup.current_decision.decided_at)}</p>}
+        </section>
+      </main>
+    </div>
+  </div>;
 }
 
 function Experiments({ project, datasetId, scenario, onRun }: {

@@ -2,6 +2,7 @@ export type JsonValue = string | number | boolean | null | JsonObject | JsonValu
 export type JsonObject = { [key: string]: JsonValue | undefined };
 
 export * from "./board2skill.js";
+export * from "./gold-review.js";
 export * from "./skill-distillation.js";
 export * from "./temporal-board.js";
 
