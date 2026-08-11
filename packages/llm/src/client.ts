@@ -18,6 +18,13 @@ export interface LlmOptions {
   maxAttempts?: number;
 }
 
+export interface LlmCallControl {
+  transport?: "auto" | "pi";
+  maxOutputTokens?: number;
+  seed?: number;
+  cacheRetention?: "none" | "short" | "long";
+}
+
 export interface ImageInput {
   label: string;
   path?: string;
@@ -41,6 +48,12 @@ export interface LlmRequestAudit {
   provider_response_received: true;
   stop_reason: string | null;
   usage: Record<string, unknown> | null;
+  transport: "fetch" | "pi";
+  temperature: number;
+  max_output_tokens: number | null;
+  seed: number | null;
+  cache_retention: "none" | "short" | "long" | null;
+  tools_policy: "none";
 }
 
 export interface AuditedJsonResponse {
@@ -94,7 +107,13 @@ export class LlmClient {
     return (await this.chatJsonAudited(system, user, images, temperature)).value;
   }
 
-  async chatJsonAudited(system: string, user: string, images: ImageInput[] = [], temperature = 0): Promise<AuditedJsonResponse> {
+  async chatJsonAudited(
+    system: string,
+    user: string,
+    images: ImageInput[] = [],
+    temperature = 0,
+    control: LlmCallControl = {},
+  ): Promise<AuditedJsonResponse> {
     if (!this.configured) throw new Error("LLM API 尚未配置");
     if (images.length > 4) throw new Error("单次模型请求最多允许 4 张图；调用方必须显式分批，不能静默截断");
     const materialized = await Promise.all(images.map(materializeImage));
@@ -112,10 +131,17 @@ export class LlmClient {
       system,
       user,
       temperature,
+      control: {
+        transport: control.transport ?? "auto",
+        max_output_tokens: control.maxOutputTokens ?? null,
+        seed: control.seed ?? null,
+        cache_retention: control.cacheRetention ?? null,
+        tools_policy: "none",
+      },
       visuals: materialized.map((item) => item.visual),
     })).digest("hex");
-    if (materialized.length) {
-      return this.chatJsonAuditedWithPi(system, user, materialized, temperature, requestSha256);
+    if (materialized.length || control.transport === "pi") {
+      return this.chatJsonAuditedWithPi(system, user, materialized, temperature, requestSha256, control);
     }
     const attempts = Math.max(1, this.options.maxAttempts ?? 3);
     let lastError: unknown;
@@ -124,7 +150,13 @@ export class LlmClient {
         const response = await fetch(endpoint(this.options.baseUrl), {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.options.apiKey}` },
-          body: JSON.stringify({ model: this.options.model, messages, temperature }),
+          body: JSON.stringify({
+            model: this.options.model,
+            messages,
+            temperature,
+            ...(control.maxOutputTokens ? { max_tokens: control.maxOutputTokens } : {}),
+            ...(control.seed !== undefined ? { seed: control.seed } : {}),
+          }),
           signal: AbortSignal.timeout((this.options.timeoutSeconds ?? 240) * 1000),
         });
         const raw = await response.json().catch(() => ({})) as Record<string, any>;
@@ -142,6 +174,12 @@ export class LlmClient {
             provider_response_received: true,
             stop_reason: finishReason,
             usage: raw.usage && typeof raw.usage === "object" && !Array.isArray(raw.usage) ? raw.usage : null,
+            transport: "fetch",
+            temperature,
+            max_output_tokens: control.maxOutputTokens ?? null,
+            seed: control.seed ?? null,
+            cache_retention: control.cacheRetention ?? null,
+            tools_policy: "none",
           },
         };
       } catch (error) {
@@ -158,6 +196,7 @@ export class LlmClient {
     materialized: Array<{ bytes: Buffer; visual: LlmSubmittedVisual }>,
     temperature: number,
     requestSha256: string,
+    control: LlmCallControl,
   ): Promise<AuditedJsonResponse> {
     const providerId = "anyteacher-llm-relay";
     const model: Model<"openai-completions"> = {
@@ -200,9 +239,13 @@ export class LlmClient {
         const response = await models.completeSimple(model, {
           systemPrompt: system,
           messages: [{ role: "user", content, timestamp: Date.now() }],
+          tools: [],
         }, {
           apiKey: this.options.apiKey,
           temperature,
+          maxTokens: control.maxOutputTokens,
+          samplingParams: control.seed === undefined ? undefined : { seed: control.seed },
+          cacheRetention: control.cacheRetention,
           timeoutMs: (this.options.timeoutSeconds ?? 240) * 1_000,
           maxRetries: 0,
         });
@@ -223,6 +266,12 @@ export class LlmClient {
             provider_response_received: true,
             stop_reason: response.stopReason,
             usage: response.usage as unknown as Record<string, unknown>,
+            transport: "pi",
+            temperature,
+            max_output_tokens: control.maxOutputTokens ?? null,
+            seed: control.seed ?? null,
+            cache_retention: control.cacheRetention ?? null,
+            tools_policy: "none",
           },
         };
       } catch (error) {

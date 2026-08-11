@@ -55,6 +55,7 @@ function validSuite(): Record<string, unknown> {
 function successfulAudit(images: ImageInput[]): LlmRequestAudit {
   return {
     request_sha256: "c".repeat(64), model: "vision-test", attempt_count: 1, provider_response_received: true, stop_reason: "stop", usage: null,
+    transport: "pi", temperature: 0, max_output_tokens: null, seed: null, cache_retention: null, tools_policy: "none",
     submitted_visuals: images.map((image) => ({
       label: image.label,
       sha256: String(image.sha256),

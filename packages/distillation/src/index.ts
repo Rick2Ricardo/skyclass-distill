@@ -2,6 +2,7 @@ import type { ImageInput, LlmClient } from "../../llm/src/client.js";
 import type { Transcript } from "../../media/src/transcribe.js";
 
 export * from "./oraclePilot.js";
+export * from "./oracleGateRunner.js";
 export * from "./groundedSkills.js";
 
 export interface LessonInput {

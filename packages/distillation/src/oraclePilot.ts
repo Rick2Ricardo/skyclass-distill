@@ -106,7 +106,7 @@ function evidenceForArm(
     return { text: "本条件提供与其他视觉条件匹配预算的一张均匀抽样画面，不提供板书变化过程或操作类型。", images: [uniformFrame] };
   }
   return {
-    text: `本条件提供人工仲裁的 before/delta/after 对照图；板书操作类型：${delta.operation}。不提供教学功能标签，不得补写学生反应、教学效果或教学角色。`,
+    text: `本条件提供人工仲裁的 before/delta/after 对照图；板书操作类型：${delta.operation}；变化区域：${JSON.stringify(delta.region)}；可见变化：${delta.semantic_label}。不提供教学功能标签，不得补写学生反应、教学效果或教学角色。`,
     images: [delta.comparison_asset],
   };
 }

@@ -1,0 +1,18 @@
+{
+  "schema_version": "oracle-gate-smoke-spec-v1",
+  "prompt_version": "oracle-gate-prompt-v1",
+  "blind_seed_sha256": "cbeb62e6c6477166e67f0eab9f20f94bc863dbbbc04750bfcf1798661e8abd7d",
+  "generation_seed": 20260812,
+  "cases": [
+    {
+      "case_id": "ly004-known-condition",
+      "delta_id": "B-DELTA-05",
+      "uniform_frame_id": "GOLD-UNIFORM-01"
+    },
+    {
+      "case_id": "ly004-question-pair",
+      "delta_id": "B-DELTA-06",
+      "uniform_frame_id": "GOLD-UNIFORM-02"
+    }
+  ]
+}

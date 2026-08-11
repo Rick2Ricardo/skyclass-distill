@@ -25,6 +25,12 @@ interface Decision {
   asr_segment_indexes: number[];
   normalized_speech: string;
   teaching_action: string;
+  uniform_frame?: {
+    frame_id: string;
+    timestamp: number;
+    asset_uri: string;
+    sha256: string;
+  };
   notes: string;
 }
 interface Ledger {
@@ -177,6 +183,7 @@ async function compile(ledgerPath: string): Promise<void> {
   bundle.states.forEach((state) => { state.status = "needs_review"; });
   bundle.deltas.forEach((delta) => { delta.status = "needs_review"; });
   bundle.transitions.forEach((transition) => { transition.status = "needs_review"; });
+  const frozenUniformShas = new Set<string>();
 
   for (const [index, decision] of ledger.decisions.entries()) {
     const delta = bundle.deltas.find((item) => item.delta_id === decision.delta_id);
@@ -226,6 +233,29 @@ async function compile(ledgerPath: string): Promise<void> {
     before.status = "accepted";
     after.status = "accepted";
     surface.status = "accepted";
+    if (decision.uniform_frame) {
+      assert(Number.isFinite(decision.uniform_frame.timestamp), `uniform frame 时间无效：${decision.uniform_frame.frame_id}`);
+      assert(!bundle.frames.some((frame) => frame.frame_id === decision.uniform_frame!.frame_id), `uniform frame_id 重复：${decision.uniform_frame.frame_id}`);
+      assert(decision.uniform_frame.timestamp >= Math.max(0, delta.time.start - bundle.config.speech_window_seconds)
+        && decision.uniform_frame.timestamp <= Math.min(bundle.source.duration_seconds, delta.time.end + bundle.config.speech_window_seconds),
+      `uniform frame 必须落在预注册事件窗口：${decision.uniform_frame.frame_id}`);
+      assert(!frozenUniformShas.has(decision.uniform_frame.sha256), `不同 case 不得复用同一张 uniform frame：${decision.uniform_frame.sha256}`);
+      assert(decision.uniform_frame.sha256 !== after.representative_asset.sha256,
+        `uniform frame 不得与该事件的 Static-Final 复用同一像素：${decision.uniform_frame.frame_id}`);
+      frozenUniformShas.add(decision.uniform_frame.sha256);
+      bundle.frames.push({
+        frame_id: decision.uniform_frame.frame_id,
+        source_video_id: delta.source_video_id,
+        surface_id: delta.surface_id,
+        timestamp: decision.uniform_frame.timestamp,
+        source_asset: {
+          asset_uri: decision.uniform_frame.asset_uri,
+          sha256: decision.uniform_frame.sha256,
+        },
+        registration_score: null,
+        visible_fraction: null,
+      });
+    }
     transition.speech_ids = [speechId];
     transition.time = {
       start: Math.min(transition.time.start, speech.time.start),
@@ -250,6 +280,7 @@ async function compile(ledgerPath: string): Promise<void> {
     transition.uncertainty_codes = transition.uncertainty_codes.filter((item) => item !== "no_independent_asr");
   }
   bundle.speech.sort((left, right) => left.time.start - right.time.start || left.speech_id.localeCompare(right.speech_id));
+  bundle.frames.sort((left, right) => left.timestamp - right.timestamp || left.frame_id.localeCompare(right.frame_id));
 
   await mkdir(join(outputRoot, "assets"), { recursive: true });
   const copied = new Map<string, string>();
