@@ -17,6 +17,17 @@ export interface VerifiedImageEvidence {
   byte_length: number;
 }
 
+export interface CanonicalImagePixels {
+  mime_type: SupportedImageMime;
+  width: number;
+  height: number;
+  rgba: Buffer;
+  canonical_pixel_sha256: string;
+}
+
+export const CANONICAL_PIXEL_HASH_VERSION = "oracle-rgba8-v1" as const;
+export const CANONICAL_PIXEL_HASH_DOMAIN = "oracle-rgba8-v1\0" as const;
+
 export interface VerifyImageEvidenceOptions {
   root: string;
   assetUri: string;
@@ -167,6 +178,32 @@ export function inspectImageBytes(bytes: Uint8Array): { mime_type: SupportedImag
     return { mime_type: "image/jpeg", ...dimensions };
   }
   throw new Error("只允许可完整解码的 PNG 或 JPEG 图像");
+}
+
+/**
+ * Decodes supported images to the single pixel representation used by Formal
+ * Oracle byte attestation. The hash is encoding-independent: PNG and JPEG bytes
+ * with identical decoded RGBA8 pixels produce the same digest.
+ */
+export function canonicalImagePixels(bytes: Uint8Array): CanonicalImagePixels {
+  const inspected = inspectImageBytes(bytes);
+  const decoded = inspected.mime_type === "image/png"
+    ? PNG.sync.read(Buffer.from(bytes), { checkCRC: true })
+    : jpeg.decode(Buffer.from(bytes), { useTArray: true, formatAsRGBA: true, tolerantDecoding: false });
+  const rgba = Buffer.from(decoded.data);
+  if (decoded.width !== inspected.width || decoded.height !== inspected.height
+    || rgba.byteLength !== inspected.width * inspected.height * 4) {
+    throw new Error("图像 RGBA8 解码长度或尺寸无效");
+  }
+  const dimensions = Buffer.alloc(8);
+  dimensions.writeUInt32BE(inspected.width, 0);
+  dimensions.writeUInt32BE(inspected.height, 4);
+  const canonical_pixel_sha256 = createHash("sha256")
+    .update(Buffer.from(CANONICAL_PIXEL_HASH_DOMAIN, "utf8"))
+    .update(dimensions)
+    .update(rgba)
+    .digest("hex");
+  return { ...inspected, rgba, canonical_pixel_sha256 };
 }
 
 export async function verifyImageEvidence(options: VerifyImageEvidenceOptions): Promise<VerifiedImageEvidence> {

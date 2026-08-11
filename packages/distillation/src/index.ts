@@ -4,6 +4,7 @@ import type { Transcript } from "../../media/src/transcribe.js";
 export * from "./oraclePilot.js";
 export * from "./oracleGateRunner.js";
 export * from "./oracleFormalPreflight.js";
+export * from "./oracleBytePreflight.js";
 export * from "./oracleTrustedPreflight.js";
 export * from "./groundedSkills.js";
 

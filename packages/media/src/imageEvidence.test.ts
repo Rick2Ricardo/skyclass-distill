@@ -4,7 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { decodeControlledAssetUri, inspectImageBytes, verifyImageEvidence } from "./imageEvidence.js";
+import {
+  CANONICAL_PIXEL_HASH_DOMAIN,
+  CANONICAL_PIXEL_HASH_VERSION,
+  canonicalImagePixels,
+  decodeControlledAssetUri,
+  inspectImageBytes,
+  verifyImageEvidence,
+} from "./imageEvidence.js";
 
 const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
 
@@ -59,6 +66,12 @@ describe("verified image evidence", () => {
     expect(verified.mime_type).toBe("image/png");
     expect([verified.width, verified.height]).toEqual([1, 1]);
     expect(verified.sha256).toBe(digest(PNG_1X1));
+    const pixels = canonicalImagePixels(verified.bytes);
+    expect(pixels.rgba).toHaveLength(4);
+    expect(CANONICAL_PIXEL_HASH_VERSION).toBe("oracle-rgba8-v1");
+    expect(CANONICAL_PIXEL_HASH_DOMAIN).toBe("oracle-rgba8-v1\0");
+    expect(pixels.canonical_pixel_sha256).toBe("f3d7cfad9feffa043147bf375b9b11660f5efdbc78a719fda63dc08d70223c20");
+    expect(canonicalImagePixels(verified.bytes).canonical_pixel_sha256).toBe(pixels.canonical_pixel_sha256);
   });
 
   it("rejects traversal, encoded traversal, schemes, UNC paths, and symlink escapes", async () => {

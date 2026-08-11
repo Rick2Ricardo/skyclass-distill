@@ -1,6 +1,6 @@
 # Formal Oracle Gate v1：正式四组实验协议
 
-> 状态：`ledger_attestation_implemented / execution_blocked`
+> 状态：`media_byte_preflight_implemented / execution_blocked`
 >
 > 日期：2026-08-12
 >
@@ -51,6 +51,10 @@
 - 账本快照只能由外部提供的 Ed25519 私钥冻结为内容寻址 registry；运行时必须从进程外获得 pinned registry SHA 与可信公钥。registry 自带的 key ID、hash 或公钥不能建立信任。撤销使用独立、追加式、外部签名记录，并与 capability callback 共用跨进程锁，防止检查后撤销的 TOCTOU。
 - 本地撤销目录只能证明“当前可见的签名撤销记录有效”，不能证明同一 OS 权限下的历史文件从未被删除。正式 API 前还必须由进程外 pinned active/revoked head、单调序列的可信审计服务或 WORM 存储证明撤销不可回滚；当前实现不宣称具备该性质。
 - 通过验证后只在持有全局账本锁的 callback 内借出不可序列化 `ledger_attested_only` capability；它不是执行令牌。registry 中 `media_bytes_verified`、`speech_bytes_verified`、`run_store_verified` 与 `api_execution_allowed` 仍强制为 `false`。
+- 已实现第三层、但尚未外部 attested 的 `oracle-gate-byte-inventory-v1` 与 `untrusted_media_bytes_valid` 预检：来源 MP4 以单一文件句柄流式重算字节哈希，检查 `ftyp`、ffprobe 元数据并用冻结 ffmpeg 对目标视频流执行完整 decode；ffmpeg/ffprobe 的二进制、版本输出与执行前后文件身份全部固定。static、uniform 与 Oracle comparison 必须逐文件真实解码，并计算编码无关的 `oracle-rgba8-v1` canonical 像素哈希。
+- 语音预检从 Whisper.cpp raw 开始，拒绝重复 JSON key、时间戳/offset 漂移和顶层/分段双重文本，逐字节重建 index、SRT、TXT 与选中片段文本。`signed-speech-alignment-v1` 账本还必须严格闭合 case、source、clip、五份文件引用、segment ID/index/time/text hash 与选中文本；账本正文先形成域分隔 SHA-256，再由进程外 trusted reviewer key 做 canonical Ed25519 签名。不同正文不能复用签字，只验一个“ledger SHA”不算通过。
+- 媒体预检输出继续显式写 `source_frame_derivation_verified=false`：当前证明固定文件字节、真实像素、视频可解码和 ASR 派生链一致，但尚未证明 static/uniform 帧由冻结 ffmpeg 在声明 PTS 自动抽取，也未把全部媒体、语音账本和工具链组合成一个进程外 pinned attestation。当前工具与视频执行仍采用路径执行前后身份复核，不宣称具备不可变 fd/副本级 TOCTOU 证明。因此它不能把账本 capability 升格为执行令牌。
+- 已冻结浏览器安全的内容寻址 run/intents/attempt receipts/commits/checkpoints/private answer key/public blind package contracts；完整验证必须提交从 generation 0 到终态的连续 checkpoint 历史。确认无结果只能在剩余 attempt 预算内进入 `RETRY_READY`，ambiguous 请求不得重发，attempt audit 不得重放，verified provenance 逐字段不可变，公开盲包按大小写无关方式拒绝 private answer-key 值。当前只有 contracts 与 cross-validator，尚未实现权限为 `0700/0600` 的真实 run store。
 - 只有资产/语音字节复核、私有 checkpoint store、盲评协议与统计器也在同一受控调用链内通过后才能执行正式 API。
 
 ## 5. 评分与统计
@@ -81,7 +85,7 @@
 | P0 | 完成 Gold 人工裁决与双签 | 当前 5+ 仲裁包 | 任一包证据或签字链不闭合 |
 | P0 | 完成 formal input/spec 与结构 preflight | Signed Gold | 少于 30 事件/2 教师/3 seeds/multi-edit |
 | P0 | 冻结当前 Gold 账本 snapshot 与外部签名 registry | 结构 preflight | 账本漂移、历史缺失、签名/权限/内容地址不匹配 |
-| P0 | 字节级验证 static/uniform/oracle/语音账本 | 结构 preflight | hash、路径、解码、时间或来源不匹配 |
+| P0 | 字节级验证 source/static/uniform/oracle/语音账本 | 结构 preflight | hash、路径、真实解码、像素、时间、账本语义或来源不匹配 |
 | P0 | 内容寻址 checkpoint、锁、resume、私有权限 | 完整 schedule | spec 漂移、损坏 checkpoint、宽权限目录 |
 | P0 | 冻结双盲 rubric 与统计预注册 | 评分者确认 | rubric/统计规则仍可运行后修改 |
 | P0 | fake client 全链 dry-run | 上述全部 | 任何失败仍产生部分结果 |

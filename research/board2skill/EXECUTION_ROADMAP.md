@@ -14,6 +14,8 @@
 >
 > 2026-08-12 Formal Oracle 可信账本补充：已增加跨实例/进程全局锁、当前账本原子快照、完整历史 revision/signoff 字节树、Signed Gold 重编译比对、强制 Ed25519 的内容寻址 registry、追加式撤销，以及 callback 作用域的冻结不可序列化 capability。运行时信任只来自进程外 pinned registry SHA 与 trusted public keys，不信任 registry 自报身份；撤销检查与 callback 共用锁。该 capability 明确只表示 `ledger_attested_only`；媒体、语音、run store 和 API 四个 gate 仍为 false。正式 API 前还需外部单调/WORM 撤销 head，避免同 OS 权限下删除本地撤销历史；尚未生成任何正式结果。
 
+> 2026-08-12 Formal Oracle 媒体字节补充：已增加 strict `oracle-gate-byte-inventory-v1`、受控路径/单链接/O_NOFOLLOW/读取前后身份、来源 MP4 流式 SHA、ffprobe 元数据与冻结 ffmpeg 全流 decode、PNG/JPEG 真解码和 `oracle-rgba8-v1` 像素哈希。Whisper.cpp raw 现在必须逐字节重建 index/SRT/TXT/selected transcript；语音账本正文严格绑定 case/source/clip/五文件/segments，并由进程外 trusted reviewer key 做 canonical Ed25519 签名。任一后续 case 失败整批拒绝；输出仍为 `untrusted_media_bytes_valid`、`source_frame_derivation_verified=false`、`api_execution_allowed=false`。run/intents/attempt/commit/完整 checkpoint hash-chain/private-public blind contracts也已冻结，并拒绝 ambiguous 重试、attempt audit 重放、稀疏数组与大小写变形的私有值泄漏；但真实私有 run store、不可变工具执行副本与来源帧 PTS 派生证明仍未实现。
+
 ## 1. 项目决策
 
 本项目不把通用清板、遮挡恢复、写入/擦除检测或关键帧摘要作为论文中心贡献。论文候选主张是：
@@ -188,7 +190,7 @@ STOP    中心假设、数据许可或关键门槛失败，按预注册路线转
 | Human Gold review workflow | PASS as unsigned review infrastructure | `/api/gold-review` 与产品 `Gold 仲裁` 中心已统一载入 6 个包/52 组/54 个候选事件；379/379 份图像按冻结 hash 解码并全部展示，组决策 append-only、按包串行写入且父链可验。全组裁决后由视觉仲裁与物理复核两名不同人员双签；首次签字锁定决策，双签才正式冻结。当前无人工决策或签字，因此仅证明评审基础设施可用，不证明 Gold 已完成 |
 | Signed Gold compiler and single-lesson handoff | PASS as gated infrastructure | 只有 `paper_gold_ready` 后才可编译确定性 `signed-gold-dataset-v1`；输出位于内容寻址目录，运行时重新验证计数、双签身份、决策覆盖、真实 comparison 图与规范 payload hash。产品可从已编译数据集选择一节双签课进入真实多模态 Skill 蒸馏，视觉请求按精确证据 ID 审计。当前 0 个包双签，所以尚无正式 Signed Gold 文件、正式单课 Skill 或价值结论 |
 | Operation-gap scouting | PASS for human review intake | `kg005 2134–2166 s` 的初始 MODIFY 假设已被双标否定并转为困难负例；`kg003 4422–4428 s` 已形成严格 A/B2 ERASE 仲裁输入；`kg005 1888–1905 s` 已完成 A/B 与待签对齐。本地 ASR 已生成，三者均未进入 Gold |
-| Formal Oracle structural + ledger preflight | PASS through trusted-ledger stage only | 结构层已冻结 30–50 events、至少两位教师、ADD/ERASE/MODIFY/CONNECT、至少三 seeds、四臂视觉互斥与完整 schedule；可信账本层在全局锁内重编译当前 Signed Gold，覆盖 manifest、intake、全部历史 revision/signoff，并以外部 Ed25519 key 冻结内容寻址 registry。只借出 callback 作用域的 `ledger_attested_only` capability；真实媒体/ASR 字节 preflight、私有 run store、恢复与盲评统计尚未完成，因此 `api_execution_allowed=false` 且不能运行正式 API |
+| Formal Oracle structural + ledger + media byte preflight | PASS through untrusted media-byte implementation | 结构层冻结 30–50 events、至少两位教师、四种 operation、至少三 seeds 与完整 schedule；可信账本层重编译当前 Signed Gold 并由外部 Ed25519 registry 固定；媒体层真实读取、解码并闭合 source/static/uniform/oracle/ASR/签字 alignment ledger，失败不返回部分 case。该层尚未与外部 registry 组合签名，也未证明声明帧由源视频指定 PTS 自动派生；私有 run store、恢复、盲评统计和不可回滚外部撤销 head仍未完成，因此 `api_execution_allowed=false` |
 | Engineering Gold-dev compile | PASS for pipeline smoke only | 仅接受 B-DELTA-05、B-DELTA-06 两个 A/B 与语音一致的低争议事件；编译时间已冻结进仲裁台账，同一输入连续两次得到稳定 payload SHA-256 `266415d4f9d67d96b4d743140f6d162197454bf5cfdbf4d86ee18386e2f27f20`。编译器将状态帧生成真正的 before / 高亮 delta / after 三联图，并把未仲裁的 pedagogical role 清回 unknown；明确标记 `engineering_gold_dev_not_paper_gold` 与 `requires_human_signoff` |
 | Engineering Gold-dev v2 for Oracle smoke | PASS for wiring smoke only | 保持 v1 及 run-005 不变，另建不可变 v2，增加冻结的 90 s / 99 s 独立 Uniform 帧；payload SHA-256 `23e8ce456c302a82c0ad2dfd9c105943bc7f2f91288cac0acaba0d1dc3758b1f`。Static-Final 与 Uniform 不再复用同一帧，仍明确不是 paper Gold |
 | Grounded Skill distillation v2 | PASS first real single-lesson smoke | 已实现 renderer-neutral Board Action IR、独立 HTML/SVG/Ink Render Plan、源 transition/delta/evidence 约束、teacher replay 与设计动作分层、schema repair 和 v2 Skill builder。真实 `gpt-5.5` run-005 实际提交 2 张 1920×360 三联 montage，单次通过并生成 1 个 capability / 1 个 Skill，视觉 SHA、正常 stop 与 usage 均进入 audit。产物正确把实例系数 1.2 参数化为 λ、没有补写学生事实。该结果只证明闭环可运行，不构成 Oracle 价值门结果；跨课 temporal common 在多 bundle 契约完成前保持关闭 |
@@ -199,7 +201,7 @@ STOP    中心假设、数据许可或关键门槛失败，按预注册路线转
 
 1. 在产品 `Gold 仲裁` 中心对当前六个仲裁包的 52 个 review groups（54 个候选事件、379 份视觉证据）逐组裁决并执行包级签字；任何 proposal、单标或 Agent 对齐结果均保持 `needs_review`，不能用“候选数超过 50”冒充“50 条 Gold”；
 2. 对 `kg005 1888–1905 s` 的前两组显式裁决 `ERASE → ADD`，对右删失第三组保留 `unknown` 或由人审给出有证据的最终事件；随后只用真正签字的事件编译内容寻址 `signed-gold-dataset-v1`，再由其中的单课包进入时序多模态 Skill 蒸馏；当前 2 条工程 Gold-dev 只用于闭环测试；
-3. 先完成可信账本 attestation、冻结预注册、真实媒体/ASR 字节 preflight、私有 run store 与盲评统计；全部通过后才解除 `api_execution_allowed=false`，运行四条件 Oracle harness。所有结果继续保持 `TBD` 直到真实运行完成；
+3. 下一步先把当前 media/ASR byte preflight 组合进外部 attestation，并增加 source video→声明 PTS→static/uniform 帧的确定性派生证明；随后实现 `0700/0600` 私有内容寻址 run store、checkpoint/resume 与盲评统计。全部通过后才可能由独立执行 gate 解除 `api_execution_allowed=false`；所有结果继续保持 `TBD`；
 4. 并行把已冻结的 8 个问题家族写成 24 条受控 Tutor 场景及物理锚点，冻结 train/selection/locked-test manifest；
 5. 给当前 v1 分析增加显式 Observation adapter，禁止把学生预期回应写入观察层；
 6. Root 先验收 G0-A，再运行并验收 G0-B；只有 `PASS` 后，才派发 `packages/board-evidence` 的完整自动恢复实现。
