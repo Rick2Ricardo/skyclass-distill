@@ -12,10 +12,15 @@ import type {
   DistillMode,
   GroundedSkillDistillationSuite,
   GroundedSkillSourceCatalog,
+  SignedGoldDataset,
+  SignedGoldPackage,
 } from "../../contracts/src/index.js";
 import {
+  canonicalSignedGoldDatasetPayload,
   validateBoardEvidenceBundle,
   validateGroundedSkillDistillationSuite,
+  validateSignedGoldDataset,
+  validateSignedGoldRecordSignatures,
 } from "../../contracts/src/index.js";
 
 const MAX_VISUALS_PER_REQUEST = 4;
@@ -37,6 +42,12 @@ const GROUNDED_DISTILL_SYSTEM = `你是一名严格的课堂能力蒸馏器。�
 
 const GROUNDED_MERGE_SYSTEM = `你是一名严格的课堂能力蒸馏合并器。输入候选均来自成功提交真实 before/delta/after montage 后通过 schema 与来源校验的分批结果。
 把重复候选合并为 1–3 个 renderer-neutral Teaching Skills。不能增加候选中不存在的 transition_id、delta_id、evidence_id，也不能丢掉 teacher_replay / merged 动作与精确视觉 evidence 的绑定。HTML / SVG / Ink 只能出现在 Render Plan。教师单人网课不得补写学生事实。只输出严格 JSON。`;
+
+const SIGNED_GOLD_DISTILL_SYSTEM = `你是一名严格的课堂能力蒸馏器。输入来自已经完成视觉仲裁与物理复核双签的 Signed Gold 单课数据。
+每张 [VISUAL ...] 是一个人工接受组的规范 comparison 证据；同组 final_events 是可见板书事实，speech_context 只作未仲裁语境，不能覆盖视觉事实。
+生成 renderer-neutral Teaching Skill：Board Action IR 只写教学语义、参数化内容模板、空间约束与渐进呈现；HTML/SVG/Ink 只能出现在独立 Render Plan。
+teacher_replay 或 merged 动作必须引用本批真实 transition_id、delta_id 与实际提交的 visual evidence_id。不得补写学生反应、学习结果、原题固定答案或未签字的教学意图。证据不足时减少 Skill 或写 limitations。
+只输出严格 JSON，不要 Markdown。`;
 
 export interface GroundedSkillVisualEvidence {
   transition_ids: string[];
@@ -74,7 +85,7 @@ export interface GroundedSkillVisualAudit {
   schema_version: "grounded-skill-visual-audit-v1";
   source_bundle_id: string;
   evidence_package_sha256: string;
-  batching_rule: "accepted-delta-comparison-montage-max-4-and-20mb";
+  batching_rule: "accepted-delta-comparison-montage-max-4-and-20mb" | "signed-gold-group-comparison-max-4-and-20mb";
   batches: GroundedSkillVisualBatchAudit[];
   merge_requests: LlmRequestAudit[];
   submitted_visual_evidence_ids: string[];
@@ -235,14 +246,14 @@ function evidenceForPrompt(bundle: BoardEvidenceBundle, catalog: GroundedSkillSo
   };
 }
 
-function suiteShape(subject: string, bundle: BoardEvidenceBundle): string {
+function suiteShape(subject: string, sourceBundleId: string, teacherOnlyRecording: boolean): string {
   return `{
   "schema_version":"grounded-skill-distillation-v2",
   "suite_name":"...",
   "subject":"${subject}",
-  "source_bundle_id":"${bundle.bundle_id}",
+  "source_bundle_id":"${sourceBundleId}",
   "renderer_neutral":true,
-  "teacher_only_recording":${bundle.teacher_only_recording},
+  "teacher_only_recording":${teacherOnlyRecording},
   "capabilities":[{
     "key":"english-kebab-case","name":"...","summary":"...","teaching_goal":"...","mechanism":"...",
     "use_when":["未来使用时可观察的条件"],"prerequisites":["..."],
@@ -285,7 +296,7 @@ function promptForGroundedSkills(input: {
   const prompt = `输出 1–3 个候选 Skill。学科：${input.subject}。
 
 严格输出以下结构，不能增加字段：
-${suiteShape(input.subject, input.bundle)}
+${suiteShape(input.subject, input.bundle.bundle_id, input.bundle.teacher_only_recording)}
 
 本批实际提交视觉索引：
 ${JSON.stringify(visualIndex)}
@@ -298,14 +309,15 @@ ${JSON.stringify(evidenceForPrompt(input.bundle, input.catalog))}${repair}`;
 
 function mergePrompt(input: {
   subject: string;
-  bundle: BoardEvidenceBundle;
+  sourceBundleId: string;
+  teacherOnlyRecording: boolean;
   candidates: GroundedSkillDistillationSuite[];
   priorErrors: string[];
 }): string {
   const repair = input.priorErrors.length
     ? `\n\n上一次合并未通过校验，请只修复：\n${input.priorErrors.map((item) => `- ${item}`).join("\n")}`
     : "";
-  const prompt = `合并为 1–3 个候选 Skill。输出结构：\n${suiteShape(input.subject, input.bundle)}\n\n已经过视觉验证的分批候选：\n${JSON.stringify(input.candidates)}${repair}`;
+  const prompt = `合并为 1–3 个候选 Skill。输出结构：\n${suiteShape(input.subject, input.sourceBundleId, input.teacherOnlyRecording)}\n\n已经过视觉验证的分批候选：\n${JSON.stringify(input.candidates)}${repair}`;
   if (prompt.length > MAX_PROMPT_CHARS) throw new Error(`Grounded Skill 合并提示超过 ${MAX_PROMPT_CHARS} 字符预算`);
   return prompt;
 }
@@ -346,6 +358,246 @@ async function generateValidatedSuite(input: {
     priorErrors = errors;
   }
   throw new Error(`grounded-skill-distillation-v2 连续校验失败：${priorErrors.join("；")}`);
+}
+
+function signedSourceBundleId(dataset: SignedGoldDataset, source: SignedGoldPackage): string {
+  return `signed-gold:${dataset.dataset_id}:${source.package_id}`;
+}
+
+function signedTransitionId(source: SignedGoldPackage, groupId: string): string {
+  return `gold-transition:${source.package_id}:${groupId}`;
+}
+
+function signedDeltaId(source: SignedGoldPackage, groupId: string): string {
+  return `gold-delta:${source.package_id}:${groupId}`;
+}
+
+function signedEvidenceId(source: SignedGoldPackage, groupId: string, evidenceId: string): string {
+  return `gold-evidence:${source.package_id}:${groupId}:${evidenceId}`;
+}
+
+function buildSignedGoldSourceCatalog(
+  dataset: SignedGoldDataset,
+  source: SignedGoldPackage,
+  options: { transitionIds?: Set<string>; submittedVisualEvidenceIds?: Iterable<string> } = {},
+): GroundedSkillSourceCatalog {
+  const sourceBundleId = signedSourceBundleId(dataset, source);
+  const acceptedTransitions = source.groups.map((group) => {
+    const transitionId = signedTransitionId(source, group.group_id);
+    const deltaId = signedDeltaId(source, group.group_id);
+    const evidenceId = signedEvidenceId(source, group.group_id, group.canonical_visual_evidence_id);
+    return {
+      transition_id: transitionId,
+      delta_ids: [deltaId],
+      evidence_refs: [evidenceId],
+      visual_evidence_by_delta: { [deltaId]: [evidenceId] },
+    };
+  }).filter((item) => !options.transitionIds || options.transitionIds.has(item.transition_id));
+  return {
+    source_bundle_id: sourceBundleId,
+    teacher_only_recording: true,
+    accepted_transitions: acceptedTransitions,
+    evidence_ids: stableUnique(acceptedTransitions.flatMap((item) => item.evidence_refs)),
+    submitted_visual_evidence_ids: stableUnique([...(options.submittedVisualEvidenceIds ?? [])]),
+  };
+}
+
+async function prepareSignedGoldVisualEvidence(
+  root: string,
+  source: SignedGoldPackage,
+): Promise<GroundedSkillVisualEvidence[]> {
+  const output: GroundedSkillVisualEvidence[] = [];
+  const seenSha = new Map<string, string>();
+  for (const group of [...source.groups].sort((left, right) => left.group_id.localeCompare(right.group_id, "en"))) {
+    const canonical = group.visual_evidence.find((item) => item.evidence_id === group.canonical_visual_evidence_id);
+    if (!canonical || !canonical.kind.toLowerCase().includes("comparison")) {
+      throw new Error(`Signed Gold 组缺少规范 comparison 证据：${source.package_id}/${group.group_id}`);
+    }
+    const verified = await verifyImageEvidence({ root, assetUri: canonical.asset_uri, expectedSha256: canonical.sha256 });
+    if (verified.mime_type !== canonical.mime_type || verified.width !== canonical.width || verified.height !== canonical.height || verified.byte_length !== canonical.byte_length) {
+      throw new Error(`Signed Gold 视觉元数据与实际文件不一致：${source.package_id}/${group.group_id}`);
+    }
+    const previous = seenSha.get(verified.sha256);
+    if (previous) throw new Error(`不同 Signed Gold 组不得共享同一规范视觉证据：${previous}/${group.group_id}`);
+    seenSha.set(verified.sha256, group.group_id);
+    const transitionId = signedTransitionId(source, group.group_id);
+    const deltaId = signedDeltaId(source, group.group_id);
+    const evidenceId = signedEvidenceId(source, group.group_id, canonical.evidence_id);
+    const label = `transition_id=${transitionId} delta_id=${deltaId} evidence_ids=${evidenceId}`;
+    output.push({
+      transition_ids: [transitionId],
+      delta_id: deltaId,
+      evidence_ids: [evidenceId],
+      asset_uri: canonical.asset_uri,
+      sha256: verified.sha256,
+      label,
+      width: verified.width,
+      height: verified.height,
+      byte_length: verified.byte_length,
+      image: { label, bytes: verified.bytes, mime_type: verified.mime_type, sha256: verified.sha256 },
+    });
+  }
+  if (!output.length) throw new Error(`Signed Gold 单课没有可蒸馏的接受组：${source.package_id}`);
+  return output;
+}
+
+function promptForSignedGold(input: {
+  subject: string;
+  dataset: SignedGoldDataset;
+  source: SignedGoldPackage;
+  catalog: GroundedSkillSourceCatalog;
+  visuals: GroundedSkillVisualEvidence[];
+  priorErrors: string[];
+}): string {
+  const transitionIds = new Set(input.catalog.accepted_transitions.map((item) => item.transition_id));
+  const groups = input.source.groups.filter((group) => transitionIds.has(signedTransitionId(input.source, group.group_id))).map((group) => ({
+    group_id: group.group_id,
+    transition_id: signedTransitionId(input.source, group.group_id),
+    delta_id: signedDeltaId(input.source, group.group_id),
+    decision_signature_sha256: group.decision_signature_sha256,
+    final_events: group.final_events,
+    canonical_visual_evidence_id: signedEvidenceId(input.source, group.group_id, group.canonical_visual_evidence_id),
+    speech_context: group.speech_context,
+  }));
+  const visualIndex = input.visuals.map((visual) => ({
+    label: visual.label,
+    transition_ids: visual.transition_ids,
+    delta_id: visual.delta_id,
+    evidence_ids: visual.evidence_ids,
+    comparison_asset_sha256: visual.sha256,
+  }));
+  const repair = input.priorErrors.length
+    ? `\n\n上一次输出未通过校验，请只修复这些问题：\n${input.priorErrors.map((item) => `- ${item}`).join("\n")}`
+    : "";
+  const prompt = `输出 1–3 个本课可迁移候选 Skill。学科：${input.subject}。
+
+严格输出以下结构，不能增加字段：
+${suiteShape(input.subject, signedSourceBundleId(input.dataset, input.source), true)}
+
+本批实际提交视觉索引：
+${JSON.stringify(visualIndex)}
+
+双签 Signed Gold 事件（speech_context.status=context_not_gold，不得冒充可见事实）：
+${JSON.stringify({ dataset_id: input.dataset.dataset_id, package_id: input.source.package_id, source_video_id: input.source.source_video_id, groups })}${repair}`;
+  if (prompt.length > MAX_PROMPT_CHARS) throw new Error(`Signed Gold Skill 批提示超过 ${MAX_PROMPT_CHARS} 字符预算`);
+  return prompt;
+}
+
+export async function distillSignedGoldLesson(
+  client: GroundedDistillationClient,
+  input: {
+    subject: string;
+    dataset: SignedGoldDataset;
+    evidenceRoot: string;
+    sourceVideoId: string;
+    mode: DistillMode;
+    validationAttempts?: number;
+  },
+): Promise<GroundedSkillDistillationResult> {
+  if (input.mode !== "single") throw new Error("Signed Gold 首批入口仅支持单课蒸馏；多教师共性融合必须走后续独立 gate。");
+  const datasetReport = validateSignedGoldDataset(input.dataset);
+  if (!datasetReport.valid) throw new Error(`Signed Gold 数据集校验失败：${datasetReport.issues.slice(0, 6).map((item) => `${item.path} ${item.message}`).join("；")}`);
+  const signatureIssues = validateSignedGoldRecordSignatures(input.dataset, (payload) => createHash("sha256").update(payload).digest("hex"));
+  if (signatureIssues.length) throw new Error(`Signed Gold 签字链校验失败：${signatureIssues.slice(0, 6).map((item) => `${item.path} ${item.message}`).join("；")}`);
+  const declaredSha = input.dataset.dataset_sha256;
+  const actualSha = createHash("sha256").update(canonicalSignedGoldDatasetPayload(input.dataset)).digest("hex");
+  if (actualSha !== declaredSha || input.dataset.dataset_id !== `signed-gold-${declaredSha.slice(0, 16)}`) {
+    throw new Error("Signed Gold 数据集内容哈希不匹配");
+  }
+  const matches = input.dataset.packages.filter((item) => item.source_video_id === input.sourceVideoId);
+  if (matches.length !== 1) throw new Error(`Signed Gold 必须恰好包含一个所选单课包：${input.sourceVideoId}`);
+  const source = matches[0];
+  if (source.signoffs.length !== 2 || !source.groups.length || source.accepted_event_count < 1) throw new Error("Signed Gold 单课包缺少双签或接受事件");
+  const attempts = Math.min(3, Math.max(1, input.validationAttempts ?? 2));
+  const visuals = await prepareSignedGoldVisualEvidence(input.evidenceRoot, source);
+  const batches = batchGroundedVisualEvidence(visuals);
+  const candidates: GroundedSkillDistillationSuite[] = [];
+  const batchAudits: GroundedSkillVisualBatchAudit[] = [];
+  const submittedEvidence = new Set<string>();
+  for (const [index, batch] of batches.entries()) {
+    const transitionIds = new Set(batch.flatMap((item) => item.transition_ids));
+    const batchEvidence = stableUnique(batch.flatMap((item) => item.evidence_ids));
+    const catalog = buildSignedGoldSourceCatalog(input.dataset, source, { transitionIds, submittedVisualEvidenceIds: batchEvidence });
+    const requests: LlmRequestAudit[] = [];
+    const prompt = (priorErrors: string[]) => promptForSignedGold({
+      subject: input.subject,
+      dataset: input.dataset,
+      source,
+      catalog,
+      visuals: batch,
+      priorErrors,
+    });
+    const suite = await generateValidatedSuite({
+      client,
+      system: SIGNED_GOLD_DISTILL_SYSTEM,
+      prompt,
+      images: batch.map((item) => item.image),
+      visuals: batch,
+      subject: input.subject,
+      catalog,
+      attempts,
+      requestAudits: requests,
+    });
+    batchEvidence.forEach((item) => submittedEvidence.add(item));
+    candidates.push(suite);
+    batchAudits.push({
+      batch_id: `signed-gold-batch-${String(index + 1).padStart(3, "0")}`,
+      transition_ids: stableUnique(batch.flatMap((item) => item.transition_ids)),
+      delta_ids: batch.map((item) => item.delta_id),
+      evidence_ids: batchEvidence,
+      visual_set_sha256: sha256(batch.map((item) => ({ label: item.label, sha256: item.sha256 }))),
+      prompt_char_count: prompt([]).length,
+      visuals: batch.map((item) => ({
+        delta_id: item.delta_id,
+        evidence_ids: item.evidence_ids,
+        asset_uri: item.asset_uri,
+        sha256: item.sha256,
+        width: item.width,
+        height: item.height,
+        byte_length: item.byte_length,
+      })),
+      requests,
+    });
+  }
+  const sourceCatalog = buildSignedGoldSourceCatalog(input.dataset, source, { submittedVisualEvidenceIds: submittedEvidence });
+  let suite = candidates[0];
+  let mergeRequests: LlmRequestAudit[] = [];
+  if (candidates.length > 1) {
+    const requests: LlmRequestAudit[] = [];
+    suite = await generateValidatedSuite({
+      client,
+      system: GROUNDED_MERGE_SYSTEM,
+      prompt: (priorErrors) => mergePrompt({
+        subject: input.subject,
+        sourceBundleId: sourceCatalog.source_bundle_id,
+        teacherOnlyRecording: true,
+        candidates,
+        priorErrors,
+      }),
+      images: [],
+      visuals: [],
+      subject: input.subject,
+      catalog: sourceCatalog,
+      attempts,
+      requestAudits: requests,
+    });
+    mergeRequests = requests;
+  }
+  return {
+    suite,
+    source_catalog: sourceCatalog,
+    visual_audit: {
+      schema_version: "grounded-skill-visual-audit-v1",
+      source_bundle_id: sourceCatalog.source_bundle_id,
+      evidence_package_sha256: input.dataset.dataset_sha256,
+      batching_rule: "signed-gold-group-comparison-max-4-and-20mb",
+      batches: batchAudits,
+      merge_requests: mergeRequests,
+      submitted_visual_evidence_ids: stableUnique([...submittedEvidence]),
+      submitted_delta_ids: visuals.map((item) => item.delta_id),
+      all_visual_batches_succeeded: true,
+    },
+  };
 }
 
 export async function distillGroundedSkills(
@@ -431,7 +683,7 @@ export async function distillGroundedSkills(
     suite = await generateValidatedSuite({
       client,
       system: GROUNDED_MERGE_SYSTEM,
-      prompt: (priorErrors) => mergePrompt({ subject: input.subject, bundle: input.bundle, candidates: candidateSuites, priorErrors }),
+      prompt: (priorErrors) => mergePrompt({ subject: input.subject, sourceBundleId: input.bundle.bundle_id, teacherOnlyRecording: input.bundle.teacher_only_recording, candidates: candidateSuites, priorErrors }),
       images: [],
       visuals: [],
       subject: input.subject,

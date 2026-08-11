@@ -395,6 +395,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 
 .gold-review-stack { display: grid; gap: 18px; }
 .gold-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.gold-compile-bar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 17px 19px; }.gold-compile-bar.ready { background: #eff8d4; border-color: #ccdc98; }.gold-compile-bar b, .gold-compile-bar small { display: block; }.gold-compile-bar b { margin-top: 4px; font-size: 11px; }.gold-compile-bar small { margin-top: 5px; color: var(--muted); font: 8px/1.4 ui-monospace, monospace; }.gold-compile-actions { display: flex; gap: 7px; }.gold-compile-actions button { min-width: 185px; }
 .gold-package-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; padding: 5px; background: #dcdbd1; border: 1px solid #ceccc1; border-radius: 13px; }
 .gold-package-tabs button { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 9px; align-items: center; padding: 12px; text-align: left; color: #686d62; background: transparent; border: 0; border-radius: 9px; }
 .gold-package-tabs button.active { color: var(--ink); background: #fffefa; box-shadow: 0 3px 10px rgba(35,38,30,.08); }
@@ -492,6 +493,7 @@ button:disabled { cursor: not-allowed; opacity: .48; }
   .gold-review-layout, .gold-detail-grid { grid-template-columns: 1fr; }
   .gold-group-list { position: static; max-height: none; }
   .gold-package-tabs, .gold-evidence-grid { grid-template-columns: 1fr 1fr; }
+  .gold-compile-bar, .gold-compile-actions { align-items: stretch; flex-direction: column; }.gold-compile-actions button { width: 100%; }
 }
 
 @media (max-width: 560px) {

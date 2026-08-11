@@ -15,6 +15,7 @@ import type {
   JobState,
   Project,
   RuntimeSettings,
+  SignedGoldCompileResult,
   Skill,
   SkillDetail,
   TeachingArtifact,
@@ -187,7 +188,7 @@ function App() {
     />
     : view === "overview" ? <Overview project={project} videos={videos} skills={skills} jobs={projectJobs} datasets={datasets} runs={experimentRuns} onNavigate={setView} onCreate={() => setProjectDialog(true)} />
     : view === "evidence" ? <EvidenceWorkspace project={project!} videos={videos} onCreated={async (job) => { setJobs((items) => [job, ...items]); flash("素材任务已开始"); }} flash={flash} />
-    : view === "gold" ? <GoldReviewCenter flash={flash} />
+    : view === "gold" ? <GoldReviewCenter flash={flash} projectId={projectId} />
     : view === "skills" ? <SkillWorkshop project={project!} videos={videos} skills={skills} onCreated={async (job) => { setJobs((items) => [job, ...items]); flash("蒸馏任务已开始"); }} onOpen={openSkill} onRefresh={refreshAll} flash={flash} />
     : <EvaluationCenter project={project!} datasets={datasets} runs={experimentRuns} onRun={loadProjectData} />;
 
@@ -910,7 +911,7 @@ function LearningCheck({ value, compact = false }: { value?: string; compact?: b
   return <div className={compact ? "small-check" : "learning-check"}>{compact ? <b>检查</b> : <span>轮到你了</span>}<Markdown>{prompt}</Markdown></div>;
 }
 
-function GoldReviewCenter({ flash }: { flash: (message: string, error?: boolean) => void }) {
+function GoldReviewCenter({ flash, projectId }: { flash: (message: string, error?: boolean) => void; projectId: string }) {
   const [queue, setQueue] = useState<GoldReviewQueue | null>(null);
   const [packageId, setPackageId] = useState("");
   const [groupId, setGroupId] = useState("");
@@ -922,6 +923,7 @@ function GoldReviewCenter({ flash }: { flash: (message: string, error?: boolean)
   const [rationale, setRationale] = useState("");
   const [signoffStatement, setSignoffStatement] = useState("我确认本包全部 review groups 已逐项核对，决策与可见证据一致，可以冻结当前版本。");
   const [signoffRole, setSignoffRole] = useState<"visual_adjudicator" | "physics_reviewer">("visual_adjudicator");
+  const [compiledDataset, setCompiledDataset] = useState<SignedGoldCompileResult | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -1011,6 +1013,30 @@ function GoldReviewCenter({ flash }: { flash: (message: string, error?: boolean)
     finally { setBusy(false); }
   }
 
+  async function compileGold(): Promise<void> {
+    if (!queue?.summary.paper_gold_ready || !window.confirm("确认将当前全部双签包编译为不可变 Signed Gold 数据集？")) return;
+    setBusy(true);
+    try {
+      const result = await api<SignedGoldCompileResult>("/api/gold-review/compile", { method: "POST" });
+      setCompiledDataset(result);
+      flash(`Signed Gold 已冻结：${result.dataset.dataset_id}`);
+    } catch (cause) { flash(cause instanceof Error ? cause.message : String(cause), true); }
+    finally { setBusy(false); }
+  }
+
+  async function distillSignedLesson(): Promise<void> {
+    if (!compiledDataset || !activePackage || !projectId) return;
+    setBusy(true);
+    try {
+      const job = await api<JobState>(`/api/projects/${projectId}/distill-signed-gold`, {
+        method: "POST",
+        body: JSON.stringify({ dataset_uri: compiledDataset.dataset_uri, source_video_id: activePackage.source_video_id }),
+      });
+      flash(`Signed Gold 单课蒸馏已启动：${job.id}`);
+    } catch (cause) { flash(cause instanceof Error ? cause.message : String(cause), true); }
+    finally { setBusy(false); }
+  }
+
   if (!queue) return <div className="agent-running"><span className="pulse" /><div><b>正在建立 Gold 评审队列</b><small>校验 5 个 A/B 仲裁包与当前决策账本…</small></div></div>;
   if (!activePackage || !activeGroup) return <Blank title="暂无待审 Gold 数据" text="先完成独立 A/B 标注与对齐，再进入人工仲裁。" />;
 
@@ -1021,6 +1047,11 @@ function GoldReviewCenter({ flash }: { flash: (message: string, error?: boolean)
       <Metric value={queue.summary.decided_count} label="已裁决" note={`剩余 ${queue.summary.group_count - queue.summary.decided_count}`} />
       <Metric value={queue.summary.accepted_event_count} label="接受事件" note={`正式门槛至少 ${queue.summary.minimum_required_event_count}`} />
       <Metric value={queue.summary.signed_package_count} label="已冻结包" note={queue.summary.paper_gold_ready ? "Paper Gold 可编译" : "不得冒充 Gold"} accent={queue.summary.paper_gold_ready} />
+    </section>
+
+    <section className={`gold-compile-bar paper-panel ${queue.summary.paper_gold_ready ? "ready" : ""}`}>
+      <div><p className="eyebrow">SIGNED GOLD DATASET</p><b>{compiledDataset ? compiledDataset.dataset.dataset_id : queue.summary.paper_gold_ready ? "双签门已通过，可以冻结数据集" : "等待 49 组裁决、5 包双签与至少 30 个接受事件"}</b>{compiledDataset && <small>{compiledDataset.dataset_uri} · {compiledDataset.dataset.dataset_sha256.slice(0, 16)}</small>}</div>
+      <div className="gold-compile-actions"><button className="primary" disabled={busy || !queue.summary.paper_gold_ready} onClick={() => void compileGold()}>{busy ? "正在处理…" : compiledDataset ? "重新验证同一内容地址" : "编译不可变 Signed Gold"}</button><button className="secondary" disabled={busy || !compiledDataset || !projectId || !activePackage.fully_signed} onClick={() => void distillSignedLesson()}>蒸馏当前双签单课</button></div>
     </section>
 
     <div className="gold-package-tabs">{queue.packages.map((item) => <button key={item.package_id} className={item.package_id === activePackage.package_id ? "active" : ""} onClick={() => { setPackageId(item.package_id); setGroupId(""); }}>

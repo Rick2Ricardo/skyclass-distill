@@ -184,6 +184,11 @@ app.post("/api/gold-review/package-signoffs", async (request, reply) => {
   try { return await goldReviews.signPackage(bodyOf(request) as unknown as GoldReviewPackageSignoffInput); }
   catch (error) { return httpError(reply, error); }
 });
+
+app.post("/api/gold-review/compile", async (_request, reply) => {
+  try { return await goldReviews.compileDataset(); }
+  catch (error) { return httpError(reply, error); }
+});
 app.post("/api/discover", async (request, reply) => {
   try {
     const body = bodyOf(request);
@@ -366,6 +371,16 @@ app.post("/api/projects/:id/distill", async (request, reply): Promise<JobState |
       mode: body.mode === "common" ? "common" : "single",
       modality: body.modality === "multimodal" ? "multimodal" : "text",
       evidence_mode: body.evidence_mode === "temporal_board" ? "temporal_board" : body.evidence_mode === "static_frames" || body.modality === "multimodal" ? "static_frames" : "text",
+    });
+  } catch (error) { return httpError(reply, error); }
+});
+
+app.post("/api/projects/:id/distill-signed-gold", async (request, reply): Promise<JobState | unknown> => {
+  try {
+    const body = bodyOf(request);
+    return await pipeline.createSignedGoldDistill(paramsOf<{ id: string }>(request).id, {
+      dataset_uri: String(body.dataset_uri || ""),
+      source_video_id: String(body.source_video_id || ""),
     });
   } catch (error) { return httpError(reply, error); }
 });

@@ -2,9 +2,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { basename, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import type { BoardEvidenceBundle, CourseItem, DistillMode, EvidenceMode, JobState, Modality, Project, Skill, VideoAsset } from "../../contracts/src/index.js";
-import { canonicalBoardEvidencePayload, validateBoardEvidenceBundle } from "../../contracts/src/index.js";
-import { analyzeLesson, attachFramePaths, distillGroundedSkills, distillSkills } from "../../distillation/src/index.js";
+import type { BoardEvidenceBundle, CourseItem, DistillMode, EvidenceMode, JobState, Modality, Project, SignedGoldDataset, Skill, VideoAsset } from "../../contracts/src/index.js";
+import { canonicalBoardEvidencePayload, canonicalSignedGoldDatasetPayload, validateBoardEvidenceBundle, validateSignedGoldDataset, validateSignedGoldRecordSignatures } from "../../contracts/src/index.js";
+import { analyzeLesson, attachFramePaths, distillGroundedSkills, distillSignedGoldLesson, distillSkills } from "../../distillation/src/index.js";
 import { LlmClient } from "../../llm/src/client.js";
 import { discoverSource, downloadVideo, extractAudio, extractFrames, mediaDuration, safeUploadName } from "../../media/src/tools.js";
 import { transcribeAudio, type Transcript } from "../../media/src/transcribe.js";
@@ -12,6 +12,8 @@ import type { PrivateSettings, SettingsStore } from "../../runtime-config/src/se
 import { buildSkillSuite } from "../../skills/src/builder.js";
 import { JobStore } from "../../store/src/jobStore.js";
 import { LibraryStore } from "../../store/src/libraryStore.js";
+import { GoldReviewStore } from "../../store/src/goldReviewStore.js";
+import { buildSignedGoldDataset } from "../../store/src/signedGoldCompiler.js";
 import { ensureDir, readJson } from "../../store/src/fileStore.js";
 
 interface IngestRequest { source_url: string; limit: number; upload_id?: string; language?: string; whisper_model?: string }
@@ -22,6 +24,7 @@ interface DistillRequest {
   evidence_mode?: EvidenceMode;
   board_bundle_uri?: string;
 }
+interface SignedGoldDistillRequest { dataset_uri: string; source_video_id: string }
 
 function controlledRelativeUri(value: string): string | null {
   if (!value || value.trim() !== value || value.includes("\\") || value.includes("\0") || isAbsolute(value)) return null;
@@ -160,6 +163,29 @@ export class PipelineEngine {
     return job;
   }
 
+  async createSignedGoldDistill(projectId: string, request: SignedGoldDistillRequest): Promise<JobState> {
+    await this.library.getProject(projectId);
+    const loaded = await this.loadSignedGoldDataset(request.dataset_uri);
+    if (loaded.dataset.packages.filter((item) => item.source_video_id === request.source_video_id).length !== 1) {
+      throw new Error("Signed Gold 数据集不包含唯一的所选单课包");
+    }
+    const normalized: SignedGoldDistillRequest = { dataset_uri: loaded.uri, source_video_id: request.source_video_id };
+    const job = await this.jobs.create({
+      kind: "distill",
+      project_id: projectId,
+      video_ids: [request.source_video_id],
+      distill_mode: "single",
+      distill_modality: "multimodal",
+      evidence_mode: "temporal_board",
+      board_bundle_uri: loaded.uri,
+      board_bundle_schema_version: loaded.dataset.schema_version,
+      request: normalized as unknown as Record<string, unknown>,
+    });
+    await this.jobs.event(job, "Signed Gold 单课蒸馏任务已创建 · 双签证据 · TypeScript Pipeline");
+    this.start(job.id, () => this.runSignedGoldDistill(job.id, normalized));
+    return job;
+  }
+
   private async loadBoardBundle(uri: string | undefined, allowAbsolute = false, expectedVideo?: VideoAsset): Promise<{ uri: string; path: string; bundle: BoardEvidenceBundle }> {
     if (!uri) throw new Error("时序板书蒸馏需要已仲裁的 board_bundle_json");
     const controlled = isAbsolute(uri) && allowAbsolute ? uri : controlledRelativeUri(uri);
@@ -182,6 +208,37 @@ export class PipelineEngine {
       if (await sha256File(videoPath) !== bundle.source.video.sha256) throw new Error("BoardEvidenceBundle 与所选课堂的视频 SHA-256 不匹配");
     }
     return { uri: relative(dataRoot, resolvedPath).split(sep).join("/"), path: resolvedPath, bundle };
+  }
+
+  private async loadSignedGoldDataset(uri: string): Promise<{ uri: string; path: string; dataset: SignedGoldDataset }> {
+    const controlled = controlledRelativeUri(uri);
+    if (!controlled) throw new Error("signed_gold_dataset_uri 必须是数据目录内的受控相对路径");
+    const dataRoot = await realpath(this.dataDir).catch(() => resolve(this.dataDir));
+    const candidate = resolve(join(this.dataDir, controlled));
+    if (!inside(resolve(this.dataDir), candidate)) throw new Error("signed_gold_dataset_uri 超出数据目录");
+    const resolvedPath = await realpath(candidate).catch(() => { throw new Error("Signed Gold 数据集不存在"); });
+    if (!inside(dataRoot, resolvedPath)) throw new Error("signed_gold_dataset_uri 超出数据目录");
+    const dataset = await readJson<SignedGoldDataset>(resolvedPath);
+    const report = validateSignedGoldDataset(dataset);
+    if (!report.valid) throw new Error(`Signed Gold 数据集校验失败：${report.issues.slice(0, 6).map((item) => `${item.path} ${item.message}`).join("；")}`);
+    const signatureIssues = validateSignedGoldRecordSignatures(dataset, (payload) => createHash("sha256").update(payload).digest("hex"));
+    if (signatureIssues.length) throw new Error(`Signed Gold 签字链校验失败：${signatureIssues.slice(0, 6).map((item) => `${item.path} ${item.message}`).join("；")}`);
+    const actualHash = createHash("sha256").update(canonicalSignedGoldDatasetPayload(dataset)).digest("hex");
+    if (dataset.dataset_sha256 !== actualHash || dataset.dataset_id !== `signed-gold-${actualHash.slice(0, 16)}`) throw new Error("Signed Gold 数据集内容哈希不匹配");
+    const relativeUri = relative(dataRoot, resolvedPath).split(sep).join("/");
+    const expectedUri = `board2skill/signed-gold/${dataset.dataset_sha256}/dataset.json`;
+    if (relativeUri !== expectedUri) throw new Error("Signed Gold 数据集必须来自内容寻址编译目录");
+    let current: SignedGoldDataset;
+    try {
+      const queue = await new GoldReviewStore(this.root, this.dataDir).queue();
+      current = await buildSignedGoldDataset(this.root, queue);
+    } catch (error) {
+      throw new Error(`Signed Gold 数据集无法由当前人工评审账本重新编译：${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (current.dataset_sha256 !== dataset.dataset_sha256 || canonicalSignedGoldDatasetPayload(current) !== canonicalSignedGoldDatasetPayload(dataset)) {
+      throw new Error("Signed Gold 数据集与当前 append-only 人工评审账本不一致");
+    }
+    return { uri: relativeUri, path: resolvedPath, dataset };
   }
 
   private start(jobId: string, task: () => Promise<void>): void {
@@ -383,6 +440,64 @@ export class PipelineEngine {
     job.stage = "completed";
     job.progress = 1;
     await this.jobs.event(job, `Skill 蒸馏完成 · ${skills.length} 个能力`, "success");
+  }
+
+  private async runSignedGoldDistill(jobId: string, request: SignedGoldDistillRequest): Promise<void> {
+    const job = await this.jobs.get(jobId);
+    const project = await this.library.getProject(String(job.project_id));
+    const settings = await this.settings.private();
+    const client = this.client(settings);
+    if (!client.configured) throw new Error("LLM API 尚未配置");
+    const loaded = await this.loadSignedGoldDataset(request.dataset_uri);
+    await this.jobs.stage(job, "evidence", .14, "正在复核 Signed Gold 内容地址与规范视觉证据");
+    jobCancelled(job);
+    await this.jobs.stage(job, "distill", .48, "正在从双签单课事件蒸馏 renderer-neutral Board Actions");
+    const grounded = await distillSignedGoldLesson(client, {
+      subject: project.subject,
+      dataset: loaded.dataset,
+      evidenceRoot: this.root,
+      sourceVideoId: request.source_video_id,
+      mode: "single",
+    });
+    await this.jobs.stage(job, "compile", .84, "正在编译 Signed Gold Board Actions 与 Render Plans");
+    const outputRoot = join(this.dataDir, "projects", project.id, "skills", job.id);
+    const skills = await buildSkillSuite({
+      suite: grounded.suite as unknown as Record<string, unknown>,
+      outputRoot,
+      subject: project.subject,
+      groundedSourceCatalog: grounded.source_catalog,
+      provenance: {
+        job_id: job.id,
+        project_id: project.id,
+        video_ids: [request.source_video_id],
+        mode: "single",
+        modality: "multimodal",
+        evidence_mode: "temporal_board",
+        signed_gold_dataset_uri: loaded.uri,
+        signed_gold_dataset_id: loaded.dataset.dataset_id,
+        signed_gold_dataset_sha256: loaded.dataset.dataset_sha256,
+        signed_gold_source_video_id: request.source_video_id,
+        model: settings.llm_model,
+        schema_version: "grounded-skill-distillation-v2",
+        visual_audit_schema_version: grounded.visual_audit.schema_version,
+        submitted_visual_evidence_ids: grounded.visual_audit.submitted_visual_evidence_ids,
+        submitted_delta_ids: grounded.visual_audit.submitted_delta_ids,
+      },
+    });
+    job.artifacts = {
+      ...(job.artifacts ?? {}),
+      skills_dir: outputRoot,
+      skills,
+      suite: grounded.suite,
+      visual_audit: grounded.visual_audit,
+      signed_gold_dataset_uri: loaded.uri,
+      signed_gold_dataset_id: loaded.dataset.dataset_id,
+      signed_gold_source_video_id: request.source_video_id,
+    };
+    job.status = "completed";
+    job.stage = "completed";
+    job.progress = 1;
+    await this.jobs.event(job, `Signed Gold 单课闭环完成 · ${skills.length} 个能力`, "success");
   }
 
   async deleteProject(projectId: string, permanent = false): Promise<Record<string, unknown>> {

@@ -303,4 +303,85 @@ describe("GoldReviewStore", () => {
     await symlink(outside, intakePath);
     await expect(store.queue()).rejects.toThrow("真实路径越界");
   });
+
+  it("fails closed when compiling an unsigned or undersized Paper Gold queue", async () => {
+    const { store } = await fixture();
+    await expect(store.compileDataset()).rejects.toThrow("Paper Gold 尚未满足");
+  });
+
+  it("compiles a fully signed 30-event queue into one deterministic content-addressed dataset", async () => {
+    const { data, store, intakePath } = await fixture();
+    const intake = JSON.parse(await readFile(intakePath, "utf8"));
+    intake.items[0].proposal.candidate_events = Array.from({ length: 30 }, (_, index) => ({
+      candidate_id: `G01-C${index + 1}`,
+      source_event_refs: ["a-1", "b-1"],
+      operation: "add",
+      time: { start: 10, end: 12 },
+      semantic_label: `新增可见箭头 ${index + 1}`,
+    }));
+    await writeFile(intakePath, JSON.stringify(intake));
+    const queue = await store.queue();
+    const selected = queue.groups[0].candidates.map((item) => item.candidate_id);
+    await store.decide({
+      package_id: "package-1", group_id: "G01", disposition: "accept", selected_candidate_ids: selected,
+      adjudicator_id: "expert-1", adjudicator_role: "visual-reviewer", rationale: "三十个事件均有同组视觉证据并逐项确认。",
+    });
+    await store.signPackage({
+      package_id: "package-1", signoff_role: "visual_adjudicator", adjudicator_id: "expert-1",
+      adjudicator_role: "visual-reviewer", statement: "我确认全部视觉事件已经逐项核验并锁定当前决策。",
+    });
+    await store.signPackage({
+      package_id: "package-1", signoff_role: "physics_reviewer", adjudicator_id: "expert-2",
+      adjudicator_role: "physics-reviewer", statement: "我确认物理语义准确并同意将当前版本冻结为 Gold。",
+    });
+    const first = await store.compileDataset();
+    const second = await store.compileDataset();
+    expect(second).toEqual(first);
+    expect(first.dataset).toMatchObject({
+      schema_version: "signed-gold-dataset-v1",
+      status: "paper_gold_signed",
+      package_count: 1,
+      reviewed_group_count: 1,
+      accepted_group_count: 1,
+      accepted_event_count: 30,
+    });
+    expect(first.dataset.packages[0].groups[0].final_events.map((item) => item.event_id))
+      .toEqual(first.dataset.packages[0].decisions[0].final_events.map((item) => item.event_id));
+    expect(first.dataset.packages[0].groups[0].speech_context.status).toBe("context_not_gold");
+    expect(first.dataset.packages[0].groups[0].visual_evidence[0]).toMatchObject({ mime_type: "image/png", width: 1, height: 1 });
+    expect(first.dataset_uri).toBe(`board2skill/signed-gold/${first.dataset.dataset_sha256}/dataset.json`);
+    expect(JSON.parse(await readFile(join(data, first.dataset_uri), "utf8"))).toEqual(first.dataset);
+
+    const outside = await mkdtemp(join(tmpdir(), "signed-gold-outside-"));
+    created.push(outside);
+    const contentDirectory = dirname(join(data, first.dataset_uri));
+    await rm(contentDirectory, { recursive: true, force: true });
+    await symlink(outside, contentDirectory);
+    await expect(store.compileDataset()).rejects.toThrow("真实路径越界");
+  });
+
+  it("re-verifies signed evidence before compiling the immutable dataset", async () => {
+    const { root, store, intakePath } = await fixture();
+    const intake = JSON.parse(await readFile(intakePath, "utf8"));
+    intake.items[0].proposal.candidate_events = Array.from({ length: 30 }, (_, index) => ({
+      candidate_id: `G01-C${index + 1}`, source_event_refs: ["a-1", "b-1"], operation: "add",
+      time: { start: 10, end: 12 }, semantic_label: `新增线段 ${index + 1}`,
+    }));
+    await writeFile(intakePath, JSON.stringify(intake));
+    const selected = (await store.queue()).groups[0].candidates.map((item) => item.candidate_id);
+    await store.decide({
+      package_id: "package-1", group_id: "G01", disposition: "accept", selected_candidate_ids: selected,
+      adjudicator_id: "expert-1", adjudicator_role: "visual-reviewer", rationale: "接受全部已逐项核验的可见线段事件。",
+    });
+    await store.signPackage({
+      package_id: "package-1", signoff_role: "visual_adjudicator", adjudicator_id: "expert-1",
+      adjudicator_role: "visual-reviewer", statement: "我确认全部视觉事件已经核验并锁定当前决策。",
+    });
+    await store.signPackage({
+      package_id: "package-1", signoff_role: "physics_reviewer", adjudicator_id: "expert-2",
+      adjudicator_role: "physics-reviewer", statement: "我确认物理语义准确并同意冻结当前 Gold 版本。",
+    });
+    await writeFile(join(root, "data/evidence.jpg"), "tampered-after-signoff");
+    await expect(store.compileDataset()).rejects.toThrow("SHA-256");
+  });
 });

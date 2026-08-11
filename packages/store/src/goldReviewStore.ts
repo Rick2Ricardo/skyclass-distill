@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
+import { lstat, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import type {
   GoldReviewCandidate,
@@ -18,9 +18,12 @@ import type {
   GoldReviewSourceEvent,
   GoldReviewSignoffRole,
   GoldReviewTimeRange,
+  SignedGoldCompileResult,
 } from "../../contracts/src/index.js";
+import { canonicalGoldReviewDecisionSignaturePayload, canonicalGoldReviewPackageSignoffSignaturePayload } from "../../contracts/src/index.js";
 import { verifyImageEvidence } from "../../media/src/imageEvidence.js";
 import { ensureDir } from "./fileStore.js";
+import { buildSignedGoldDataset } from "./signedGoldCompiler.js";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -377,7 +380,7 @@ export class GoldReviewStore {
         || decision.source_intake_sha256 !== intakeSha256
         || decision.revision !== index + 1
         || decision.parent_signature_sha256 !== (previous?.signature_sha256 ?? null)
-        || signature !== sha256(JSON.stringify(base))
+        || signature !== sha256(canonicalGoldReviewDecisionSignaturePayload(base))
         || !name.endsWith(`-${signature}.json`)) {
         throw new Error(`Gold 仲裁决策链校验失败：${packageId}/${groupId}/${name}`);
       }
@@ -401,7 +404,7 @@ export class GoldReviewStore {
         || signoff.signoff_role !== role
         || signoff.source_intake_sha256 !== intakeSha256
         || JSON.stringify(signoff.decision_signatures) !== JSON.stringify(expectedDecisions)
-        || signature !== sha256(JSON.stringify(base))) {
+        || signature !== sha256(canonicalGoldReviewPackageSignoffSignaturePayload(base))) {
         throw new Error(`Gold 仲裁包签字链校验失败：${packageId}/${role}`);
       }
       output.push(signoff);
@@ -513,7 +516,7 @@ export class GoldReviewStore {
       rationale,
       decided_at: new Date().toISOString(),
     };
-    const decision: GoldReviewDecisionRecord = { ...base, signature_sha256: sha256(JSON.stringify(base)) };
+    const decision: GoldReviewDecisionRecord = { ...base, signature_sha256: sha256(canonicalGoldReviewDecisionSignaturePayload(base)) };
     const directory = this.decisionDirectory(group.package_id, group.group_id);
     await ensureDir(directory);
     const target = join(directory, `${String(decision.revision).padStart(4, "0")}-${decision.signature_sha256}.json`);
@@ -557,7 +560,7 @@ export class GoldReviewStore {
       statement,
       signed_at: new Date().toISOString(),
     };
-    const signoff: GoldReviewPackageSignoff = { ...base, signature_sha256: sha256(JSON.stringify(base)) };
+    const signoff: GoldReviewPackageSignoff = { ...base, signature_sha256: sha256(canonicalGoldReviewPackageSignoffSignaturePayload(base)) };
     await ensureDir(dirname(this.signoffPath(pkg.package_id, input.signoff_role)));
     await writeFile(this.signoffPath(pkg.package_id, input.signoff_role), `${JSON.stringify(signoff, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
     return signoff;
@@ -570,5 +573,29 @@ export class GoldReviewStore {
     if (!evidence) throw new Error("视觉证据不存在");
     const verified = await verifyImageEvidence({ root: this.root, assetUri: evidence.path, expectedSha256: evidence.sha256 });
     return { bytes: verified.bytes, mime: verified.mime_type };
+  }
+
+  async compileDataset(): Promise<SignedGoldCompileResult> {
+    const dataset = await buildSignedGoldDataset(this.root, await this.queue());
+    const directory = join(this.dataDir, "board2skill", "signed-gold", dataset.dataset_sha256);
+    const serialized = `${JSON.stringify(dataset, null, 2)}\n`;
+    await ensureDir(this.dataDir);
+    const dataRootReal = await realpath(this.dataDir);
+    await ensureDir(directory);
+    const directoryReal = await realpath(directory);
+    if (!inside(dataRootReal, directoryReal)) throw new Error("Signed Gold 内容寻址目录真实路径越界");
+    const target = join(directoryReal, "dataset.json");
+    try {
+      await writeFile(target, serialized, { encoding: "utf8", flag: "wx" });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const targetStat = await lstat(target);
+      if (!targetStat.isFile() || targetStat.isSymbolicLink()) throw new Error("已存在的 Signed Gold 数据集不是受控普通文件");
+      if (await readFile(target, "utf8") !== serialized) throw new Error("已存在的 Signed Gold 数据集与内容地址不一致");
+    }
+    return {
+      dataset_uri: relative(dataRootReal, target).split("\\").join("/"),
+      dataset,
+    };
   }
 }

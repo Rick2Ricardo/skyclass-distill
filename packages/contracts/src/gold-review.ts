@@ -156,3 +156,37 @@ export interface GoldReviewPackageSignoffInput {
   adjudicator_role: string;
   statement: string;
 }
+
+/** Field order is frozen because review record signatures use JSON bytes. */
+export function canonicalGoldReviewDecisionSignaturePayload(record: Omit<GoldReviewDecisionRecord, "signature_sha256"> | GoldReviewDecisionRecord): string {
+  return JSON.stringify({
+    schema_version: record.schema_version,
+    package_id: record.package_id,
+    group_id: record.group_id,
+    revision: record.revision,
+    parent_signature_sha256: record.parent_signature_sha256,
+    source_intake_sha256: record.source_intake_sha256,
+    disposition: record.disposition,
+    selected_candidate_ids: record.selected_candidate_ids,
+    final_events: record.final_events,
+    adjudicator_id: record.adjudicator_id,
+    adjudicator_role: record.adjudicator_role,
+    rationale: record.rationale,
+    decided_at: record.decided_at,
+  });
+}
+
+/** Field order is frozen because package signoff signatures use JSON bytes. */
+export function canonicalGoldReviewPackageSignoffSignaturePayload(record: Omit<GoldReviewPackageSignoff, "signature_sha256"> | GoldReviewPackageSignoff): string {
+  return JSON.stringify({
+    schema_version: record.schema_version,
+    package_id: record.package_id,
+    signoff_role: record.signoff_role,
+    source_intake_sha256: record.source_intake_sha256,
+    decision_signatures: record.decision_signatures,
+    adjudicator_id: record.adjudicator_id,
+    adjudicator_role: record.adjudicator_role,
+    statement: record.statement,
+    signed_at: record.signed_at,
+  });
+}
