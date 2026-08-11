@@ -1,0 +1,4123 @@
+{
+  "schema_version": "temporal-board-adjudication-intake-v1",
+  "intake_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+  "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+  "created_at": "2026-08-12",
+  "source_video_id": "phy-force-liyongle-003",
+  "scope": {
+    "start": 702,
+    "end": 922,
+    "time_basis": "absolute_seconds_in_canonical_source_video"
+  },
+  "decision_status": "pending_human",
+  "review_states": [
+    "pending"
+  ],
+  "accepted_count": 0,
+  "paper_gold_status": "blocked_pending_human_signoff",
+  "not_gold": true,
+  "source": {
+    "path": "data/raw/physics/force-pilot/phy-force-liyongle-003/source.mp4",
+    "sha256": "c7e62d680e003d9e5d28305015bd409f9e6e155e67fcaba72b73f9571de39d95",
+    "duration_seconds": 986.965
+  },
+  "sources": {
+    "annotator_a": {
+      "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a.json",
+      "sha256": "7943be809bf2a55077a55b81de8af48d7008319cd93e39123a52563babc1eefc",
+      "bundle_id": "tbv2-ly-003-01-annotator-a",
+      "payload_sha256": "12365c9e8af108ac42387cca954157494f52cc2f1c8d53c0b986f3e99400c50e",
+      "event_count": 16,
+      "review_status": "independent_needs_review"
+    },
+    "annotator_b": {
+      "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-b.json",
+      "sha256": "36d2e681e823dde4d7df01c38b0b3aaed41ffd81f1f09c3aab27a1ca7d220791",
+      "bundle_id": "tbv2-ly-003-01-annotator-b-702-922",
+      "payload_sha256": "44102cb741a5217f664936cff271a2e76e2303af6c38f1f4dbe955042f5db086",
+      "event_count": 17,
+      "review_status": "independent_needs_review"
+    },
+    "alignment": {
+      "path": "research/board2skill/LIYONGLE_003_AB_ALIGNMENT_702_922.md",
+      "sha256": "38f582b966baab0ea911968441cf12bedd8512b86feaec6107a3c269c17cfa4e"
+    },
+    "annotation_policy": {
+      "path": "research/board2skill/DATA_AND_ANNOTATION_SPEC.md",
+      "sha256": "4068892dd320772a1743ba2b464a92a1d66084abcfd2c0c3d2d2edb287ad57d3"
+    },
+    "runtime_contract": {
+      "path": "packages/contracts/src/temporal-board.ts",
+      "sha256": "db231fc43433624252d8d014a64264173ef770e63c0b362b5397dbaf0b0f29f8"
+    }
+  },
+  "inputs": [
+    {
+      "role": "annotator_a",
+      "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a.json",
+      "sha256": "7943be809bf2a55077a55b81de8af48d7008319cd93e39123a52563babc1eefc"
+    },
+    {
+      "role": "annotator_b",
+      "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-b.json",
+      "sha256": "36d2e681e823dde4d7df01c38b0b3aaed41ffd81f1f09c3aab27a1ca7d220791"
+    },
+    {
+      "role": "alignment",
+      "path": "research/board2skill/LIYONGLE_003_AB_ALIGNMENT_702_922.md",
+      "sha256": "38f582b966baab0ea911968441cf12bedd8512b86feaec6107a3c269c17cfa4e"
+    },
+    {
+      "role": "canonical_source_video",
+      "path": "data/raw/physics/force-pilot/phy-force-liyongle-003/source.mp4",
+      "sha256": "c7e62d680e003d9e5d28305015bd409f9e6e155e67fcaba72b73f9571de39d95"
+    },
+    {
+      "role": "annotation_policy",
+      "path": "research/board2skill/DATA_AND_ANNOTATION_SPEC.md",
+      "sha256": "4068892dd320772a1743ba2b464a92a1d66084abcfd2c0c3d2d2edb287ad57d3"
+    },
+    {
+      "role": "runtime_contract",
+      "path": "packages/contracts/src/temporal-board.ts",
+      "sha256": "db231fc43433624252d8d014a64264173ef770e63c0b362b5397dbaf0b0f29f8"
+    }
+  ],
+  "governance": {
+    "default_group_status": "pending_human",
+    "automatic_promotion_allowed": false,
+    "allowed_decisions": [
+      "add",
+      "reject",
+      "not_an_event",
+      "unknown"
+    ],
+    "visual_facts_only": true,
+    "speech": [],
+    "speech_evidence_used": [],
+    "burned_subtitle_policy": "excluded_not_independent_asr_not_evidence",
+    "learner_observations": [],
+    "learner_evidence_used": [],
+    "pedagogical_role": {
+      "value": "unknown",
+      "evidence_refs": []
+    },
+    "teacher_intent": {
+      "value": "unknown",
+      "evidence_refs": []
+    },
+    "learner_effect": {
+      "value": "unknown",
+      "evidence_refs": []
+    },
+    "operation_rules": {
+      "add": "A new persistent object is present after the event while prior objects remain.",
+      "modify": "Requires an old-to-new replacement in the same semantic slot; continued writing, a new similar diagram, and added arrows do not satisfy this rule.",
+      "erase": "Requires persistent absence after visibility returns and occlusion is excluded.",
+      "connect": "Requires a newly created connector and at least two persistent anchors with an explicit relation."
+    },
+    "blocked_outputs_until_signoff": [
+      "temporal_board_v2_gold_bundle",
+      "accepted_board_delta",
+      "adjudicated_board_delta",
+      "accepted_teaching_transition",
+      "paper_gold_claim"
+    ]
+  },
+  "coverage": {
+    "alignment_group_count": 17,
+    "matched_group_count": 13,
+    "a_only_group_count": 1,
+    "b_only_group_count": 3,
+    "a_event_ids": [
+      "LY003-A-DELTA-E001",
+      "LY003-A-DELTA-E002",
+      "LY003-A-DELTA-E003",
+      "LY003-A-DELTA-E004",
+      "LY003-A-DELTA-E005",
+      "LY003-A-DELTA-E006",
+      "LY003-A-DELTA-E007",
+      "LY003-A-DELTA-E008",
+      "LY003-A-DELTA-E009",
+      "LY003-A-DELTA-E010",
+      "LY003-A-DELTA-E011",
+      "LY003-A-DELTA-E012",
+      "LY003-A-DELTA-E013",
+      "LY003-A-DELTA-E014",
+      "LY003-A-DELTA-E015",
+      "LY003-A-DELTA-E016"
+    ],
+    "b_event_ids": [
+      "tbv2-ly-003-b-delta-01",
+      "tbv2-ly-003-b-delta-02",
+      "tbv2-ly-003-b-delta-03",
+      "tbv2-ly-003-b-delta-04",
+      "tbv2-ly-003-b-delta-05",
+      "tbv2-ly-003-b-delta-06",
+      "tbv2-ly-003-b-delta-07",
+      "tbv2-ly-003-b-delta-08",
+      "tbv2-ly-003-b-delta-09",
+      "tbv2-ly-003-b-delta-10",
+      "tbv2-ly-003-b-delta-11",
+      "tbv2-ly-003-b-delta-12",
+      "tbv2-ly-003-b-delta-13",
+      "tbv2-ly-003-b-delta-14",
+      "tbv2-ly-003-b-delta-15",
+      "tbv2-ly-003-b-delta-16",
+      "tbv2-ly-003-b-delta-17"
+    ],
+    "matched_a_event_ids": [
+      "LY003-A-DELTA-E001",
+      "LY003-A-DELTA-E002",
+      "LY003-A-DELTA-E003",
+      "LY003-A-DELTA-E004",
+      "LY003-A-DELTA-E005",
+      "LY003-A-DELTA-E006",
+      "LY003-A-DELTA-E007",
+      "LY003-A-DELTA-E008",
+      "LY003-A-DELTA-E009",
+      "LY003-A-DELTA-E010",
+      "LY003-A-DELTA-E011",
+      "LY003-A-DELTA-E012",
+      "LY003-A-DELTA-E013",
+      "LY003-A-DELTA-E014",
+      "LY003-A-DELTA-E016"
+    ],
+    "matched_b_event_ids": [
+      "tbv2-ly-003-b-delta-02",
+      "tbv2-ly-003-b-delta-03",
+      "tbv2-ly-003-b-delta-04",
+      "tbv2-ly-003-b-delta-07",
+      "tbv2-ly-003-b-delta-08",
+      "tbv2-ly-003-b-delta-09",
+      "tbv2-ly-003-b-delta-10",
+      "tbv2-ly-003-b-delta-11",
+      "tbv2-ly-003-b-delta-12",
+      "tbv2-ly-003-b-delta-13",
+      "tbv2-ly-003-b-delta-14",
+      "tbv2-ly-003-b-delta-15",
+      "tbv2-ly-003-b-delta-16",
+      "tbv2-ly-003-b-delta-17"
+    ],
+    "unmatched_a_event_ids": [
+      "LY003-A-DELTA-E015"
+    ],
+    "unmatched_b_event_ids": [
+      "tbv2-ly-003-b-delta-01",
+      "tbv2-ly-003-b-delta-05",
+      "tbv2-ly-003-b-delta-06"
+    ],
+    "completeness_assertion": "Every frozen A16/B17 delta appears exactly once in the 17 strict-overlap connected-component groups; validated mechanically, not adjudicated."
+  },
+  "items": [
+    {
+      "group_id": "G01",
+      "alignment_class": "b_only",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-01"
+      ],
+      "alignment_window": {
+        "start": 702.05,
+        "end": 706.1
+      },
+      "temporal_union_iou": null,
+      "visual_candidate_label": "窗口起点后继续补写既有第2条文字行",
+      "boundary_and_object_split_difference": "B-only；左截断续写，A 可能吸收到窗口初始状态或漏标。",
+      "required_human_check": "核对 702.000 前后原帧，只把窗内新增且持续的后缀当 ADD；也可 reject/not_an_event/unknown。",
+      "focus_codes": [
+        "left_censored",
+        "continuation_not_modify"
+      ],
+      "a_side": {
+        "event_ids": [],
+        "events": []
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-01"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-01",
+            "time": {
+              "start": 702.05,
+              "end": 706.1
+            },
+            "operation": "add",
+            "semantic_label": "窗口内继续补写既有第2条文字行的右侧后缀（旧文字保留）",
+            "region": {
+              "x": 0.6203125,
+              "y": 0.3104575163398693,
+              "width": 0.28984375,
+              "height": 0.09967320261437909
+            },
+            "json_pointer": "/deltas/0",
+            "before_state_id": "tbv2-ly-003-b-state-00",
+            "after_state_id": "tbv2-ly-003-b-state-01",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-04"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "left_censored_at_window_start",
+              "teacher_partial_occlusion",
+              "continued_writing_is_add_not_modify",
+              "text_transcription_unresolved"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-01-comparison.jpg",
+                "sha256": "5c40f6d22423bc2adad5df38467fe7a7b1e2d6f931745ed5d6c4be9d071116b2"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-01-mask.png",
+                "sha256": "b82f3efaa2efdb6ad30064339161c6116948ab3c9ab857d74388f8ae618c5f87"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-702000-board.jpg",
+                "sha256": "8728253965f255ea3dc095949756ff2734d1d9d1928806b997a18255de58286f"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-708000-board.jpg",
+                "sha256": "5e721f2303ecaddf81a907a3d9f39bc06823c1851abb051b3d3e8ed5e1623339"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-01",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-01-comparison.jpg",
+          "sha256": "5c40f6d22423bc2adad5df38467fe7a7b1e2d6f931745ed5d6c4be9d071116b2"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-01",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-01-mask.png",
+          "sha256": "b82f3efaa2efdb6ad30064339161c6116948ab3c9ab857d74388f8ae618c5f87"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-01",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-702000-board.jpg",
+          "sha256": "8728253965f255ea3dc095949756ff2734d1d9d1928806b997a18255de58286f"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-01",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-708000-board.jpg",
+          "sha256": "5e721f2303ecaddf81a907a3d9f39bc06823c1851abb051b3d3e8ed5e1623339"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G02",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E001"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-02"
+      ],
+      "alignment_window": {
+        "start": 710.4,
+        "end": 716.7
+      },
+      "temporal_union_iou": 0.8730158730158636,
+      "visual_candidate_label": "新增第3条文字“求力的合成”",
+      "boundary_and_object_split_difference": "一对一；起止边界略有差异。",
+      "required_human_check": "确定第一笔可见与完成稳定边界；对象为新行而非旧行替换。",
+      "focus_codes": [
+        "boundary"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E001"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E001",
+            "time": {
+              "start": 710.5,
+              "end": 716
+            },
+            "operation": "add",
+            "semantic_label": "新增第3条板书：求力的合成",
+            "region": {
+              "x": 0.52,
+              "y": 0.49,
+              "width": 0.2,
+              "height": 0.09
+            },
+            "json_pointer": "/deltas/0",
+            "before_state_id": "LY003-A-STATE-S00",
+            "after_state_id": "LY003-A-STATE-S01",
+            "affected_object_ids": [
+              "LY003-A-O001"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E001.jpg",
+                "sha256": "d2080d68acd7348b5e7371da194f4f52eea5ebfb23e95982e5fa95677d9c50bb"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E001.png",
+                "sha256": "8c2dc2e40ce51bdbc13dea3d2d73cf84ba0e58aa45f05192329945c0fe54d76a"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S00.jpg",
+                "sha256": "d294a21e43814f9840119348a2991fd57af74ebd401aaa0240c7fd74a031a8bd"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S01.jpg",
+                "sha256": "8e7d83621f725893bb0205bf64813e1e960983940251d61045ecf61f66fbcf41"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-02"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-02",
+            "time": {
+              "start": 710.4,
+              "end": 716.7
+            },
+            "operation": "add",
+            "semantic_label": "新增第3条文字：求力的合成",
+            "region": {
+              "x": 0.46015625,
+              "y": 0.369281045751634,
+              "width": 0.2203125,
+              "height": 0.08006535947712418
+            },
+            "json_pointer": "/deltas/1",
+            "before_state_id": "tbv2-ly-003-b-state-01",
+            "after_state_id": "tbv2-ly-003-b-state-02",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-05"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "teacher_partial_occlusion"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-02-comparison.jpg",
+                "sha256": "fe9b1933e70be4082af2ca98ec8f936578abf9cf885e148a78f488ca85cdd2bc"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-02-mask.png",
+                "sha256": "3f216e3fd5530d0b0d755e8b3baaa2a64bef8dcc1ea4cc4382a32c9b699d6b41"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-708000-board.jpg",
+                "sha256": "5e721f2303ecaddf81a907a3d9f39bc06823c1851abb051b3d3e8ed5e1623339"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-718000-board.jpg",
+                "sha256": "8617d1397535c18e3bb5e7588bbc2437c42ef753fbb019f674fbc39793625db4"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E001",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E001.jpg",
+          "sha256": "d2080d68acd7348b5e7371da194f4f52eea5ebfb23e95982e5fa95677d9c50bb"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E001",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E001.png",
+          "sha256": "8c2dc2e40ce51bdbc13dea3d2d73cf84ba0e58aa45f05192329945c0fe54d76a"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E001",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S00.jpg",
+          "sha256": "d294a21e43814f9840119348a2991fd57af74ebd401aaa0240c7fd74a031a8bd"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E001",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S01.jpg",
+          "sha256": "8e7d83621f725893bb0205bf64813e1e960983940251d61045ecf61f66fbcf41"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-02",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-02-comparison.jpg",
+          "sha256": "fe9b1933e70be4082af2ca98ec8f936578abf9cf885e148a78f488ca85cdd2bc"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-02",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-02-mask.png",
+          "sha256": "3f216e3fd5530d0b0d755e8b3baaa2a64bef8dcc1ea4cc4382a32c9b699d6b41"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-02",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-708000-board.jpg",
+          "sha256": "5e721f2303ecaddf81a907a3d9f39bc06823c1851abb051b3d3e8ed5e1623339"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-02",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-718000-board.jpg",
+          "sha256": "8617d1397535c18e3bb5e7588bbc2437c42ef753fbb019f674fbc39793625db4"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G03",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E002"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-03"
+      ],
+      "alignment_window": {
+        "start": 720.25,
+        "end": 725.8
+      },
+      "temporal_union_iou": 0.8918918918919074,
+      "visual_candidate_label": "新增第4条公式 F合=ma",
+      "boundary_and_object_split_difference": "一对一；B 结束略晚。",
+      "required_human_check": "核对公式完成笔画与稳定边界。",
+      "focus_codes": [
+        "boundary"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E002"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E002",
+            "time": {
+              "start": 720.25,
+              "end": 725.25
+            },
+            "operation": "add",
+            "semantic_label": "新增第4条公式：F合=ma",
+            "region": {
+              "x": 0.71,
+              "y": 0.48,
+              "width": 0.23,
+              "height": 0.1
+            },
+            "json_pointer": "/deltas/1",
+            "before_state_id": "LY003-A-STATE-S01",
+            "after_state_id": "LY003-A-STATE-S02",
+            "affected_object_ids": [
+              "LY003-A-O002"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E002.jpg",
+                "sha256": "9da3568a7f120abd0f7d2cd782ef54821e92ab08b0c2f95f3f3502bf63e21e3e"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E002.png",
+                "sha256": "4110646897ee7825c2b24b7fa192275007d926e477e34282fe626bb6c770d53c"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S01.jpg",
+                "sha256": "8e7d83621f725893bb0205bf64813e1e960983940251d61045ecf61f66fbcf41"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S02.jpg",
+                "sha256": "49b6f6e568f0ce87fefd68510d8ac705337430c98d30b150805b0d9314c8f03c"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-03"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-03",
+            "time": {
+              "start": 720.3,
+              "end": 725.8
+            },
+            "operation": "add",
+            "semantic_label": "新增第4条公式 F合=ma",
+            "region": {
+              "x": 0.6,
+              "y": 0.35947712418300654,
+              "width": 0.2296875,
+              "height": 0.08986928104575163
+            },
+            "json_pointer": "/deltas/2",
+            "before_state_id": "tbv2-ly-003-b-state-02",
+            "after_state_id": "tbv2-ly-003-b-state-03",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-06"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "teacher_partial_occlusion"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-03-comparison.jpg",
+                "sha256": "f56268953dff218a193fab10f3f21bc4c912d705bbe6c1a45b2d1e9ebda50047"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-03-mask.png",
+                "sha256": "77c62ba481ca22e8d9eac15f1039b5d8f22b83c937fe073bf51b455b7118e206"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-718000-board.jpg",
+                "sha256": "8617d1397535c18e3bb5e7588bbc2437c42ef753fbb019f674fbc39793625db4"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-728000-board.jpg",
+                "sha256": "402192daa90227de580241980d654e76092d9e4af901d4be9c9e84eac9e06703"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E002",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E002.jpg",
+          "sha256": "9da3568a7f120abd0f7d2cd782ef54821e92ab08b0c2f95f3f3502bf63e21e3e"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E002",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E002.png",
+          "sha256": "4110646897ee7825c2b24b7fa192275007d926e477e34282fe626bb6c770d53c"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E002",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S01.jpg",
+          "sha256": "8e7d83621f725893bb0205bf64813e1e960983940251d61045ecf61f66fbcf41"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E002",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S02.jpg",
+          "sha256": "49b6f6e568f0ce87fefd68510d8ac705337430c98d30b150805b0d9314c8f03c"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-03",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-03-comparison.jpg",
+          "sha256": "f56268953dff218a193fab10f3f21bc4c912d705bbe6c1a45b2d1e9ebda50047"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-03",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-03-mask.png",
+          "sha256": "77c62ba481ca22e8d9eac15f1039b5d8f22b83c937fe073bf51b455b7118e206"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-03",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-718000-board.jpg",
+          "sha256": "8617d1397535c18e3bb5e7588bbc2437c42ef753fbb019f674fbc39793625db4"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-03",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-728000-board.jpg",
+          "sha256": "402192daa90227de580241980d654e76092d9e4af901d4be9c9e84eac9e06703"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G04",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E003"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-04"
+      ],
+      "alignment_window": {
+        "start": 730.2,
+        "end": 738.8
+      },
+      "temporal_union_iou": 0.9302325581395448,
+      "visual_candidate_label": "新增第一幅斜面小球图",
+      "boundary_and_object_split_difference": "一对一；两侧都把空白区域新图作为 ADD。",
+      "required_human_check": "确认旧板书持续存在；新图不是 MODIFY。",
+      "focus_codes": [
+        "new_diagram_not_modify"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E003"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E003",
+            "time": {
+              "start": 730.25,
+              "end": 738.25
+            },
+            "operation": "add",
+            "semantic_label": "新增第一幅斜面、小球与底角图示",
+            "region": {
+              "x": 0.52,
+              "y": 0.58,
+              "width": 0.2,
+              "height": 0.24
+            },
+            "json_pointer": "/deltas/2",
+            "before_state_id": "LY003-A-STATE-S02",
+            "after_state_id": "LY003-A-STATE-S03",
+            "affected_object_ids": [
+              "LY003-A-O003"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E003.jpg",
+                "sha256": "ae8ac96d7a87cc3b803e46cc6b10017d34e5b8f2f1f8dc8c726b0513431a0bf9"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E003.png",
+                "sha256": "4fdc1a8e6ff203e2572f167301e3917ab4b0796c22f25adba7933e1110909510"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S02.jpg",
+                "sha256": "49b6f6e568f0ce87fefd68510d8ac705337430c98d30b150805b0d9314c8f03c"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S03.jpg",
+                "sha256": "d9fade62cbd881201fdb84dfc67d53f06fd700b29def65752f3172660f5fa20f"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-04"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-04",
+            "time": {
+              "start": 730.2,
+              "end": 738.8
+            },
+            "operation": "add",
+            "semantic_label": "在空白区域新增第一幅斜面小球示意图",
+            "region": {
+              "x": 0.46015625,
+              "y": 0.47058823529411764,
+              "width": 0.41015625,
+              "height": 0.3104575163398693
+            },
+            "json_pointer": "/deltas/3",
+            "before_state_id": "tbv2-ly-003-b-state-03",
+            "after_state_id": "tbv2-ly-003-b-state-04",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-07"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "multi_stroke_object_grouped",
+              "new_diagram_not_modify",
+              "teacher_partial_occlusion"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-04-comparison.jpg",
+                "sha256": "0d04c03323bb47495dc73d634a886744c5de8c2175037720416f3b6f5444732e"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-04-mask.png",
+                "sha256": "0e1d6856a89c70d0c070bdd27cbce6caedc3ad6d0d20306db623bca4207da3a4"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-728000-board.jpg",
+                "sha256": "402192daa90227de580241980d654e76092d9e4af901d4be9c9e84eac9e06703"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-739500-board.jpg",
+                "sha256": "2552b18f4a2f55c62f18fe3523a4cbb081d754452d761f588707543ba95ebe84"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E003",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E003.jpg",
+          "sha256": "ae8ac96d7a87cc3b803e46cc6b10017d34e5b8f2f1f8dc8c726b0513431a0bf9"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E003",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E003.png",
+          "sha256": "4fdc1a8e6ff203e2572f167301e3917ab4b0796c22f25adba7933e1110909510"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E003",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S02.jpg",
+          "sha256": "49b6f6e568f0ce87fefd68510d8ac705337430c98d30b150805b0d9314c8f03c"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E003",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S03.jpg",
+          "sha256": "d9fade62cbd881201fdb84dfc67d53f06fd700b29def65752f3172660f5fa20f"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-04",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-04-comparison.jpg",
+          "sha256": "0d04c03323bb47495dc73d634a886744c5de8c2175037720416f3b6f5444732e"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-04",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-04-mask.png",
+          "sha256": "0e1d6856a89c70d0c070bdd27cbce6caedc3ad6d0d20306db623bca4207da3a4"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-04",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-728000-board.jpg",
+          "sha256": "402192daa90227de580241980d654e76092d9e4af901d4be9c9e84eac9e06703"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-04",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-739500-board.jpg",
+          "sha256": "2552b18f4a2f55c62f18fe3523a4cbb081d754452d761f588707543ba95ebe84"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G05",
+      "alignment_class": "b_only",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-05"
+      ],
+      "alignment_window": {
+        "start": 740.3,
+        "end": 743
+      },
+      "temporal_union_iou": null,
+      "visual_candidate_label": "第一幅图下方问题行起始片段",
+      "boundary_and_object_split_difference": "B-only；A 未冻结对应时段事件。",
+      "required_human_check": "核对是否为持久新增，或应并入后续问题文字；保留 reject/not_an_event/unknown。",
+      "focus_codes": [
+        "b_only",
+        "granularity"
+      ],
+      "a_side": {
+        "event_ids": [],
+        "events": []
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-05"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-05",
+            "time": {
+              "start": 740.3,
+              "end": 743
+            },
+            "operation": "add",
+            "semantic_label": "在第一幅图下方新增问题行的起始片段",
+            "region": {
+              "x": 0.4703125,
+              "y": 0.8300653594771242,
+              "width": 0.1203125,
+              "height": 0.08006535947712418
+            },
+            "json_pointer": "/deltas/4",
+            "before_state_id": "tbv2-ly-003-b-state-04",
+            "after_state_id": "tbv2-ly-003-b-state-05",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-08"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "text_transcription_unresolved",
+              "short_stable_interval",
+              "continued_writing_is_add_not_modify"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-05-comparison.jpg",
+                "sha256": "73729aed3a5f52625e6924f6aa9e3d4127d8b394a43460f307707504178ba00d"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-05-mask.png",
+                "sha256": "d60736cde1748192abc23af9665768e9d674f686149c0f3162b0afb2c66a6101"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-739500-board.jpg",
+                "sha256": "2552b18f4a2f55c62f18fe3523a4cbb081d754452d761f588707543ba95ebe84"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-743500-board.jpg",
+                "sha256": "f2a25749ac52c68bbda9f2f3dd88a963670c672530caf1db62f2de87a402da90"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-05",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-05-comparison.jpg",
+          "sha256": "73729aed3a5f52625e6924f6aa9e3d4127d8b394a43460f307707504178ba00d"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-05",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-05-mask.png",
+          "sha256": "d60736cde1748192abc23af9665768e9d674f686149c0f3162b0afb2c66a6101"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-05",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-739500-board.jpg",
+          "sha256": "2552b18f4a2f55c62f18fe3523a4cbb081d754452d761f588707543ba95ebe84"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-05",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-743500-board.jpg",
+          "sha256": "f2a25749ac52c68bbda9f2f3dd88a963670c672530caf1db62f2de87a402da90"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G06",
+      "alignment_class": "b_only",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-06"
+      ],
+      "alignment_window": {
+        "start": 744.2,
+        "end": 747
+      },
+      "temporal_union_iou": null,
+      "visual_candidate_label": "第一幅图左上侧短文字标记",
+      "boundary_and_object_split_difference": "B-only；A 未冻结对应时段事件。",
+      "required_human_check": "核对短标记是否真实、持久且不只是遮挡/动作。",
+      "focus_codes": [
+        "b_only",
+        "event_existence"
+      ],
+      "a_side": {
+        "event_ids": [],
+        "events": []
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-06"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-06",
+            "time": {
+              "start": 744.2,
+              "end": 747
+            },
+            "operation": "add",
+            "semantic_label": "在第一幅图左上侧新增短文字标记",
+            "region": {
+              "x": 0.45,
+              "y": 0.4493464052287582,
+              "width": 0.06015625,
+              "height": 0.1503267973856209
+            },
+            "json_pointer": "/deltas/5",
+            "before_state_id": "tbv2-ly-003-b-state-05",
+            "after_state_id": "tbv2-ly-003-b-state-06",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-09"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "text_transcription_unresolved",
+              "short_stable_interval",
+              "teacher_partial_occlusion"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-06-comparison.jpg",
+                "sha256": "6ba92c13ff3a620a13d247af508f3fb4650cc7225a8fe0ae8b224eb07cfa5365"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-06-mask.png",
+                "sha256": "36324180dd9d83ac8cbdaf95cd001238c00f958138460ed55ff0067e9f66e31c"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-743500-board.jpg",
+                "sha256": "f2a25749ac52c68bbda9f2f3dd88a963670c672530caf1db62f2de87a402da90"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-747500-board.jpg",
+                "sha256": "8f46f98190b3551c077e095be58be64f869e06f7162f5ff9e4d30e4d7cc0cb73"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-06",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-06-comparison.jpg",
+          "sha256": "6ba92c13ff3a620a13d247af508f3fb4650cc7225a8fe0ae8b224eb07cfa5365"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-06",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-06-mask.png",
+          "sha256": "36324180dd9d83ac8cbdaf95cd001238c00f958138460ed55ff0067e9f66e31c"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-06",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-743500-board.jpg",
+          "sha256": "f2a25749ac52c68bbda9f2f3dd88a963670c672530caf1db62f2de87a402da90"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-06",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-747500-board.jpg",
+          "sha256": "8f46f98190b3551c077e095be58be64f869e06f7162f5ff9e4d30e4d7cc0cb73"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G07",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E004",
+        "LY003-A-DELTA-E005"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-07"
+      ],
+      "alignment_window": {
+        "start": 748.2,
+        "end": 771.5
+      },
+      "temporal_union_iou": 0.9334763948497873,
+      "visual_candidate_label": "第一幅图下方问题文字续写",
+      "boundary_and_object_split_difference": "A 拆为 2 个对象/事件，B 合为 1 个持续续写对象/事件。",
+      "required_human_check": "裁决 1 或 2 个原子 ADD；先前文字始终保留，所以不能改判 MODIFY。",
+      "focus_codes": [
+        "two_a_to_one_b",
+        "continuation_not_modify"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E004",
+          "LY003-A-DELTA-E005"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E004",
+            "time": {
+              "start": 748.25,
+              "end": 754
+            },
+            "operation": "add",
+            "semantic_label": "新增第一种情形的问题标记，并写出下一项序号",
+            "region": {
+              "x": 0.54,
+              "y": 0.79,
+              "width": 0.16,
+              "height": 0.08
+            },
+            "json_pointer": "/deltas/3",
+            "before_state_id": "LY003-A-STATE-S03",
+            "after_state_id": "LY003-A-STATE-S04",
+            "affected_object_ids": [
+              "LY003-A-O004"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E004.jpg",
+                "sha256": "fa2a759c0f8d67c8a42a30c460a92de41b87c5377978eed6ad14c18c9438bfb0"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E004.png",
+                "sha256": "5029b56803d78f95883860401ab50e0cdf88e5c02f7e4e20167e0aa52232187e"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S03.jpg",
+                "sha256": "d9fade62cbd881201fdb84dfc67d53f06fd700b29def65752f3172660f5fa20f"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S04.jpg",
+                "sha256": "7089e77b0e56a786d09fc3cd317e7ef89f694aa88c54fda06e8b9b9c51cb0547"
+              }
+            }
+          },
+          {
+            "event_id": "LY003-A-DELTA-E005",
+            "time": {
+              "start": 755.25,
+              "end": 771.25
+            },
+            "operation": "add",
+            "semantic_label": "新增第二种斜面运动情形的问题描述",
+            "region": {
+              "x": 0.66,
+              "y": 0.79,
+              "width": 0.33,
+              "height": 0.08
+            },
+            "json_pointer": "/deltas/4",
+            "before_state_id": "LY003-A-STATE-S04",
+            "after_state_id": "LY003-A-STATE-S05",
+            "affected_object_ids": [
+              "LY003-A-O005"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E005.jpg",
+                "sha256": "52088ccba5a26b6559fcfeeef8ef4645424f2298e232648494bce1dd764b6779"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E005.png",
+                "sha256": "2ddf22750aca6b85d75ded2e7396c5142625212dbac8174ede8d0e058629b79a"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S04.jpg",
+                "sha256": "7089e77b0e56a786d09fc3cd317e7ef89f694aa88c54fda06e8b9b9c51cb0547"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S05.jpg",
+                "sha256": "76aaa855f433eeb564b820a25b4cd3c69c70eb8914a7c3fb72e389e955f6319e"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-07"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-07",
+            "time": {
+              "start": 748.2,
+              "end": 771.5
+            },
+            "operation": "add",
+            "semantic_label": "沿第一幅图下方继续新增问题文字（先前片段保留）",
+            "region": {
+              "x": 0.55,
+              "y": 0.8202614379084967,
+              "width": 0.43984375,
+              "height": 0.10947712418300654
+            },
+            "json_pointer": "/deltas/6",
+            "before_state_id": "tbv2-ly-003-b-state-06",
+            "after_state_id": "tbv2-ly-003-b-state-07",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-10"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "text_transcription_unresolved",
+              "multi_stroke_text_grouped",
+              "continued_writing_is_add_not_modify",
+              "teacher_partial_occlusion"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-07-comparison.jpg",
+                "sha256": "8f6ff1b5480cd851e56c7c693dc8a0affc914174fdfcdf8416d0a1822a69d052"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-07-mask.png",
+                "sha256": "44c82528570fc2ecd1c35590b60ace169855857e97f9d7ddf63434d10701e44a"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-747500-board.jpg",
+                "sha256": "8f46f98190b3551c077e095be58be64f869e06f7162f5ff9e4d30e4d7cc0cb73"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-776000-board.jpg",
+                "sha256": "28ffc9c9ce768fe78b81031b18ddaa8a73d2dcc1f29e5e07a292eed51eb64f8c"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E004",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E004.jpg",
+          "sha256": "fa2a759c0f8d67c8a42a30c460a92de41b87c5377978eed6ad14c18c9438bfb0"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E004",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E004.png",
+          "sha256": "5029b56803d78f95883860401ab50e0cdf88e5c02f7e4e20167e0aa52232187e"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E004",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S03.jpg",
+          "sha256": "d9fade62cbd881201fdb84dfc67d53f06fd700b29def65752f3172660f5fa20f"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E004",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S04.jpg",
+          "sha256": "7089e77b0e56a786d09fc3cd317e7ef89f694aa88c54fda06e8b9b9c51cb0547"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E005",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E005.jpg",
+          "sha256": "52088ccba5a26b6559fcfeeef8ef4645424f2298e232648494bce1dd764b6779"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E005",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E005.png",
+          "sha256": "2ddf22750aca6b85d75ded2e7396c5142625212dbac8174ede8d0e058629b79a"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E005",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S04.jpg",
+          "sha256": "7089e77b0e56a786d09fc3cd317e7ef89f694aa88c54fda06e8b9b9c51cb0547"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E005",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S05.jpg",
+          "sha256": "76aaa855f433eeb564b820a25b4cd3c69c70eb8914a7c3fb72e389e955f6319e"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-07",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-07-comparison.jpg",
+          "sha256": "8f6ff1b5480cd851e56c7c693dc8a0affc914174fdfcdf8416d0a1822a69d052"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-07",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-07-mask.png",
+          "sha256": "44c82528570fc2ecd1c35590b60ace169855857e97f9d7ddf63434d10701e44a"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-07",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-747500-board.jpg",
+          "sha256": "8f46f98190b3551c077e095be58be64f869e06f7162f5ff9e4d30e4d7cc0cb73"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-07",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-776000-board.jpg",
+          "sha256": "28ffc9c9ce768fe78b81031b18ddaa8a73d2dcc1f29e5e07a292eed51eb64f8c"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          2,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G08",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E006"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-08"
+      ],
+      "alignment_window": {
+        "start": 782.2,
+        "end": 784.8
+      },
+      "temporal_union_iou": 0.9615384615384952,
+      "visual_candidate_label": "第一幅图新增 mg 箭头与标注",
+      "boundary_and_object_split_difference": "一对一；边界接近。",
+      "required_human_check": "确认箭头与标签是否作为一个原子 ADD。",
+      "focus_codes": [
+        "boundary",
+        "new_arrow_not_modify"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E006"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E006",
+            "time": {
+              "start": 782.25,
+              "end": 784.75
+            },
+            "operation": "add",
+            "semantic_label": "在第一幅斜面图新增重力箭头与mg标注",
+            "region": {
+              "x": 0.55,
+              "y": 0.61,
+              "width": 0.08,
+              "height": 0.17
+            },
+            "json_pointer": "/deltas/5",
+            "before_state_id": "LY003-A-STATE-S05",
+            "after_state_id": "LY003-A-STATE-S06",
+            "affected_object_ids": [
+              "LY003-A-O006"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E006.jpg",
+                "sha256": "da2fa93adbab2853a4072df653d0be26c721c8d17a763d0f723e55791cd70091"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E006.png",
+                "sha256": "5fb1cad9ad7ff6c158f38db3caa998b21a02466be1634fa1aff293991a86619f"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S05.jpg",
+                "sha256": "76aaa855f433eeb564b820a25b4cd3c69c70eb8914a7c3fb72e389e955f6319e"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S06.jpg",
+                "sha256": "4f808d16dbf95a78022d2f289c8552b968a862b391adeba296e3cce14be0cde0"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-08"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-08",
+            "time": {
+              "start": 782.2,
+              "end": 784.8
+            },
+            "operation": "add",
+            "semantic_label": "在第一幅图小球处新增向下的 mg 箭头与标注",
+            "region": {
+              "x": 0.5703125,
+              "y": 0.5702614379084967,
+              "width": 0.0796875,
+              "height": 0.19934640522875818
+            },
+            "json_pointer": "/deltas/7",
+            "before_state_id": "tbv2-ly-003-b-state-07",
+            "after_state_id": "tbv2-ly-003-b-state-08",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-11"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "teacher_partial_occlusion",
+              "new_arrow_not_modify"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-08-comparison.jpg",
+                "sha256": "5df09ac846c1264a7c235b0e84d05f0c1b8be0b0ae066956cbe076d9aa6e0944"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-08-mask.png",
+                "sha256": "bb697d3012000b9bdc25be81b3da1135a7f55e0ed34bfb490b4bc748894ffeab"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-776000-board.jpg",
+                "sha256": "28ffc9c9ce768fe78b81031b18ddaa8a73d2dcc1f29e5e07a292eed51eb64f8c"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-785200-board.jpg",
+                "sha256": "6ad5f5956a0e0775ab40ec895f29a403b4975ceb16e71706aaec9d00be548065"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E006",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E006.jpg",
+          "sha256": "da2fa93adbab2853a4072df653d0be26c721c8d17a763d0f723e55791cd70091"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E006",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E006.png",
+          "sha256": "5fb1cad9ad7ff6c158f38db3caa998b21a02466be1634fa1aff293991a86619f"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E006",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S05.jpg",
+          "sha256": "76aaa855f433eeb564b820a25b4cd3c69c70eb8914a7c3fb72e389e955f6319e"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E006",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S06.jpg",
+          "sha256": "4f808d16dbf95a78022d2f289c8552b968a862b391adeba296e3cce14be0cde0"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-08",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-08-comparison.jpg",
+          "sha256": "5df09ac846c1264a7c235b0e84d05f0c1b8be0b0ae066956cbe076d9aa6e0944"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-08",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-08-mask.png",
+          "sha256": "bb697d3012000b9bdc25be81b3da1135a7f55e0ed34bfb490b4bc748894ffeab"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-08",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-776000-board.jpg",
+          "sha256": "28ffc9c9ce768fe78b81031b18ddaa8a73d2dcc1f29e5e07a292eed51eb64f8c"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-08",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-785200-board.jpg",
+          "sha256": "6ad5f5956a0e0775ab40ec895f29a403b4975ceb16e71706aaec9d00be548065"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G09",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E007"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-09"
+      ],
+      "alignment_window": {
+        "start": 785.4,
+        "end": 788.3
+      },
+      "temporal_union_iou": 0.7758620689655233,
+      "visual_candidate_label": "第一幅图新增 N 箭头与标注",
+      "boundary_and_object_split_difference": "一对一；A 起点较晚。",
+      "required_human_check": "确定起点和箭头/标签粒度；既有图与 mg 保留。",
+      "focus_codes": [
+        "boundary",
+        "new_arrow_not_modify"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E007"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E007",
+            "time": {
+              "start": 786,
+              "end": 788.25
+            },
+            "operation": "add",
+            "semantic_label": "在第一幅斜面图新增支持力箭头与N标注",
+            "region": {
+              "x": 0.55,
+              "y": 0.55,
+              "width": 0.1,
+              "height": 0.14
+            },
+            "json_pointer": "/deltas/6",
+            "before_state_id": "LY003-A-STATE-S06",
+            "after_state_id": "LY003-A-STATE-S07",
+            "affected_object_ids": [
+              "LY003-A-O007"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E007.jpg",
+                "sha256": "7d5c4951b941f0cbfc640159a73c049e72df959ee4a8b8d43730eb77134978e1"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E007.png",
+                "sha256": "02badf25b91a81b696adfae3e559c089d800bf02a48c2ddc0dd7e319baa38672"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S06.jpg",
+                "sha256": "4f808d16dbf95a78022d2f289c8552b968a862b391adeba296e3cce14be0cde0"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S07.jpg",
+                "sha256": "77f86b15b8bb66e0e239884346adf59d8b04d9f3cf21eaaedbb249849fefd45e"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-09"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-09",
+            "time": {
+              "start": 785.4,
+              "end": 788.3
+            },
+            "operation": "add",
+            "semantic_label": "在第一幅图小球处新增 N 箭头与标注",
+            "region": {
+              "x": 0.5703125,
+              "y": 0.5,
+              "width": 0.1,
+              "height": 0.16013071895424835
+            },
+            "json_pointer": "/deltas/8",
+            "before_state_id": "tbv2-ly-003-b-state-08",
+            "after_state_id": "tbv2-ly-003-b-state-09",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-12"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "short_stable_interval",
+              "teacher_partial_occlusion",
+              "new_arrow_not_modify"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-09-comparison.jpg",
+                "sha256": "658fa6c9e92a1fc5bcc5e4e08891f957a723c2c3bd8c7730b4beb870464adc52"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-09-mask.png",
+                "sha256": "9d9e7027956fe20dcc591f7de1c73d1897b009c0d0915d2f27ee0df9a6bd2d05"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-785200-board.jpg",
+                "sha256": "6ad5f5956a0e0775ab40ec895f29a403b4975ceb16e71706aaec9d00be548065"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-794000-board.jpg",
+                "sha256": "61c92038a75d65c1a3e7a609cadb07fc19ea3a96f5ff5a4fa020ac8bc0650bd0"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E007",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E007.jpg",
+          "sha256": "7d5c4951b941f0cbfc640159a73c049e72df959ee4a8b8d43730eb77134978e1"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E007",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E007.png",
+          "sha256": "02badf25b91a81b696adfae3e559c089d800bf02a48c2ddc0dd7e319baa38672"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E007",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S06.jpg",
+          "sha256": "4f808d16dbf95a78022d2f289c8552b968a862b391adeba296e3cce14be0cde0"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E007",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S07.jpg",
+          "sha256": "77f86b15b8bb66e0e239884346adf59d8b04d9f3cf21eaaedbb249849fefd45e"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-09",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-09-comparison.jpg",
+          "sha256": "658fa6c9e92a1fc5bcc5e4e08891f957a723c2c3bd8c7730b4beb870464adc52"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-09",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-09-mask.png",
+          "sha256": "9d9e7027956fe20dcc591f7de1c73d1897b009c0d0915d2f27ee0df9a6bd2d05"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-09",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-785200-board.jpg",
+          "sha256": "6ad5f5956a0e0775ab40ec895f29a403b4975ceb16e71706aaec9d00be548065"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-09",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-794000-board.jpg",
+          "sha256": "61c92038a75d65c1a3e7a609cadb07fc19ea3a96f5ff5a4fa020ac8bc0650bd0"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G10",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E008"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-10"
+      ],
+      "alignment_window": {
+        "start": 797.5,
+        "end": 809.25
+      },
+      "temporal_union_iou": 0.5617021276595667,
+      "visual_candidate_label": "第一幅图新增红色合力辅助线、箭头与标注",
+      "boundary_and_object_split_difference": "一对一但对象范围不同；A 覆盖 797.5–809.25，B 只冻结 802.2–808.8 主箭头段。",
+      "required_human_check": "核对辅助线是否属于同一复合 ADD，统一边界与 region。",
+      "focus_codes": [
+        "boundary",
+        "object_scope"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E008"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E008",
+            "time": {
+              "start": 797.5,
+              "end": 809.25
+            },
+            "operation": "add",
+            "semantic_label": "在第一幅受力图新增红色合力作图辅助线、合力箭头与F合标注",
+            "region": {
+              "x": 0.55,
+              "y": 0.56,
+              "width": 0.14,
+              "height": 0.19
+            },
+            "json_pointer": "/deltas/7",
+            "before_state_id": "LY003-A-STATE-S07",
+            "after_state_id": "LY003-A-STATE-S08",
+            "affected_object_ids": [
+              "LY003-A-O008"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E008.jpg",
+                "sha256": "70c24cecdfe99f5d8d6befe92c5f0ea7b5b82cb5b6b22f6fc73fef6c26f30289"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E008.png",
+                "sha256": "e8ce70d1e9586322a3a21112a0a931a35999462e5a9bd645d4ee83bba9243423"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S07.jpg",
+                "sha256": "77f86b15b8bb66e0e239884346adf59d8b04d9f3cf21eaaedbb249849fefd45e"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S08.jpg",
+                "sha256": "318331e41f180fe12772dc3a4347f2339bbcb4530a41d5630e4f84907a9250c4"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-10"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-10",
+            "time": {
+              "start": 802.2,
+              "end": 808.8
+            },
+            "operation": "add",
+            "semantic_label": "在第一幅图小球处新增红色 F合 方向箭头与标注",
+            "region": {
+              "x": 0.5703125,
+              "y": 0.5800653594771242,
+              "width": 0.1703125,
+              "height": 0.10947712418300654
+            },
+            "json_pointer": "/deltas/9",
+            "before_state_id": "tbv2-ly-003-b-state-09",
+            "after_state_id": "tbv2-ly-003-b-state-10",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-13"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "teacher_partial_occlusion",
+              "new_arrow_not_modify"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-10-comparison.jpg",
+                "sha256": "a7d524fa4ffe15cb28155b236a5129256bb2e7b211206079eb0aa8a910046de6"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-10-mask.png",
+                "sha256": "b662b7c8c7c07d20ca5511700f09e7d8ae2c07c520119d0973b0d18eeb71c838"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-794000-board.jpg",
+                "sha256": "61c92038a75d65c1a3e7a609cadb07fc19ea3a96f5ff5a4fa020ac8bc0650bd0"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-830000-board.jpg",
+                "sha256": "2b4cc44a372637716f0d593b4cbd6f05ec749998b65f08d691fd65c7aef20318"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E008",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E008.jpg",
+          "sha256": "70c24cecdfe99f5d8d6befe92c5f0ea7b5b82cb5b6b22f6fc73fef6c26f30289"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E008",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E008.png",
+          "sha256": "e8ce70d1e9586322a3a21112a0a931a35999462e5a9bd645d4ee83bba9243423"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E008",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S07.jpg",
+          "sha256": "77f86b15b8bb66e0e239884346adf59d8b04d9f3cf21eaaedbb249849fefd45e"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E008",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S08.jpg",
+          "sha256": "318331e41f180fe12772dc3a4347f2339bbcb4530a41d5630e4f84907a9250c4"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-10",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-10-comparison.jpg",
+          "sha256": "a7d524fa4ffe15cb28155b236a5129256bb2e7b211206079eb0aa8a910046de6"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-10",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-10-mask.png",
+          "sha256": "b662b7c8c7c07d20ca5511700f09e7d8ae2c07c520119d0973b0d18eeb71c838"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-10",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-794000-board.jpg",
+          "sha256": "61c92038a75d65c1a3e7a609cadb07fc19ea3a96f5ff5a4fa020ac8bc0650bd0"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-10",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-830000-board.jpg",
+          "sha256": "2b4cc44a372637716f0d593b4cbd6f05ec749998b65f08d691fd65c7aef20318"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G11",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E009",
+        "LY003-A-DELTA-E010"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-11"
+      ],
+      "alignment_window": {
+        "start": 841,
+        "end": 853.75
+      },
+      "temporal_union_iou": 0.6627450980392192,
+      "visual_candidate_label": "新增公式 F合=mg sinθ，并继续追加 =ma",
+      "boundary_and_object_split_difference": "A 拆为主公式与追加 =ma 两个 ADD；B 合为完整公式一个 ADD。",
+      "required_human_check": "裁决 1 或 2 个原子 ADD；追加内容不替换原公式，严禁误判 MODIFY。",
+      "focus_codes": [
+        "two_a_to_one_b",
+        "continuation_not_modify"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E009",
+          "LY003-A-DELTA-E010"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E009",
+            "time": {
+              "start": 842.25,
+              "end": 849.25
+            },
+            "operation": "add",
+            "semantic_label": "新增公式① F合=mg sinθ",
+            "region": {
+              "x": 0.8,
+              "y": 0.54,
+              "width": 0.19,
+              "height": 0.07
+            },
+            "json_pointer": "/deltas/8",
+            "before_state_id": "LY003-A-STATE-S08",
+            "after_state_id": "LY003-A-STATE-S09",
+            "affected_object_ids": [
+              "LY003-A-O009"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E009.jpg",
+                "sha256": "a2b8c2e29847b18610078536643ab1c6db7fbf3a68704020c31fa69bc2321842"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E009.png",
+                "sha256": "eb994257811ec90e38ea729e87041cf64626aad75ea840bd5b62446e34be4899"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S08.jpg",
+                "sha256": "318331e41f180fe12772dc3a4347f2339bbcb4530a41d5630e4f84907a9250c4"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S09.jpg",
+                "sha256": "8cd6357ed64479b5f5ee52c0eed1f6a53cffd6c5833eba4f436c6340a319210e"
+              }
+            }
+          },
+          {
+            "event_id": "LY003-A-DELTA-E010",
+            "time": {
+              "start": 852.25,
+              "end": 853.75
+            },
+            "operation": "add",
+            "semantic_label": "在既有公式右侧追加=ma；原公式字迹保留，严格标为ADD而非MODIFY",
+            "region": {
+              "x": 0.955,
+              "y": 0.54,
+              "width": 0.045,
+              "height": 0.07
+            },
+            "json_pointer": "/deltas/9",
+            "before_state_id": "LY003-A-STATE-S09",
+            "after_state_id": "LY003-A-STATE-S10",
+            "affected_object_ids": [
+              "LY003-A-O010"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed",
+              "strict_add_not_modify_old_marks_persist"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E010.jpg",
+                "sha256": "2b22315435baac18388e6c2bbe9f9c7c06b30fd16c787e24d8f4b97c8de7a401"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E010.png",
+                "sha256": "c1696d5264d21362ba33e19a184e214c6157c1c1189fd5f9c4ef4bd34e1863ca"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S09.jpg",
+                "sha256": "8cd6357ed64479b5f5ee52c0eed1f6a53cffd6c5833eba4f436c6340a319210e"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S10.jpg",
+                "sha256": "f785accfcd29c48b5323fb61801972a040d767d32177d5c3d08e61138401f771"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-11"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-11",
+            "time": {
+              "start": 841,
+              "end": 853.7
+            },
+            "operation": "add",
+            "semantic_label": "在第一幅图右侧新增公式行 F合=mg sinθ=ma",
+            "region": {
+              "x": 0.6203125,
+              "y": 0.4297385620915033,
+              "width": 0.3703125,
+              "height": 0.12091503267973856
+            },
+            "json_pointer": "/deltas/10",
+            "before_state_id": "tbv2-ly-003-b-state-10",
+            "after_state_id": "tbv2-ly-003-b-state-11",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-14"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "multi_stroke_formula_grouped",
+              "teacher_partial_occlusion"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-11-comparison.jpg",
+                "sha256": "175c042037984867033fbdaba3c72769931a787502e114c4939aa83f640ca7db"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-11-mask.png",
+                "sha256": "53b187e14349a698d6b0aa9676fb06d1d45e08b536e58eb16aaab6e3c43fb9bc"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-830000-board.jpg",
+                "sha256": "2b4cc44a372637716f0d593b4cbd6f05ec749998b65f08d691fd65c7aef20318"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-854100-board.jpg",
+                "sha256": "8321ba6c4a9f7df44a0a2d8b8a78b3e45c32fb1d0baf9e453d580e02276ffaaf"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E009",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E009.jpg",
+          "sha256": "a2b8c2e29847b18610078536643ab1c6db7fbf3a68704020c31fa69bc2321842"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E009",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E009.png",
+          "sha256": "eb994257811ec90e38ea729e87041cf64626aad75ea840bd5b62446e34be4899"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E009",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S08.jpg",
+          "sha256": "318331e41f180fe12772dc3a4347f2339bbcb4530a41d5630e4f84907a9250c4"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E009",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S09.jpg",
+          "sha256": "8cd6357ed64479b5f5ee52c0eed1f6a53cffd6c5833eba4f436c6340a319210e"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E010",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E010.jpg",
+          "sha256": "2b22315435baac18388e6c2bbe9f9c7c06b30fd16c787e24d8f4b97c8de7a401"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E010",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E010.png",
+          "sha256": "c1696d5264d21362ba33e19a184e214c6157c1c1189fd5f9c4ef4bd34e1863ca"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E010",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S09.jpg",
+          "sha256": "8cd6357ed64479b5f5ee52c0eed1f6a53cffd6c5833eba4f436c6340a319210e"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E010",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S10.jpg",
+          "sha256": "f785accfcd29c48b5323fb61801972a040d767d32177d5c3d08e61138401f771"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-11",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-11-comparison.jpg",
+          "sha256": "175c042037984867033fbdaba3c72769931a787502e114c4939aa83f640ca7db"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-11",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-11-mask.png",
+          "sha256": "53b187e14349a698d6b0aa9676fb06d1d45e08b536e58eb16aaab6e3c43fb9bc"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-11",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-830000-board.jpg",
+          "sha256": "2b4cc44a372637716f0d593b4cbd6f05ec749998b65f08d691fd65c7aef20318"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-11",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-854100-board.jpg",
+          "sha256": "8321ba6c4a9f7df44a0a2d8b8a78b3e45c32fb1d0baf9e453d580e02276ffaaf"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          2,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G12",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E011"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-12"
+      ],
+      "alignment_window": {
+        "start": 854.4,
+        "end": 858.8
+      },
+      "temporal_union_iou": 0.7386363636363674,
+      "visual_candidate_label": "新增结论 a=g sinθ",
+      "boundary_and_object_split_difference": "一对一；边界略有差异。",
+      "required_human_check": "核对结论完成边界与可见转写。",
+      "focus_codes": [
+        "boundary"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E011"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E011",
+            "time": {
+              "start": 855.25,
+              "end": 858.5
+            },
+            "operation": "add",
+            "semantic_label": "新增推导结果∴ a=g sinθ",
+            "region": {
+              "x": 0.83,
+              "y": 0.61,
+              "width": 0.17,
+              "height": 0.07
+            },
+            "json_pointer": "/deltas/10",
+            "before_state_id": "LY003-A-STATE-S10",
+            "after_state_id": "LY003-A-STATE-S11",
+            "affected_object_ids": [
+              "LY003-A-O011"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E011.jpg",
+                "sha256": "837b0a63c07bd04ab8ab81c9e8bcc4ee0b8e379bb92bc1ccc435e3fdba685a61"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E011.png",
+                "sha256": "1d37dc2dd57880f54e51da97e3b9e1f3fee421c71035ef9489a63747acd37b18"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S10.jpg",
+                "sha256": "f785accfcd29c48b5323fb61801972a040d767d32177d5c3d08e61138401f771"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S11.jpg",
+                "sha256": "17d3b35eb27bf6b4bd028d9af20bb71a1737087ab6a03d3bb4a9911bdda082f2"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-12"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-12",
+            "time": {
+              "start": 854.4,
+              "end": 858.8
+            },
+            "operation": "add",
+            "semantic_label": "在上一公式下方新增结论 a=g sinθ",
+            "region": {
+              "x": 0.6703125,
+              "y": 0.5294117647058824,
+              "width": 0.21015625,
+              "height": 0.08986928104575163
+            },
+            "json_pointer": "/deltas/11",
+            "before_state_id": "tbv2-ly-003-b-state-11",
+            "after_state_id": "tbv2-ly-003-b-state-12",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-15"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "teacher_partial_occlusion"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-12-comparison.jpg",
+                "sha256": "650d65bf51ae35be1fc82793e4bc2af45846d65a92a49bf6ad39f18fa1770ab6"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-12-mask.png",
+                "sha256": "0da7f1291b1f4d44518090f97a15bbe9e18a72ff45c6512f608d7b776c885bbe"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-854100-board.jpg",
+                "sha256": "8321ba6c4a9f7df44a0a2d8b8a78b3e45c32fb1d0baf9e453d580e02276ffaaf"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-870000-board.jpg",
+                "sha256": "11c940a9cfe5c18a5c4911579625ed47514a90932769e588014e35448732b80a"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E011",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E011.jpg",
+          "sha256": "837b0a63c07bd04ab8ab81c9e8bcc4ee0b8e379bb92bc1ccc435e3fdba685a61"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E011",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E011.png",
+          "sha256": "1d37dc2dd57880f54e51da97e3b9e1f3fee421c71035ef9489a63747acd37b18"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E011",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S10.jpg",
+          "sha256": "f785accfcd29c48b5323fb61801972a040d767d32177d5c3d08e61138401f771"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E011",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S11.jpg",
+          "sha256": "17d3b35eb27bf6b4bd028d9af20bb71a1737087ab6a03d3bb4a9911bdda082f2"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-12",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-12-comparison.jpg",
+          "sha256": "650d65bf51ae35be1fc82793e4bc2af45846d65a92a49bf6ad39f18fa1770ab6"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-12",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-12-mask.png",
+          "sha256": "0da7f1291b1f4d44518090f97a15bbe9e18a72ff45c6512f608d7b776c885bbe"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-12",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-854100-board.jpg",
+          "sha256": "8321ba6c4a9f7df44a0a2d8b8a78b3e45c32fb1d0baf9e453d580e02276ffaaf"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-12",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-870000-board.jpg",
+          "sha256": "11c940a9cfe5c18a5c4911579625ed47514a90932769e588014e35448732b80a"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G13",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E012"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-13"
+      ],
+      "alignment_window": {
+        "start": 884,
+        "end": 889.25
+      },
+      "temporal_union_iou": 0.9047619047619048,
+      "visual_candidate_label": "右下空白处新增第二幅斜面小球图",
+      "boundary_and_object_split_difference": "一对一；第一幅图同时持续存在。",
+      "required_human_check": "核心困难负例：相似新图是独立新增对象，只支持 ADD，不支持 MODIFY。",
+      "focus_codes": [
+        "second_diagram_not_modify"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E012"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E012",
+            "time": {
+              "start": 884.25,
+              "end": 889.25
+            },
+            "operation": "add",
+            "semantic_label": "新增第二幅斜面与小球图示",
+            "region": {
+              "x": 0.68,
+              "y": 0.59,
+              "width": 0.25,
+              "height": 0.23
+            },
+            "json_pointer": "/deltas/11",
+            "before_state_id": "LY003-A-STATE-S11",
+            "after_state_id": "LY003-A-STATE-S12",
+            "affected_object_ids": [
+              "LY003-A-O012"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E012.jpg",
+                "sha256": "b310070da652eb439e8a4dfbd61c2fc3ed2cbb4b49c84456743df04dbdd2fc06"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E012.png",
+                "sha256": "69b89169ff1509bdcffc81b460573a5112b53fa92d032b64655b5439ad0f0e92"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S11.jpg",
+                "sha256": "17d3b35eb27bf6b4bd028d9af20bb71a1737087ab6a03d3bb4a9911bdda082f2"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S12.jpg",
+                "sha256": "d791688e7b69ecee7743154ddf2335d1d9e88f8a47fbe204f02dc2a11ec72694"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-13"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-13",
+            "time": {
+              "start": 884,
+              "end": 889
+            },
+            "operation": "add",
+            "semantic_label": "在右下空白区域另画第二幅斜面小球图（第一幅图保留）",
+            "region": {
+              "x": 0.68984375,
+              "y": 0.5196078431372549,
+              "width": 0.26015625,
+              "height": 0.35947712418300654
+            },
+            "json_pointer": "/deltas/12",
+            "before_state_id": "tbv2-ly-003-b-state-12",
+            "after_state_id": "tbv2-ly-003-b-state-13",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-16"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "multi_stroke_object_grouped",
+              "second_diagram_spatially_distinct_not_modify",
+              "teacher_partial_occlusion"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-13-comparison.jpg",
+                "sha256": "b69d4383f5309be161e45b6e68182f1bb1f6af2a7e8d5fa3fea1498b6b43200a"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-13-mask.png",
+                "sha256": "bf60ff1c03e74945e3b54f71f31acb428d6b3ec558acb233aceef411c302ff7b"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-870000-board.jpg",
+                "sha256": "11c940a9cfe5c18a5c4911579625ed47514a90932769e588014e35448732b80a"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-890000-board.jpg",
+                "sha256": "e39514848e09f34c5afe447a849543a05fdc67627341c0dee5fa2e5536009a3a"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E012",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E012.jpg",
+          "sha256": "b310070da652eb439e8a4dfbd61c2fc3ed2cbb4b49c84456743df04dbdd2fc06"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E012",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E012.png",
+          "sha256": "69b89169ff1509bdcffc81b460573a5112b53fa92d032b64655b5439ad0f0e92"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E012",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S11.jpg",
+          "sha256": "17d3b35eb27bf6b4bd028d9af20bb71a1737087ab6a03d3bb4a9911bdda082f2"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E012",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S12.jpg",
+          "sha256": "d791688e7b69ecee7743154ddf2335d1d9e88f8a47fbe204f02dc2a11ec72694"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-13",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-13-comparison.jpg",
+          "sha256": "b69d4383f5309be161e45b6e68182f1bb1f6af2a7e8d5fa3fea1498b6b43200a"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-13",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-13-mask.png",
+          "sha256": "bf60ff1c03e74945e3b54f71f31acb428d6b3ec558acb233aceef411c302ff7b"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-13",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-870000-board.jpg",
+          "sha256": "11c940a9cfe5c18a5c4911579625ed47514a90932769e588014e35448732b80a"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-13",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-890000-board.jpg",
+          "sha256": "e39514848e09f34c5afe447a849543a05fdc67627341c0dee5fa2e5536009a3a"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G14",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E013"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-14",
+        "tbv2-ly-003-b-delta-15"
+      ],
+      "alignment_window": {
+        "start": 892.25,
+        "end": 896.2
+      },
+      "temporal_union_iou": 0.7848101265822752,
+      "visual_candidate_label": "第二幅图新增 mg 与 N 箭头/标注",
+      "boundary_and_object_split_difference": "A 合为 1 个事件，B 拆为 mg、N 两个事件。",
+      "required_human_check": "裁决 1 或 2 个原子 ADD；新增受力对象不修改第二幅图本体。",
+      "focus_codes": [
+        "one_a_to_two_b",
+        "new_arrows_not_modify"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E013"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E013",
+            "time": {
+              "start": 892.25,
+              "end": 896
+            },
+            "operation": "add",
+            "semantic_label": "在第二幅斜面图新增重力与支持力箭头及mg、N标注",
+            "region": {
+              "x": 0.7,
+              "y": 0.55,
+              "width": 0.11,
+              "height": 0.21
+            },
+            "json_pointer": "/deltas/12",
+            "before_state_id": "LY003-A-STATE-S12",
+            "after_state_id": "LY003-A-STATE-S13",
+            "affected_object_ids": [
+              "LY003-A-O013"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E013.jpg",
+                "sha256": "b565519be2480132a3e49d2cd037a49dcbf90d2b0d6cff996c85186b5096aad6"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E013.png",
+                "sha256": "2642577abc10affd9f1a7945fc6e7c763fede5727fe17c403e5ba771b7cf6004"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S12.jpg",
+                "sha256": "d791688e7b69ecee7743154ddf2335d1d9e88f8a47fbe204f02dc2a11ec72694"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S13.jpg",
+                "sha256": "b0d0e658fdf9d9f50dc73b2ea2dda8dbfb8eb932a9205f358ea4061da937854b"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-14",
+          "tbv2-ly-003-b-delta-15"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-14",
+            "time": {
+              "start": 892.4,
+              "end": 894.3
+            },
+            "operation": "add",
+            "semantic_label": "在第二幅图小球处新增向下的 mg 箭头与标注",
+            "region": {
+              "x": 0.7203125,
+              "y": 0.5800653594771242,
+              "width": 0.0796875,
+              "height": 0.23039215686274508
+            },
+            "json_pointer": "/deltas/13",
+            "before_state_id": "tbv2-ly-003-b-state-13",
+            "after_state_id": "tbv2-ly-003-b-state-14",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-17"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "short_stable_interval",
+              "teacher_partial_occlusion",
+              "new_arrow_not_modify"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-14-comparison.jpg",
+                "sha256": "6f0e77c30a3d4c172af2447e73856c4a8a3e6dcca8b57e2980f9024fd9d7078b"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-14-mask.png",
+                "sha256": "0e08cea9912bb9594ed9fee8bf442041fd09b2bb2e7324b34857d188f8d2c241"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-890000-board.jpg",
+                "sha256": "e39514848e09f34c5afe447a849543a05fdc67627341c0dee5fa2e5536009a3a"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-894600-board.jpg",
+                "sha256": "fd9a7aed70817c6a4bc9f9d64dc1ab5d36598cd13df18b640d907670e9b82fc0"
+              }
+            }
+          },
+          {
+            "event_id": "tbv2-ly-003-b-delta-15",
+            "time": {
+              "start": 894.8,
+              "end": 896.2
+            },
+            "operation": "add",
+            "semantic_label": "在第二幅图小球处新增 N 箭头与标注",
+            "region": {
+              "x": 0.71015625,
+              "y": 0.4803921568627451,
+              "width": 0.1,
+              "height": 0.16993464052287582
+            },
+            "json_pointer": "/deltas/14",
+            "before_state_id": "tbv2-ly-003-b-state-14",
+            "after_state_id": "tbv2-ly-003-b-state-15",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-18"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "short_stable_interval",
+              "teacher_partial_occlusion",
+              "new_arrow_not_modify"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-15-comparison.jpg",
+                "sha256": "38aa6591bb52b2de9b905b9186517b2a3812ed2763b08c9b23ff6dc79936176a"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-15-mask.png",
+                "sha256": "f848f62720ea6670f19143b3495b9201e58db02b1b0e0873c76fb588fce33950"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-894600-board.jpg",
+                "sha256": "fd9a7aed70817c6a4bc9f9d64dc1ab5d36598cd13df18b640d907670e9b82fc0"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-900000-board.jpg",
+                "sha256": "8af107dd4e391f5344ce47a1c298555236bb45215fe500e3b2026f8e941fb32e"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E013",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E013.jpg",
+          "sha256": "b565519be2480132a3e49d2cd037a49dcbf90d2b0d6cff996c85186b5096aad6"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E013",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E013.png",
+          "sha256": "2642577abc10affd9f1a7945fc6e7c763fede5727fe17c403e5ba771b7cf6004"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E013",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S12.jpg",
+          "sha256": "d791688e7b69ecee7743154ddf2335d1d9e88f8a47fbe204f02dc2a11ec72694"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E013",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S13.jpg",
+          "sha256": "b0d0e658fdf9d9f50dc73b2ea2dda8dbfb8eb932a9205f358ea4061da937854b"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-14",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-14-comparison.jpg",
+          "sha256": "6f0e77c30a3d4c172af2447e73856c4a8a3e6dcca8b57e2980f9024fd9d7078b"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-14",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-14-mask.png",
+          "sha256": "0e08cea9912bb9594ed9fee8bf442041fd09b2bb2e7324b34857d188f8d2c241"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-14",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-890000-board.jpg",
+          "sha256": "e39514848e09f34c5afe447a849543a05fdc67627341c0dee5fa2e5536009a3a"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-14",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-894600-board.jpg",
+          "sha256": "fd9a7aed70817c6a4bc9f9d64dc1ab5d36598cd13df18b640d907670e9b82fc0"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-15",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-15-comparison.jpg",
+          "sha256": "38aa6591bb52b2de9b905b9186517b2a3812ed2763b08c9b23ff6dc79936176a"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-15",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-15-mask.png",
+          "sha256": "f848f62720ea6670f19143b3495b9201e58db02b1b0e0873c76fb588fce33950"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-15",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-894600-board.jpg",
+          "sha256": "fd9a7aed70817c6a4bc9f9d64dc1ab5d36598cd13df18b640d907670e9b82fc0"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-15",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-900000-board.jpg",
+          "sha256": "8af107dd4e391f5344ce47a1c298555236bb45215fe500e3b2026f8e941fb32e"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          2,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G15",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E014"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-16"
+      ],
+      "alignment_window": {
+        "start": 904.1,
+        "end": 909.2
+      },
+      "temporal_union_iou": 0.5392156862745074,
+      "visual_candidate_label": "第二幅图新增红色水平向右合力箭头",
+      "boundary_and_object_split_difference": "一对一；B 时间包络更长，A 结束更早。",
+      "required_human_check": "核对主箭头完成边界；后续辅助线另见 G16。",
+      "focus_codes": [
+        "boundary",
+        "new_arrow_not_modify"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E014"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E014",
+            "time": {
+              "start": 904.25,
+              "end": 907
+            },
+            "operation": "add",
+            "semantic_label": "在第二幅受力图新增水平向右的红色合力箭头",
+            "region": {
+              "x": 0.72,
+              "y": 0.61,
+              "width": 0.12,
+              "height": 0.09
+            },
+            "json_pointer": "/deltas/13",
+            "before_state_id": "LY003-A-STATE-S13",
+            "after_state_id": "LY003-A-STATE-S14",
+            "affected_object_ids": [
+              "LY003-A-O014"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E014.jpg",
+                "sha256": "cab08fb811c49452e742e235be85bce0f85aed4dc7b3d2223c0c9b42bd5d41a6"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E014.png",
+                "sha256": "195884d219dc2030efd8b76f9f9f63892a5544469ef9cb6b7100b9ca2008a7f0"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S13.jpg",
+                "sha256": "b0d0e658fdf9d9f50dc73b2ea2dda8dbfb8eb932a9205f358ea4061da937854b"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S14.jpg",
+                "sha256": "f419758ee481f89a37e5c1d18c7f5310094457a43276c2eb4ca07deb776530cc"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-16"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-16",
+            "time": {
+              "start": 904.1,
+              "end": 909.2
+            },
+            "operation": "add",
+            "semantic_label": "在第二幅图小球处新增红色水平向右箭头",
+            "region": {
+              "x": 0.7203125,
+              "y": 0.5702614379084967,
+              "width": 0.15,
+              "height": 0.09967320261437909
+            },
+            "json_pointer": "/deltas/15",
+            "before_state_id": "tbv2-ly-003-b-state-15",
+            "after_state_id": "tbv2-ly-003-b-state-16",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-19"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "teacher_partial_occlusion",
+              "new_arrow_not_modify"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-16-comparison.jpg",
+                "sha256": "acc361184c2cf41eb5d947e974a4d789e07267dba3842afb36d5f7a9716268c1"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-16-mask.png",
+                "sha256": "607cf3b15cc7ea8c501aa6d1b0e2d8ba39d3b43889edb1049ef3555a9555a3b9"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-900000-board.jpg",
+                "sha256": "8af107dd4e391f5344ce47a1c298555236bb45215fe500e3b2026f8e941fb32e"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-917500-board.jpg",
+                "sha256": "2f70249385c43f8a9a9023a46c650e11dd0a70f436a6ebf7b7ac2af2a89fb214"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E014",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E014.jpg",
+          "sha256": "cab08fb811c49452e742e235be85bce0f85aed4dc7b3d2223c0c9b42bd5d41a6"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E014",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E014.png",
+          "sha256": "195884d219dc2030efd8b76f9f9f63892a5544469ef9cb6b7100b9ca2008a7f0"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E014",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S13.jpg",
+          "sha256": "b0d0e658fdf9d9f50dc73b2ea2dda8dbfb8eb932a9205f358ea4061da937854b"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E014",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S14.jpg",
+          "sha256": "f419758ee481f89a37e5c1d18c7f5310094457a43276c2eb4ca07deb776530cc"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-16",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-16-comparison.jpg",
+          "sha256": "acc361184c2cf41eb5d947e974a4d789e07267dba3842afb36d5f7a9716268c1"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-16",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-16-mask.png",
+          "sha256": "607cf3b15cc7ea8c501aa6d1b0e2d8ba39d3b43889edb1049ef3555a9555a3b9"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-16",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-900000-board.jpg",
+          "sha256": "8af107dd4e391f5344ce47a1c298555236bb45215fe500e3b2026f8e941fb32e"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-16",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-917500-board.jpg",
+          "sha256": "2f70249385c43f8a9a9023a46c650e11dd0a70f436a6ebf7b7ac2af2a89fb214"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G16",
+      "alignment_class": "a_only",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E015"
+      ],
+      "b_event_ids": [],
+      "alignment_window": {
+        "start": 911,
+        "end": 912.25
+      },
+      "temporal_union_iou": null,
+      "visual_candidate_label": "第二幅图新增红色合力作图辅助线",
+      "boundary_and_object_split_difference": "A-only；与 G15 不重叠，B 未冻结对应事件。",
+      "required_human_check": "核对 911.0–912.25 的新增线是否持久独立事件；可 ADD/reject/not_an_event/unknown。",
+      "focus_codes": [
+        "a_only",
+        "event_existence"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E015"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E015",
+            "time": {
+              "start": 911,
+              "end": 912.25
+            },
+            "operation": "add",
+            "semantic_label": "在第二幅受力图新增红色合力作图辅助线",
+            "region": {
+              "x": 0.72,
+              "y": 0.58,
+              "width": 0.12,
+              "height": 0.17
+            },
+            "json_pointer": "/deltas/14",
+            "before_state_id": "LY003-A-STATE-S14",
+            "after_state_id": "LY003-A-STATE-S15",
+            "affected_object_ids": [
+              "LY003-A-O015"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E015.jpg",
+                "sha256": "76cb14d30eaf5cafd7206163bc71374bbb86da6eb97c691685eb9b2cf5e4c2a9"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E015.png",
+                "sha256": "3e27273e2aa6ca8cd9a482730a9ea1051eed30ee288d9fd4b813377ebaadb78e"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S14.jpg",
+                "sha256": "f419758ee481f89a37e5c1d18c7f5310094457a43276c2eb4ca07deb776530cc"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S15.jpg",
+                "sha256": "ef25e238cfa64a6baf61a67352d7ee23c25d7cee092214c6db6496bed6577a06"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [],
+        "events": []
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E015",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E015.jpg",
+          "sha256": "76cb14d30eaf5cafd7206163bc71374bbb86da6eb97c691685eb9b2cf5e4c2a9"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E015",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E015.png",
+          "sha256": "3e27273e2aa6ca8cd9a482730a9ea1051eed30ee288d9fd4b813377ebaadb78e"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E015",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S14.jpg",
+          "sha256": "f419758ee481f89a37e5c1d18c7f5310094457a43276c2eb4ca07deb776530cc"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E015",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S15.jpg",
+          "sha256": "ef25e238cfa64a6baf61a67352d7ee23c25d7cee092214c6db6496bed6577a06"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G17",
+      "alignment_class": "matched",
+      "alignment_method": "connected_component_of_strict_temporal_overlap",
+      "a_event_ids": [
+        "LY003-A-DELTA-E016"
+      ],
+      "b_event_ids": [
+        "tbv2-ly-003-b-delta-17"
+      ],
+      "alignment_window": {
+        "start": 917.75,
+        "end": 919.3
+      },
+      "temporal_union_iou": 0.6129032258064989,
+      "visual_candidate_label": "第二幅图底角新增红色 θ 标记",
+      "boundary_and_object_split_difference": "一对一；B 结束略晚。",
+      "required_human_check": "核对角标完成边界；新角标不修改原斜面图。",
+      "focus_codes": [
+        "boundary",
+        "new_mark_not_modify"
+      ],
+      "a_side": {
+        "event_ids": [
+          "LY003-A-DELTA-E016"
+        ],
+        "events": [
+          {
+            "event_id": "LY003-A-DELTA-E016",
+            "time": {
+              "start": 917.75,
+              "end": 918.75
+            },
+            "operation": "add",
+            "semantic_label": "在第二幅斜面图底角新增红色θ标记",
+            "region": {
+              "x": 0.8,
+              "y": 0.73,
+              "width": 0.08,
+              "height": 0.08
+            },
+            "json_pointer": "/deltas/15",
+            "before_state_id": "LY003-A-STATE-S15",
+            "after_state_id": "LY003-A-STATE-S16",
+            "affected_object_ids": [
+              "LY003-A-O016"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "coarse_region_mask",
+              "no_asr_used",
+              "physical_chalkboard_occlusion_reviewed"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E016.jpg",
+                "sha256": "09f654547faccedda7e298a3f2e4e8cbbada931a78670e473d05a4cbd8061d95"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E016.png",
+                "sha256": "231e8e698a0596075337dac99e2d77d655afffda5454e271133f14028fb13093"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S15.jpg",
+                "sha256": "ef25e238cfa64a6baf61a67352d7ee23c25d7cee092214c6db6496bed6577a06"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S16.jpg",
+                "sha256": "004faec6892c1971fc54a99bc20d61abdd089f92c25b20e84c494ff16b86c207"
+              }
+            }
+          }
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "tbv2-ly-003-b-delta-17"
+        ],
+        "events": [
+          {
+            "event_id": "tbv2-ly-003-b-delta-17",
+            "time": {
+              "start": 917.8,
+              "end": 919.3
+            },
+            "operation": "add",
+            "semantic_label": "在第二幅图斜面底角处新增红色角标记 θ",
+            "region": {
+              "x": 0.76171875,
+              "y": 0.6699346405228758,
+              "width": 0.09375,
+              "height": 0.17973856209150327
+            },
+            "json_pointer": "/deltas/16",
+            "before_state_id": "tbv2-ly-003-b-state-16",
+            "after_state_id": "tbv2-ly-003-b-state-17",
+            "affected_object_ids": [
+              "tbv2-ly-003-b-object-20"
+            ],
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "short_stable_interval",
+              "teacher_partial_occlusion",
+              "red_angle_mark_add_not_modify"
+            ],
+            "evidence": {
+              "comparison_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-17-comparison.jpg",
+                "sha256": "003eeb8d2effa4ca432f87ba223aa130f4be3e90e3e8b476f0b7d3cf30e86680"
+              },
+              "delta_mask": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-17-mask.png",
+                "sha256": "31654c27ae1c5d4dd752fd7a671e858b2378b87bc20187e6307fb7aa5f55c405"
+              },
+              "before_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-917500-board.jpg",
+                "sha256": "2f70249385c43f8a9a9023a46c650e11dd0a70f436a6ebf7b7ac2af2a89fb214"
+              },
+              "after_state_asset": {
+                "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-919600-board.jpg",
+                "sha256": "525a544974bc2cba2779cc6b09869936c120812da53e2c4f4b629ee6816877fd"
+              }
+            }
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E016",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/comparison-E016.jpg",
+          "sha256": "09f654547faccedda7e298a3f2e4e8cbbada931a78670e473d05a4cbd8061d95"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E016",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/mask-E016.png",
+          "sha256": "231e8e698a0596075337dac99e2d77d655afffda5454e271133f14028fb13093"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E016",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S15.jpg",
+          "sha256": "ef25e238cfa64a6baf61a67352d7ee23c25d7cee092214c6db6496bed6577a06"
+        },
+        {
+          "side": "A",
+          "event_id": "LY003-A-DELTA-E016",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a-assets/evidence/S16.jpg",
+          "sha256": "004faec6892c1971fc54a99bc20d61abdd089f92c25b20e84c494ff16b86c207"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-17",
+          "kind": "comparison_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-17-comparison.jpg",
+          "sha256": "003eeb8d2effa4ca432f87ba223aa130f4be3e90e3e8b476f0b7d3cf30e86680"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-17",
+          "kind": "delta_mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/deltas/b-d-17-mask.png",
+          "sha256": "31654c27ae1c5d4dd752fd7a671e858b2378b87bc20187e6307fb7aa5f55c405"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-17",
+          "kind": "before_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-917500-board.jpg",
+          "sha256": "2f70249385c43f8a9a9023a46c650e11dd0a70f436a6ebf7b7ac2af2a89fb214"
+        },
+        {
+          "side": "B",
+          "event_id": "tbv2-ly-003-b-delta-17",
+          "kind": "after_state_asset",
+          "path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/b-assets/boards/b-f-919600-board.jpg",
+          "sha256": "525a544974bc2cba2779cc6b09869936c120812da53e2c4f4b629ee6816877fd"
+        }
+      ],
+      "speech_ids": [],
+      "speech_evidence_status": "unavailable_no_independent_asr_burned_subtitles_excluded",
+      "proposal": {
+        "candidate_operation_from_frozen_visual_inputs": "add",
+        "allowed_decisions": [
+          "add",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "candidate_event_count_options": [
+          0,
+          1,
+          "unknown"
+        ],
+        "automatic_acceptance_allowed": false,
+        "accepted": false,
+        "pedagogical_role": "unknown",
+        "teacher_intent": "unknown",
+        "learner_effect": "unknown"
+      },
+      "unresolved_fields": [
+        "event_existence",
+        "operation",
+        "candidate_event_count",
+        "time",
+        "object_granularity",
+        "semantic_label",
+        "region",
+        "state_and_object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "selected_option": null,
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "signature_sha256": null,
+        "rationale": null,
+        "final_events": []
+      }
+    }
+  ],
+  "package_signoff": {
+    "decision_status": "pending_human",
+    "adjudicator_id": null,
+    "adjudicator_role": null,
+    "signed_at": null,
+    "signature_sha256": null,
+    "signed_group_ids": [],
+    "expected_group_ids": [
+      "G01",
+      "G02",
+      "G03",
+      "G04",
+      "G05",
+      "G06",
+      "G07",
+      "G08",
+      "G09",
+      "G10",
+      "G11",
+      "G12",
+      "G13",
+      "G14",
+      "G15",
+      "G16",
+      "G17"
+    ],
+    "notes": ""
+  }
+}

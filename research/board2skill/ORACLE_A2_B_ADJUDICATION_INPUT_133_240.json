@@ -1,0 +1,1169 @@
+{
+  "schema_version": "temporal-board-adjudication-intake-v1",
+  "intake_id": "tbv2-ly-004-01-a2-b-133-240-human-intake",
+  "package_id": "tbv2-ly-004-01-a2-b-133-240-human-intake",
+  "created_at": "2026-08-12",
+  "source_video_id": "phy-force-liyongle-004",
+  "clip": {
+    "clip_id": "tbv2-ly-004-01",
+    "source_record_id": "phy-force-liyongle-004",
+    "source_video_path": "data/raw/physics/force-pilot/phy-force-liyongle-004/source.mp4",
+    "source_video_sha256": "3811c42fb32f36e27754926062a1280b0b576edee91adca0d0a8f9a5362ad6d9"
+  },
+  "sources": {
+    "a2": {
+      "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-a-extension-133-240.json",
+      "sha256": "5f1f5f47b8c9370e978b07d93c7ef4a62053db60b273c070a44a7645560c8dcc"
+    },
+    "b": {
+      "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b.json",
+      "sha256": "4d079190ac20e9657b82aa20612810071c55319e1181e824dfd28c4111092bb4"
+    },
+    "asr_raw_context": {
+      "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/asr/clip-12-240.json",
+      "sha256": "d53b23e1e0156c3d36db7d98dd3131b876d777e13ab25999fab769a85c45177f",
+      "clip_start_offset_seconds": 12,
+      "use": "context_only_not_adjudicated"
+    }
+  },
+  "scope": {
+    "start": 133,
+    "end": 240,
+    "time_basis": "absolute_seconds_in_canonical_source_video"
+  },
+  "decision_status": "pending_human",
+  "review_states": [
+    "pending"
+  ],
+  "paper_gold_status": "blocked_pending_human_signoff",
+  "not_gold": true,
+  "inputs": [
+    {
+      "role": "annotator_a2",
+      "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-a-extension-133-240.json",
+      "sha256": "5f1f5f47b8c9370e978b07d93c7ef4a62053db60b273c070a44a7645560c8dcc"
+    },
+    {
+      "role": "annotator_b",
+      "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b.json",
+      "sha256": "4d079190ac20e9657b82aa20612810071c55319e1181e824dfd28c4111092bb4"
+    },
+    {
+      "role": "alignment_intake",
+      "asset_uri": "research/board2skill/ORACLE_A2_B_ALIGNMENT_133_240.md",
+      "sha256": "3b70aa6920586a426c19065c6ac03ff9d30b84c72e114adf5930ff51917843a0"
+    },
+    {
+      "role": "annotation_policy",
+      "asset_uri": "research/board2skill/DATA_AND_ANNOTATION_SPEC.md",
+      "sha256": "4068892dd320772a1743ba2b464a92a1d66084abcfd2c0c3d2d2edb287ad57d3"
+    },
+    {
+      "role": "runtime_contract",
+      "asset_uri": "packages/contracts/src/temporal-board.ts",
+      "sha256": "db231fc43433624252d8d014a64264173ef770e63c0b362b5397dbaf0b0f29f8"
+    },
+    {
+      "role": "asr_raw_context",
+      "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/asr/clip-12-240.json",
+      "sha256": "d53b23e1e0156c3d36db7d98dd3131b876d777e13ab25999fab769a85c45177f"
+    }
+  ],
+  "governance": {
+    "default_group_status": "pending_human",
+    "automatic_promotion_allowed": false,
+    "visual_facts_only": true,
+    "speech_evidence_used": [
+      {
+        "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/asr/clip-12-240.json",
+        "use": "context_only_not_adjudicated",
+        "normalization": "none"
+      }
+    ],
+    "learner_evidence_used": [],
+    "pedagogical_role": {
+      "value": "unknown",
+      "evidence_refs": []
+    },
+    "constraints": [
+      "This file is an adjudication intake ledger, not a temporal-board-v2 Gold bundle.",
+      "No proposal may become Gold or an accepted BoardDelta without explicit human sign-off.",
+      "Do not infer speech, learner response, learning effect, or teaching intent from board changes or burned-in subtitles.",
+      "A new physical force vector is normally ADD unless it establishes a relation between at least two existing anchors.",
+      "CONNECT requires persistent source and target anchors, a newly created connector object, and an explicit relation type.",
+      "When a visible change is reliable but its pedagogical role is not, preserve the visual event and keep the role unknown."
+    ],
+    "blocked_outputs_until_signoff": [
+      "temporal_board_v2_gold_bundle",
+      "accepted_board_delta",
+      "accepted_teaching_transition",
+      "paper_gold_claim"
+    ]
+  },
+  "coverage": {
+    "alignment_group_count": 7,
+    "a2_event_ids": [
+      "tbv2-ly-004-01-a2-d011",
+      "tbv2-ly-004-01-a2-d012",
+      "tbv2-ly-004-01-a2-d013",
+      "tbv2-ly-004-01-a2-d014",
+      "tbv2-ly-004-01-a2-d015",
+      "tbv2-ly-004-01-a2-d016",
+      "tbv2-ly-004-01-a2-d017",
+      "tbv2-ly-004-01-a2-d018",
+      "tbv2-ly-004-01-a2-d019"
+    ],
+    "b_event_ids": [
+      "B-DELTA-09",
+      "B-DELTA-10",
+      "B-DELTA-11",
+      "B-DELTA-12",
+      "B-DELTA-13",
+      "B-DELTA-14",
+      "B-DELTA-15"
+    ],
+    "unmatched_a2_event_ids": [],
+    "unmatched_b_event_ids": [],
+    "proposed_candidate_event_count": 9,
+    "reviewed_no_change_intervals": [
+      {"start": 133.0, "end": 138.0},
+      {"start": 148.25, "end": 152.25},
+      {"start": 154.75, "end": 158.5},
+      {"start": 167.75, "end": 177.0},
+      {"start": 206.0, "end": 224.0},
+      {"start": 237.25, "end": 240.0}
+    ]
+  },
+  "items": [
+    {
+      "group_id": "G01",
+      "a_event_ids": ["tbv2-ly-004-01-a2-d011", "tbv2-ly-004-01-a2-d012"],
+      "b_event_ids": ["B-DELTA-09"],
+      "evidence_assets": [
+        {"side": "A2", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d011-before-after.jpg", "sha256": "91ecd82cc8f68df1c709afe2d5698eb55448c8d15abb056dfa91ae2eda7fc3f1"},
+        {"side": "A2", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d012-before-after.jpg", "sha256": "7ec77b94b9f8d1ddfcac14457453c7aeabad3abc6a91277f3c1fe61f1ddc67f5"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-09-before-after.jpg", "sha256": "b538ee7a631309a682c3c71518be454d07a074831a97c381d64c520a1dce5f8c"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-09-region-mask.png", "sha256": "594d190c3b53681ccc6b49654f3cb5e9365431c90256d6b6acb7f3e8207f0d4a"}
+      ],
+      "asr_segment_indexes": [42, 43, 44, 45, 46],
+      "raw_text": "那我们是不是可以先把这个人所受到的支持力和重力先合起来 对吧 这个力有多大 支持力1.2MG 减重力MG 那就是1/5MG 所以这个人在数值方向就受到一个1/5MG的力",
+      "speech_evidence_status": "context_only_not_adjudicated",
+      "asr_time_basis": "clip_relative_seconds; add 12 seconds for source time",
+      "alignment_window": {"start": 138.0, "end": 150.2},
+      "a_side": {
+        "event_ids": ["tbv2-ly-004-01-a2-d011", "tbv2-ly-004-01-a2-d012"],
+        "events": [
+          {
+            "event_id": "tbv2-ly-004-01-a2-d011",
+            "time": {"start": 138.0, "end": 140.0},
+            "operation": "add",
+            "semantic_label": "在左中下方新增竖直向上的合力分量箭头",
+            "source_pointer": "/board_deltas/0"
+          },
+          {
+            "event_id": "tbv2-ly-004-01-a2-d012",
+            "time": {"start": 140.25, "end": 148.0},
+            "operation": "add",
+            "semantic_label": "在竖直箭头旁写 F₁=1/5mg",
+            "source_pointer": "/board_deltas/1"
+          }
+        ],
+        "evidence": {
+          "comparison_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d011-before-after.jpg",
+              "sha256": "91ecd82cc8f68df1c709afe2d5698eb55448c8d15abb056dfa91ae2eda7fc3f1"
+            },
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d012-before-after.jpg",
+              "sha256": "7ec77b94b9f8d1ddfcac14457453c7aeabad3abc6a91277f3c1fe61f1ddc67f5"
+            }
+          ],
+          "frame_refs": [
+            "a2-extension-frames-4fps/qsec-0552.jpg",
+            "a2-extension-frames-4fps/qsec-0560.jpg",
+            "a2-extension-frames-4fps/qsec-0561.jpg",
+            "a2-extension-frames-4fps/qsec-0592.jpg"
+          ]
+        }
+      },
+      "b_side": {
+        "event_ids": ["B-DELTA-09"],
+        "events": [
+          {
+            "event_id": "B-DELTA-09",
+            "time": {"start": 138.5, "end": 150.2},
+            "operation": "add",
+            "semantic_label": "添加竖直合力分量箭头及约为 N-mg=mg/5 的标注",
+            "source_pointer": "/deltas/8",
+            "evidence_refs": ["B-EV-F08", "B-EV-F09"]
+          }
+        ],
+        "evidence": {
+          "comparison_asset": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-09-before-after.jpg",
+            "sha256": "b538ee7a631309a682c3c71518be454d07a074831a97c381d64c520a1dce5f8c"
+          },
+          "delta_mask": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-09-region-mask.png",
+            "sha256": "594d190c3b53681ccc6b49654f3cb5e9365431c90256d6b6acb7f3e8207f0d4a"
+          },
+          "frame_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0133.jpg",
+              "sha256": "709327580d37a64f88a9e800b84911c0d9cf0274ef0cae5811e9b93c7fbd546f"
+            },
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0151.jpg",
+              "sha256": "d6020cbbe8292b3e563108a932ec8fc54303c3a85356b07d6638e26e3cba89c2"
+            }
+          ]
+        }
+      },
+      "proposal": {
+        "recommended_action": "split",
+        "recommended_event_count": 2,
+        "rationale": "The drawing and equation are separated by a change in object type and a visible boundary; B merged both into one compound event.",
+        "candidate_events": [
+          {
+            "candidate_id": "G01-C1",
+            "source_event_refs": ["tbv2-ly-004-01-a2-d011", "B-DELTA-09"],
+            "time": {"start": 138.0, "end": 140.0},
+            "operation": "add",
+            "semantic_label": "新增竖直向上的合力分量箭头",
+            "region": {"x": 0.175, "y": 0.455, "width": 0.035, "height": 0.115},
+            "pedagogical_role": "unknown",
+            "decision_status": "pending_human"
+          },
+          {
+            "candidate_id": "G01-C2",
+            "source_event_refs": ["tbv2-ly-004-01-a2-d012", "B-DELTA-09"],
+            "time": {"start": 140.25, "end": 148.0},
+            "operation": "add",
+            "semantic_label": "建议转写：F₁=1/5mg",
+            "region": {"x": 0.205, "y": 0.43, "width": 0.105, "height": 0.105},
+            "pedagogical_role": "unknown",
+            "decision_status": "pending_human"
+          }
+        ],
+        "unresolved_fields": [
+          {
+            "field": "G01-C2.semantic_label",
+            "candidates": ["F₁=1/5mg", "N-mg=mg/5", "unreadable"],
+            "required_human_check": "Inspect original-resolution frames and decide only the visible chalk transcription."
+          },
+          {
+            "field": "candidate_event_granularity",
+            "candidates": ["split", "merge"],
+            "required_human_check": "Apply the frozen atomic-event rule and record a rationale."
+          },
+          {
+            "field": "before_state_id/after_state_id/object_ids",
+            "candidates": [],
+            "required_human_check": "Allocate contract-valid states and object identities after the split decision."
+          }
+        ]
+      },
+      "proposed": {
+        "decision": "split",
+        "time": [
+          {"candidate_id": "G01-C1", "start": 138.0, "end": 140.0},
+          {"candidate_id": "G01-C2", "start": 140.25, "end": 148.0}
+        ],
+        "operation": [
+          {"candidate_id": "G01-C1", "value": "add"},
+          {"candidate_id": "G01-C2", "value": "add"}
+        ],
+        "semantic_label": [
+          {"candidate_id": "G01-C1", "value": "新增竖直向上的合力分量箭头"},
+          {"candidate_id": "G01-C2", "value": "建议转写：F₁=1/5mg"}
+        ],
+        "granularity": "two_atomic_events"
+      },
+      "unresolved_fields": [
+        "G01-C2.semantic_label: F₁=1/5mg vs N-mg=mg/5 vs unreadable",
+        "candidate_event_granularity: split vs merge",
+        "before_state_id/after_state_id/object_ids"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "signature_sha256": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G02",
+      "a_event_ids": ["tbv2-ly-004-01-a2-d013"],
+      "b_event_ids": ["B-DELTA-10"],
+      "evidence_assets": [
+        {"side": "A2", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d013-before-after.jpg", "sha256": "270483c0e59354e4f89dcfd628c59b7a148ed4439b40dc5a659f5de2928a4fcd"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-10-before-after.jpg", "sha256": "32d64edf4a5589bea8596c9d770b1cb09799d73c0899541dd6a1f4caa2a289bd"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-10-region-mask.png", "sha256": "09ca035bc2e6f9f07dc474b464ef72bc7d8a5121ce8aa8b7213906907b80fe8a"}
+      ],
+      "asr_segment_indexes": [47],
+      "raw_text": "这个人在水平方向还受到一个向右的摩擦",
+      "speech_evidence_status": "context_only_not_adjudicated",
+      "asr_time_basis": "clip_relative_seconds; add 12 seconds for source time",
+      "alignment_window": {"start": 151.5, "end": 155.0},
+      "a_side": {
+        "event_ids": ["tbv2-ly-004-01-a2-d013"],
+        "events": [
+          {
+            "event_id": "tbv2-ly-004-01-a2-d013",
+            "time": {"start": 152.25, "end": 154.75},
+            "operation": "connect",
+            "semantic_label": "从 F₁ 箭头原点连接一条水平向右箭头并标记 f",
+            "source_pointer": "/board_deltas/2"
+          }
+        ],
+        "evidence": {
+          "comparison_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d013-before-after.jpg",
+              "sha256": "270483c0e59354e4f89dcfd628c59b7a148ed4439b40dc5a659f5de2928a4fcd"
+            }
+          ],
+          "frame_refs": [
+            "a2-extension-frames-4fps/qsec-0608.jpg",
+            "a2-extension-frames-4fps/qsec-0619.jpg"
+          ]
+        }
+      },
+      "b_side": {
+        "event_ids": ["B-DELTA-10"],
+        "events": [
+          {
+            "event_id": "B-DELTA-10",
+            "time": {"start": 151.5, "end": 155.0},
+            "operation": "add",
+            "semantic_label": "添加水平向右的摩擦力分量箭头 f",
+            "source_pointer": "/deltas/9",
+            "evidence_refs": ["B-EV-F09", "B-EV-F10"]
+          }
+        ],
+        "evidence": {
+          "comparison_asset": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-10-before-after.jpg",
+            "sha256": "32d64edf4a5589bea8596c9d770b1cb09799d73c0899541dd6a1f4caa2a289bd"
+          },
+          "delta_mask": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-10-region-mask.png",
+            "sha256": "09ca035bc2e6f9f07dc474b464ef72bc7d8a5121ce8aa8b7213906907b80fe8a"
+          },
+          "frame_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0151.jpg",
+              "sha256": "d6020cbbe8292b3e563108a932ec8fc54303c3a85356b07d6638e26e3cba89c2"
+            },
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0156.jpg",
+              "sha256": "2dbb1e165971dbb9f3065a6048553aed809e919e3a585146238f7c5386f7ef68"
+            }
+          ]
+        }
+      },
+      "proposal": {
+        "recommended_action": "merge_equivalent_content_resolve_operation",
+        "recommended_event_count": 1,
+        "rationale": "Both sides identify the same new force vector. Under the frozen policy, a new physical force vector is normally ADD; CONNECT would require two persistent anchors plus a connector relation, which neither source supplies for this stroke.",
+        "candidate_events": [
+          {
+            "candidate_id": "G02-C1",
+            "source_event_refs": ["tbv2-ly-004-01-a2-d013", "B-DELTA-10"],
+            "time": {"start": 152.25, "end": 154.75},
+            "operation": "add",
+            "semantic_label": "新增水平向右的摩擦力箭头 f",
+            "region": {"x": 0.18, "y": 0.525, "width": 0.12, "height": 0.105},
+            "relation": null,
+            "pedagogical_role": "unknown",
+            "decision_status": "pending_human"
+          }
+        ],
+        "unresolved_fields": [
+          {
+            "field": "G02-C1.operation",
+            "candidates": ["add", "connect"],
+            "required_human_check": "Choose CONNECT only if two persistent anchors and a distinct new connector object can be named."
+          },
+          {
+            "field": "G02-C1.time",
+            "candidates": ["152.25–154.75", "151.50–155.00"],
+            "required_human_check": "Confirm first and last chalk contact in the dense frames."
+          },
+          {
+            "field": "before_state_id/after_state_id/created_object_id",
+            "candidates": [],
+            "required_human_check": "Allocate contract-valid state and object IDs."
+          }
+        ]
+      },
+      "proposed": {
+        "decision": "merge",
+        "time": [{"candidate_id": "G02-C1", "start": 152.25, "end": 154.75}],
+        "operation": [{"candidate_id": "G02-C1", "value": "add"}],
+        "semantic_label": [{"candidate_id": "G02-C1", "value": "新增水平向右的摩擦力箭头 f"}],
+        "granularity": "single_atomic_event"
+      },
+      "unresolved_fields": [
+        "G02-C1.operation: add vs connect",
+        "G02-C1.time: 152.25–154.75 vs 151.50–155.00",
+        "before_state_id/after_state_id/created_object_id"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "signature_sha256": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G03",
+      "a_event_ids": ["tbv2-ly-004-01-a2-d014", "tbv2-ly-004-01-a2-d015"],
+      "b_event_ids": ["B-DELTA-11"],
+      "evidence_assets": [
+        {"side": "A2", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d014-before-after.jpg", "sha256": "c19220b705eae0986ca5d26203e8626de855206d7fe0c2ab41d575bd4a1ccc4c"},
+        {"side": "A2", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d015-before-after.jpg", "sha256": "ecceb81ef27ebce0962e7ea6ef7e774d44f40e1bbd77db683ff4fbb6cd690c3a"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-11-before-after.jpg", "sha256": "38310980768824e113bb2aa9262ebc6369da23801857430d173241ee71a85afa"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-11-region-mask.png", "sha256": "84c2472624a882950d7c983c573f381c15c9ae3c67b2de1326c4022202a0f552"}
+      ],
+      "asr_segment_indexes": [49, 50, 51, 52],
+      "raw_text": "必然和加速度方向一致 那是不是朝右上呢 对不对 这是河力 而且河力的方向必然与水平方向也夹30度角吧",
+      "speech_evidence_status": "context_only_not_adjudicated",
+      "asr_time_basis": "clip_relative_seconds; add 12 seconds for source time",
+      "alignment_window": {"start": 158.5, "end": 167.75},
+      "a_side": {
+        "event_ids": ["tbv2-ly-004-01-a2-d014", "tbv2-ly-004-01-a2-d015"],
+        "events": [
+          {
+            "event_id": "tbv2-ly-004-01-a2-d014",
+            "time": {"start": 158.5, "end": 163.5},
+            "operation": "connect",
+            "semantic_label": "连接右端竖直复制边和原点至右上端点的 F合 对角线，补成平行四边形/直角三角形",
+            "source_pointer": "/board_deltas/3"
+          },
+          {
+            "event_id": "tbv2-ly-004-01-a2-d015",
+            "time": {"start": 164.5, "end": 167.75},
+            "operation": "add",
+            "semantic_label": "在合力对角线与水平 f 边之间加角弧并标 α=30°",
+            "source_pointer": "/board_deltas/4"
+          }
+        ],
+        "evidence": {
+          "comparison_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d014-before-after.jpg",
+              "sha256": "c19220b705eae0986ca5d26203e8626de855206d7fe0c2ab41d575bd4a1ccc4c"
+            },
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d015-before-after.jpg",
+              "sha256": "ecceb81ef27ebce0962e7ea6ef7e774d44f40e1bbd77db683ff4fbb6cd690c3a"
+            }
+          ],
+          "frame_refs": [
+            "a2-extension-frames-4fps/qsec-0633.jpg",
+            "a2-extension-frames-4fps/qsec-0654.jpg",
+            "a2-extension-frames-4fps/qsec-0657.jpg",
+            "a2-extension-frames-4fps/qsec-0671.jpg"
+          ]
+        }
+      },
+      "b_side": {
+        "event_ids": ["B-DELTA-11"],
+        "events": [
+          {
+            "event_id": "B-DELTA-11",
+            "time": {"start": 158.5, "end": 166.2},
+            "operation": "connect",
+            "semantic_label": "连接竖直/水平分量端点形成合力斜边，并补30°夹角",
+            "source_pointer": "/deltas/10",
+            "evidence_refs": ["B-EV-F10", "B-EV-F11"],
+            "relation": {
+              "source_object_ids": ["B-O10"],
+              "target_object_ids": ["B-O11"],
+              "relation_type": "resultant_of_perpendicular_force_components"
+            }
+          }
+        ],
+        "evidence": {
+          "comparison_asset": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-11-before-after.jpg",
+            "sha256": "38310980768824e113bb2aa9262ebc6369da23801857430d173241ee71a85afa"
+          },
+          "delta_mask": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-11-region-mask.png",
+            "sha256": "84c2472624a882950d7c983c573f381c15c9ae3c67b2de1326c4022202a0f552"
+          },
+          "frame_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0156.jpg",
+              "sha256": "2dbb1e165971dbb9f3065a6048553aed809e919e3a585146238f7c5386f7ef68"
+            },
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0167.jpg",
+              "sha256": "6c5dee798e097beaf7c1264e2ce97fb79eba657411ee4e5de86015f946ba8b98"
+            }
+          ]
+        }
+      },
+      "proposal": {
+        "recommended_action": "split",
+        "recommended_event_count": 2,
+        "rationale": "The connector geometry stabilizes before a later angle-annotation episode. Splitting also lets the CONNECT candidate carry the mandatory relation while the angle mark remains ADD.",
+        "candidate_events": [
+          {
+            "candidate_id": "G03-C1",
+            "source_event_refs": ["tbv2-ly-004-01-a2-d014", "B-DELTA-11"],
+            "time": {"start": 158.5, "end": 163.5},
+            "operation": "connect",
+            "semantic_label": "补齐右侧竖直复制边与 F合 对角线，形成分力—合力几何关系",
+            "region": {"x": 0.18, "y": 0.405, "width": 0.145, "height": 0.17},
+            "relation_candidate": {
+              "source_object_ids": ["B-O10"],
+              "target_object_ids": ["B-O11"],
+              "relation_type": "resultant_of_perpendicular_force_components"
+            },
+            "pedagogical_role": "unknown",
+            "decision_status": "pending_human"
+          },
+          {
+            "candidate_id": "G03-C2",
+            "source_event_refs": ["tbv2-ly-004-01-a2-d015", "B-DELTA-11"],
+            "time": {"start": 164.5, "end": 167.75},
+            "operation": "add",
+            "semantic_label": "新增角弧与 α=30° 标记",
+            "region": {"x": 0.195, "y": 0.515, "width": 0.09, "height": 0.065},
+            "relation": null,
+            "pedagogical_role": "unknown",
+            "decision_status": "pending_human"
+          }
+        ],
+        "unresolved_fields": [
+          {
+            "field": "candidate_event_granularity",
+            "candidates": ["split", "merge"],
+            "required_human_check": "Confirm that the geometry has stabilized before the angle-mark episode."
+          },
+          {
+            "field": "G03-C1.connector_object_id",
+            "candidates": ["split B-O12 into connector and angle objects", "allocate new IDs"],
+            "required_human_check": "A contract-valid CONNECT must include a newly created connector object plus persistent anchors."
+          },
+          {
+            "field": "G03-C2.semantic_label.angle_letter",
+            "candidates": ["α", "θ", "unreadable"],
+            "required_human_check": "Inspect original-resolution chalk glyph without using speech inference."
+          }
+        ]
+      },
+      "proposed": {
+        "decision": "split",
+        "time": [
+          {"candidate_id": "G03-C1", "start": 158.5, "end": 163.5},
+          {"candidate_id": "G03-C2", "start": 164.5, "end": 167.75}
+        ],
+        "operation": [
+          {"candidate_id": "G03-C1", "value": "connect"},
+          {"candidate_id": "G03-C2", "value": "add"}
+        ],
+        "semantic_label": [
+          {"candidate_id": "G03-C1", "value": "补齐右侧竖直复制边与 F合 对角线，形成分力—合力几何关系"},
+          {"candidate_id": "G03-C2", "value": "新增角弧与 α=30° 标记"}
+        ],
+        "granularity": "two_atomic_events"
+      },
+      "unresolved_fields": [
+        "candidate_event_granularity: split vs merge",
+        "G03-C1.connector_object_id and persistent relation anchors",
+        "G03-C2.semantic_label.angle_letter: α vs θ vs unreadable"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "signature_sha256": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G04",
+      "a_event_ids": ["tbv2-ly-004-01-a2-d016"],
+      "b_event_ids": ["B-DELTA-12"],
+      "evidence_assets": [
+        {"side": "A2", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d016-before-after.jpg", "sha256": "764b1c3234d76f2d62136b1420369e4713332de6b2338d78f6e868fdc0306ff8"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-12-before-after.jpg", "sha256": "86e860c8dffcaa35fc2949b35e2fd8baf755fc04636ed851ec1ff27b7d0586df"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-12-region-mask.png", "sha256": "3a0e6f4ce219ab190f4e9272c4d92d89e6503303aa82f76d4120fac604917afd"}
+      ],
+      "asr_segment_indexes": [58, 59, 60, 61],
+      "raw_text": "所以摩擦力有多大 一个角是30度的直角三角形 这个长边应该是短边的更耗3倍吧 5分之更耗3MG 对不对",
+      "speech_evidence_status": "context_only_not_adjudicated",
+      "asr_time_basis": "clip_relative_seconds; add 12 seconds for source time",
+      "alignment_window": {"start": 176.8, "end": 186.5},
+      "a_side": {
+        "event_ids": ["tbv2-ly-004-01-a2-d016"],
+        "events": [
+          {
+            "event_id": "tbv2-ly-004-01-a2-d016",
+            "time": {"start": 177.0, "end": 186.5},
+            "operation": "add",
+            "semantic_label": "在向量图右侧写 f=√3/5mg",
+            "source_pointer": "/board_deltas/5"
+          }
+        ],
+        "evidence": {
+          "comparison_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d016-before-after.jpg",
+              "sha256": "764b1c3234d76f2d62136b1420369e4713332de6b2338d78f6e868fdc0306ff8"
+            }
+          ],
+          "frame_refs": [
+            "a2-extension-frames-4fps/qsec-0708.jpg",
+            "a2-extension-frames-4fps/qsec-0736.jpg",
+            "a2-extension-frames-4fps/qsec-0746.jpg"
+          ]
+        }
+      },
+      "b_side": {
+        "event_ids": ["B-DELTA-12"],
+        "events": [
+          {
+            "event_id": "B-DELTA-12",
+            "time": {"start": 176.8, "end": 185.5},
+            "operation": "add",
+            "semantic_label": "添加摩擦力结果 f=√3mg/5",
+            "source_pointer": "/deltas/11",
+            "evidence_refs": ["B-EV-F11", "B-EV-F12"]
+          }
+        ],
+        "evidence": {
+          "comparison_asset": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-12-before-after.jpg",
+            "sha256": "86e860c8dffcaa35fc2949b35e2fd8baf755fc04636ed851ec1ff27b7d0586df"
+          },
+          "delta_mask": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-12-region-mask.png",
+            "sha256": "3a0e6f4ce219ab190f4e9272c4d92d89e6503303aa82f76d4120fac604917afd"
+          },
+          "frame_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0167.jpg",
+              "sha256": "6c5dee798e097beaf7c1264e2ce97fb79eba657411ee4e5de86015f946ba8b98"
+            },
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0186.jpg",
+              "sha256": "f09da310024c78d9ab5d83ef299763820cc02c93f9f5a5c3e5a318e109deb4a0"
+            }
+          ]
+        }
+      },
+      "proposal": {
+        "recommended_action": "merge_equivalent",
+        "recommended_event_count": 1,
+        "rationale": "The formula content and operation agree; A2 supplies the denser 4 fps boundary review.",
+        "candidate_events": [
+          {
+            "candidate_id": "G04-C1",
+            "source_event_refs": ["tbv2-ly-004-01-a2-d016", "B-DELTA-12"],
+            "time": {"start": 177.0, "end": 186.5},
+            "operation": "add",
+            "semantic_label": "f=(√3/5)mg",
+            "region": {"x": 0.305, "y": 0.43, "width": 0.165, "height": 0.11},
+            "pedagogical_role": "unknown",
+            "decision_status": "pending_human"
+          }
+        ],
+        "unresolved_fields": [
+          {
+            "field": "G04-C1.time",
+            "candidates": ["177.00–186.50", "176.80–185.50"],
+            "required_human_check": "Confirm dense-frame start/end and stable-after frame."
+          },
+          {
+            "field": "G04-C1.semantic_label",
+            "candidates": ["f=√3mg/5", "f=(√3/5)mg", "unreadable"],
+            "required_human_check": "Choose a visible transcription and optional canonical math form separately."
+          },
+          {
+            "field": "state_ids/object_id/comparison_asset/delta_mask",
+            "candidates": [],
+            "required_human_check": "Allocate contract-valid references after the event is signed."
+          }
+        ]
+      },
+      "proposed": {
+        "decision": "merge",
+        "time": [{"candidate_id": "G04-C1", "start": 177.0, "end": 186.5}],
+        "operation": [{"candidate_id": "G04-C1", "value": "add"}],
+        "semantic_label": [{"candidate_id": "G04-C1", "value": "f=(√3/5)mg"}],
+        "granularity": "single_atomic_event"
+      },
+      "unresolved_fields": [
+        "G04-C1.time: 177.00–186.50 vs 176.80–185.50",
+        "G04-C1.semantic_label: visible transcription vs canonical math formatting",
+        "state_ids/object_id/comparison_asset/delta_mask"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "signature_sha256": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G05",
+      "a_event_ids": ["tbv2-ly-004-01-a2-d017"],
+      "b_event_ids": ["B-DELTA-13"],
+      "evidence_assets": [
+        {"side": "A2", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d017-before-after.jpg", "sha256": "8a7a95da461607d4a91f4a7b893b3806a4bd21bb2db2b19447ebc521e7fca089"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-13-before-after.jpg", "sha256": "e8c937e9ec6ebb7673cf4d63216709cc024ea97b9a8374c765f8907eee30e77a"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-13-region-mask.png", "sha256": "e39bbbea750760650a1d7c97726345d70de3e0a3818e76a36fb3b3dae8350a64"}
+      ],
+      "asr_segment_indexes": [62, 63, 64, 65, 66],
+      "raw_text": "不仅如此我还可以把河力求出来 河力是这个斜边 这是1/5MG 斜边应该是2/5MG 又因为2/5MG 这个河力它应该等于MA 所以这个加速度A 是不就算出来了",
+      "speech_evidence_status": "context_only_not_adjudicated",
+      "asr_time_basis": "clip_relative_seconds; add 12 seconds for source time",
+      "alignment_window": {"start": 187.75, "end": 201.0},
+      "a_side": {
+        "event_ids": ["tbv2-ly-004-01-a2-d017"],
+        "events": [
+          {
+            "event_id": "tbv2-ly-004-01-a2-d017",
+            "time": {"start": 187.75, "end": 197.0},
+            "operation": "add",
+            "semantic_label": "在下一行写 F合=2/5mg=ma",
+            "source_pointer": "/board_deltas/6"
+          }
+        ],
+        "evidence": {
+          "comparison_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d017-before-after.jpg",
+              "sha256": "8a7a95da461607d4a91f4a7b893b3806a4bd21bb2db2b19447ebc521e7fca089"
+            }
+          ],
+          "frame_refs": [
+            "a2-extension-frames-4fps/qsec-0751.jpg",
+            "a2-extension-frames-4fps/qsec-0776.jpg",
+            "a2-extension-frames-4fps/qsec-0788.jpg"
+          ]
+        }
+      },
+      "b_side": {
+        "event_ids": ["B-DELTA-13"],
+        "events": [
+          {
+            "event_id": "B-DELTA-13",
+            "time": {"start": 188.0, "end": 201.0},
+            "operation": "add",
+            "semantic_label": "添加合力方程 F合=2mg/5=ma",
+            "source_pointer": "/deltas/12",
+            "evidence_refs": ["B-EV-F12", "B-EV-F13"]
+          }
+        ],
+        "evidence": {
+          "comparison_asset": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-13-before-after.jpg",
+            "sha256": "e8c937e9ec6ebb7673cf4d63216709cc024ea97b9a8374c765f8907eee30e77a"
+          },
+          "delta_mask": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-13-region-mask.png",
+            "sha256": "e39bbbea750760650a1d7c97726345d70de3e0a3818e76a36fb3b3dae8350a64"
+          },
+          "frame_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0186.jpg",
+              "sha256": "f09da310024c78d9ab5d83ef299763820cc02c93f9f5a5c3e5a318e109deb4a0"
+            },
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0201.jpg",
+              "sha256": "b1c93f9d5797b4c605257a90dd4dfc2b7c1bffafce2a65cd84958c09e589a568"
+            }
+          ]
+        }
+      },
+      "proposal": {
+        "recommended_action": "merge_equivalent_trim_b_tail",
+        "recommended_event_count": 1,
+        "rationale": "The equation content and operation agree. B's interval extends into the next equation; the A2 dense boundary separates the two writing episodes.",
+        "candidate_events": [
+          {
+            "candidate_id": "G05-C1",
+            "source_event_refs": ["tbv2-ly-004-01-a2-d017", "B-DELTA-13"],
+            "time": {"start": 187.75, "end": 197.0},
+            "operation": "add",
+            "semantic_label": "F合=(2/5)mg=ma",
+            "region": {"x": 0.3, "y": 0.51, "width": 0.205, "height": 0.1},
+            "pedagogical_role": "unknown",
+            "decision_status": "pending_human"
+          }
+        ],
+        "unresolved_fields": [
+          {
+            "field": "G05-C1.time",
+            "candidates": ["187.75–197.00", "188.00–201.00"],
+            "required_human_check": "Confirm the end before the acceleration-conclusion writing begins."
+          },
+          {
+            "field": "G05-C1.semantic_label",
+            "candidates": ["F合=2mg/5=ma", "F合=(2/5)mg=ma", "unreadable"],
+            "required_human_check": "Separate visible transcription from canonical math formatting."
+          },
+          {
+            "field": "state_ids/object_id/comparison_asset/delta_mask",
+            "candidates": [],
+            "required_human_check": "Allocate contract-valid references after sign-off."
+          }
+        ]
+      },
+      "proposed": {
+        "decision": "merge",
+        "time": [{"candidate_id": "G05-C1", "start": 187.75, "end": 197.0}],
+        "operation": [{"candidate_id": "G05-C1", "value": "add"}],
+        "semantic_label": [{"candidate_id": "G05-C1", "value": "F合=(2/5)mg=ma"}],
+        "granularity": "single_atomic_event"
+      },
+      "unresolved_fields": [
+        "G05-C1.time: 187.75–197.00 vs 188.00–201.00",
+        "G05-C1.semantic_label: visible transcription vs canonical math formatting",
+        "state_ids/object_id/comparison_asset/delta_mask"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "signature_sha256": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G06",
+      "a_event_ids": ["tbv2-ly-004-01-a2-d018"],
+      "b_event_ids": ["B-DELTA-14"],
+      "evidence_assets": [
+        {"side": "A2", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d018-before-after.jpg", "sha256": "51798f3c18252f91e1a61779b30c306b220c5970181eed981134c4e2f6293575"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-14-before-after.jpg", "sha256": "8cf51d509b3dc8db959c705e1f86e6a6cbe31b9fad65cba1aad3ea66ca83ccf3"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-14-region-mask.png", "sha256": "bc3f77e5305218219a58e7726efa311a6da58e7126e1482c9fb216fe35d55967"}
+      ],
+      "asr_segment_indexes": [65, 66, 67],
+      "raw_text": "又因为2/5MG 这个河力它应该等于MA 所以这个加速度A 是不就算出来了 2/5G 大约是4米每二次方面 对吧",
+      "speech_evidence_status": "context_only_not_adjudicated",
+      "asr_time_basis": "clip_relative_seconds; add 12 seconds for source time",
+      "alignment_window": {"start": 198.25, "end": 207.5},
+      "a_side": {
+        "event_ids": ["tbv2-ly-004-01-a2-d018"],
+        "events": [
+          {
+            "event_id": "tbv2-ly-004-01-a2-d018",
+            "time": {"start": 198.25, "end": 206.0},
+            "operation": "add",
+            "semantic_label": "写结论 ∴a=2/5g=4m/s²",
+            "source_pointer": "/board_deltas/7"
+          }
+        ],
+        "evidence": {
+          "comparison_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d018-before-after.jpg",
+              "sha256": "51798f3c18252f91e1a61779b30c306b220c5970181eed981134c4e2f6293575"
+            }
+          ],
+          "frame_refs": [
+            "a2-extension-frames-4fps/qsec-0793.jpg",
+            "a2-extension-frames-4fps/qsec-0812.jpg",
+            "a2-extension-frames-4fps/qsec-0824.jpg"
+          ]
+        }
+      },
+      "b_side": {
+        "event_ids": ["B-DELTA-14"],
+        "events": [
+          {
+            "event_id": "B-DELTA-14",
+            "time": {"start": 201.5, "end": 207.5},
+            "operation": "add",
+            "semantic_label": "添加加速度结果 a=2g/5≈4m/s²",
+            "source_pointer": "/deltas/13",
+            "evidence_refs": ["B-EV-F13", "B-EV-F14"]
+          }
+        ],
+        "evidence": {
+          "comparison_asset": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-14-before-after.jpg",
+            "sha256": "8cf51d509b3dc8db959c705e1f86e6a6cbe31b9fad65cba1aad3ea66ca83ccf3"
+          },
+          "delta_mask": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-14-region-mask.png",
+            "sha256": "bc3f77e5305218219a58e7726efa311a6da58e7126e1482c9fb216fe35d55967"
+          },
+          "frame_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0201.jpg",
+              "sha256": "b1c93f9d5797b4c605257a90dd4dfc2b7c1bffafce2a65cd84958c09e589a568"
+            },
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0208.jpg",
+              "sha256": "413b1c6e42c7801ebb346d811a977327f236c65b9a030bf78b0371aac0e76136"
+            }
+          ]
+        }
+      },
+      "proposal": {
+        "recommended_action": "merge_equivalent_expand_b_start",
+        "recommended_event_count": 1,
+        "rationale": "Both sides recover the acceleration conclusion. A2's dense review includes the initial conclusion symbol and symbolic equality that B's later start omits.",
+        "candidate_events": [
+          {
+            "candidate_id": "G06-C1",
+            "source_event_refs": ["tbv2-ly-004-01-a2-d018", "B-DELTA-14"],
+            "time": {"start": 198.25, "end": 206.0},
+            "operation": "add",
+            "semantic_label": "∴a=(2/5)g=4m/s²",
+            "region": {"x": 0.285, "y": 0.59, "width": 0.225, "height": 0.09},
+            "pedagogical_role": "unknown",
+            "decision_status": "pending_human"
+          }
+        ],
+        "unresolved_fields": [
+          {
+            "field": "G06-C1.time",
+            "candidates": ["198.25–206.00", "201.50–207.50"],
+            "required_human_check": "Confirm whether the conclusion symbol and initial a-expression belong to this event."
+          },
+          {
+            "field": "G06-C1.semantic_label.final_relation",
+            "candidates": ["=4m/s²", "≈4m/s²", "unreadable"],
+            "required_human_check": "Transcribe the visible equality/approximation glyph; do not replace it with inferred physics intent."
+          },
+          {
+            "field": "state_ids/object_id/comparison_asset/delta_mask",
+            "candidates": [],
+            "required_human_check": "Allocate contract-valid references after sign-off."
+          }
+        ]
+      },
+      "proposed": {
+        "decision": "merge",
+        "time": [{"candidate_id": "G06-C1", "start": 198.25, "end": 206.0}],
+        "operation": [{"candidate_id": "G06-C1", "value": "add"}],
+        "semantic_label": [{"candidate_id": "G06-C1", "value": "∴a=(2/5)g=4m/s²"}],
+        "granularity": "single_atomic_event"
+      },
+      "unresolved_fields": [
+        "G06-C1.time: 198.25–206.00 vs 201.50–207.50",
+        "G06-C1.semantic_label.final_relation: = vs ≈ vs unreadable",
+        "state_ids/object_id/comparison_asset/delta_mask"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "signature_sha256": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "rationale": null,
+        "final_events": []
+      }
+    },
+    {
+      "group_id": "G07",
+      "a_event_ids": ["tbv2-ly-004-01-a2-d019"],
+      "b_event_ids": ["B-DELTA-15"],
+      "evidence_assets": [
+        {"side": "A2", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d019-before-after.jpg", "sha256": "53d312cb608088b9f461a94ef3e0efe6ffb4c94b89bacd329c2fca247eb0db50"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-15-before-after.jpg", "sha256": "19c4ea723e6be43ab46024884d8eecd4e97d300955e6ec3ed092b76ec3311954"},
+        {"side": "B", "path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-15-region-mask.png", "sha256": "604301350b657b73381d5d7c4ae60c40c8a50e906bd1511eb60d5a0ebfcb492c"}
+      ],
+      "asr_segment_indexes": [75, 76, 77, 78, 79],
+      "raw_text": "如果没有办法把多个粒转化成两个粒的话 那我们就使用第二个思路 也就是正交分解法 正交分解法 政調分解法我們在處理 經理學問題的時候已經使用過了",
+      "speech_evidence_status": "context_only_not_adjudicated",
+      "asr_time_basis": "clip_relative_seconds; add 12 seconds for source time",
+      "alignment_window": {"start": 224.0, "end": 237.25},
+      "a_side": {
+        "event_ids": ["tbv2-ly-004-01-a2-d019"],
+        "events": [
+          {
+            "event_id": "tbv2-ly-004-01-a2-d019",
+            "time": {"start": 224.0, "end": 237.25},
+            "operation": "add",
+            "semantic_label": "在左下新增带“>”式项目符号的标题“正交分解法”",
+            "source_pointer": "/board_deltas/8"
+          }
+        ],
+        "evidence": {
+          "comparison_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/a2-extension-comparisons/d019-before-after.jpg",
+              "sha256": "53d312cb608088b9f461a94ef3e0efe6ffb4c94b89bacd329c2fca247eb0db50"
+            }
+          ],
+          "frame_refs": [
+            "a2-extension-frames-4fps/qsec-0896.jpg",
+            "a2-extension-frames-4fps/qsec-0904.jpg",
+            "a2-extension-frames-4fps/qsec-0917.jpg",
+            "a2-extension-frames-4fps/qsec-0949.jpg"
+          ]
+        }
+      },
+      "b_side": {
+        "event_ids": ["B-DELTA-15"],
+        "events": [
+          {
+            "event_id": "B-DELTA-15",
+            "time": {"start": 224.5, "end": 235.8},
+            "operation": "add",
+            "semantic_label": "添加第二种思路标题“2. 正交分解法”",
+            "source_pointer": "/deltas/14",
+            "evidence_refs": ["B-EV-F14", "B-EV-F15"]
+          }
+        ],
+        "evidence": {
+          "comparison_asset": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/comparisons/delta-15-before-after.jpg",
+            "sha256": "19c4ea723e6be43ab46024884d8eecd4e97d300955e6ec3ed092b76ec3311954"
+          },
+          "delta_mask": {
+            "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b-assets/masks/delta-15-region-mask.png",
+            "sha256": "604301350b657b73381d5d7c4ae60c40c8a50e906bd1511eb60d5a0ebfcb492c"
+          },
+          "frame_assets": [
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0208.jpg",
+              "sha256": "413b1c6e42c7801ebb346d811a977327f236c65b9a030bf78b0371aac0e76136"
+            },
+            {
+              "asset_uri": "data/board2skill/oracle-pilot/tbv2-ly-004-01/frames-1fps/sec-0239.jpg",
+              "sha256": "3334b7fb052c99bc3592cbd83de7242fd4940aa14d3ab655ed7ef10bebb19cbb"
+            }
+          ]
+        }
+      },
+      "proposal": {
+        "recommended_action": "merge_shared_heading_keep_prefix_unresolved",
+        "recommended_event_count": 1,
+        "rationale": "Both sides agree on the persistent heading text. The leading glyph is not needed to establish the visible heading event and should remain unresolved until inspected by a human.",
+        "candidate_events": [
+          {
+            "candidate_id": "G07-C1",
+            "source_event_refs": ["tbv2-ly-004-01-a2-d019", "B-DELTA-15"],
+            "time": {"start": 224.0, "end": 237.25},
+            "operation": "add",
+            "semantic_label": "正交分解法",
+            "prefix_glyph": null,
+            "region": {"x": 0.105, "y": 0.66, "width": 0.235, "height": 0.11},
+            "pedagogical_role": "unknown",
+            "decision_status": "pending_human"
+          }
+        ],
+        "unresolved_fields": [
+          {
+            "field": "G07-C1.prefix_glyph",
+            "candidates": [">-like bullet", "2.", "二", "unreadable"],
+            "required_human_check": "Inspect the first strokes at 224–226 s and the stable title frame."
+          },
+          {
+            "field": "G07-C1.time",
+            "candidates": ["224.00–237.25", "224.50–235.80"],
+            "required_human_check": "Decide whether the leading glyph and title belong to one event despite the pause."
+          },
+          {
+            "field": "state_ids/object_id/comparison_asset/delta_mask",
+            "candidates": [],
+            "required_human_check": "Allocate contract-valid references after sign-off."
+          }
+        ]
+      },
+      "proposed": {
+        "decision": "merge",
+        "time": [{"candidate_id": "G07-C1", "start": 224.0, "end": 237.25}],
+        "operation": [{"candidate_id": "G07-C1", "value": "add"}],
+        "semantic_label": [{"candidate_id": "G07-C1", "value": "正交分解法"}],
+        "granularity": "single_atomic_event_with_unresolved_prefix"
+      },
+      "unresolved_fields": [
+        "G07-C1.prefix_glyph: >-like bullet vs 2. vs 二 vs unreadable",
+        "G07-C1.time: 224.00–237.25 vs 224.50–235.80",
+        "state_ids/object_id/comparison_asset/delta_mask"
+      ],
+      "human_review": {
+        "decision": "pending",
+        "reviewer_id": null,
+        "reviewed_at": null,
+        "signature_sha256": null,
+        "notes": ""
+      },
+      "human_signoff": {
+        "decision_status": "pending_human",
+        "decision": null,
+        "adjudicator_id": null,
+        "adjudicator_role": null,
+        "signed_at": null,
+        "rationale": null,
+        "final_events": []
+      }
+    }
+  ],
+  "package_signoff": {
+    "decision_status": "pending_human",
+    "visual_adjudicator_id": null,
+    "physics_reviewer_id": null,
+    "signed_at": null,
+    "signed_group_ids": [],
+    "notes": null
+  }
+}

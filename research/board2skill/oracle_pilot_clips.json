@@ -1,6 +1,7 @@
 {
   "schema_version": "temporal-board-oracle-pilot-manifest-v1",
   "created_at": "2026-08-11",
+  "updated_at": "2026-08-12",
   "rights_policy": {
     "rights_status": "internal_review_only",
     "allow_public_redistribution": false,
@@ -8,16 +9,16 @@
     "note": "本地公开视频副本只用于内部、非商业研究复核；不得把本地持有误解为转载、再发布或公开训练授权。"
   },
   "review_summary": {
-    "clip_count": 8,
-    "total_duration_seconds": 1518,
-    "source_video_count": 5,
+    "clip_count": 11,
+    "total_duration_seconds": 1573,
+    "source_video_count": 6,
     "teacher_count": 2,
     "board_media": [
       "physical_chalkboard",
       "digital_ink_over_slides"
     ],
-    "review_method": "先对短视频约每20秒、长视频约每120秒低频通览，再对候选窗口约每5秒视觉复核；仅 phy-force-liyongle-002 有现成带时间戳 ASR。",
-    "actual_verification_level": "coarse_visual_verified_not_delta_annotated",
+    "review_method": "先低频通览，再对候选窗口做1–5秒视觉复核；5 个片段已完成独立 A/B（含严格盲标 B2）和待人工签字的对齐包，新增 operation-gap 窗已密集视觉复核并生成本地 ASR。",
+    "actual_verification_level": "five_clips_independent_a_b_aligned_49_review_groups_51_events_pending_human_signoff",
     "delta_ground_truth_complete": false
   },
   "clips": [
@@ -220,10 +221,9 @@
         "add_force_arrow",
         "add_resultant_arrow",
         "add_equation",
-        "modify_motion_condition",
-        "modify_resultant_direction"
+        "add_parallel_comparison_scene"
       ],
-      "candidate_value": "同一底图随条件变化而修订，适合标注 modify 而非只标 add。",
+      "candidate_value": "条件变化通过另起新图继续表达；适合作为 ADD 序列和‘新图不等于 MODIFY’的困难负例。",
       "evidence": {
         "video_path": "data/raw/physics/force-pilot/phy-force-liyongle-003/source.mp4",
         "metadata_path": "data/raw/physics/force-pilot/phy-force-liyongle-003/source.json",
@@ -234,7 +234,8 @@
       "risks": [
         "dense_preexisting_board",
         "requires_board_state_before",
-        "motion_arrow_vs_force_arrow_confusion"
+        "motion_arrow_vs_force_arrow_confusion",
+        "false_modify_from_parallel_scene"
       ],
       "rights_status": "internal_review_only",
       "oracle_labels": {
@@ -242,7 +243,10 @@
         "board_deltas": [],
         "board_state_after": null,
         "needs_review": true,
-        "review_status": "coarse_visual_verified_not_delta_annotated"
+        "review_status": "independent_a_b_aligned_pending_human_signoff",
+        "annotation_a_path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-a.json",
+        "annotation_b_path": "data/board2skill/oracle-pilot/tbv2-ly-003-01/annotator-b.json",
+        "adjudication_intake_path": "research/board2skill/LIYONGLE_003_AB_ADJUDICATION_INPUT_702_922.json"
       }
     },
     {
@@ -287,7 +291,10 @@
         "board_deltas": [],
         "board_state_after": null,
         "needs_review": true,
-        "review_status": "coarse_visual_verified_not_delta_annotated"
+        "review_status": "partial_independent_a_b_aligned_pending_human_signoff",
+        "annotation_a_path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-a-extension-133-240.json",
+        "annotation_b_path": "data/board2skill/oracle-pilot/tbv2-ly-004-01/annotator-b.json",
+        "adjudication_intake_path": "research/board2skill/ORACLE_A2_B_ADJUDICATION_INPUT_133_240.json"
       }
     },
     {
@@ -317,9 +324,9 @@
       "evidence": {
         "video_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.mp4",
         "metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.json",
-        "transcript_path": null,
-        "transcript_coverage": "none",
-        "visual_review_sampling_seconds": 5
+        "transcript_path": "data/board2skill/oracle-pilot/tbv2-kg-003-01/asr/clip-2640-2880.json",
+        "transcript_coverage": "machine_time_aligned_asr_unadjudicated",
+        "visual_review_sampling_seconds": 0.25
       },
       "risks": [
         "picture_in_picture_occlusion",
@@ -333,7 +340,10 @@
         "board_deltas": [],
         "board_state_after": null,
         "needs_review": true,
-        "review_status": "coarse_visual_verified_not_delta_annotated"
+        "review_status": "independent_a_b_aligned_pending_human_signoff",
+        "annotation_a_path": "data/board2skill/oracle-pilot/tbv2-kg-003-01/annotator-a.json",
+        "annotation_b_path": "data/board2skill/oracle-pilot/tbv2-kg-003-01/annotator-b.json",
+        "adjudication_intake_path": "research/board2skill/KUNGE_ORACLE_AB_ADJUDICATION_INPUT_2720_2880.json"
       }
     },
     {
@@ -381,6 +391,139 @@
         "board_state_after": null,
         "needs_review": true,
         "review_status": "coarse_visual_verified_not_delta_annotated"
+      }
+    },
+    {
+      "clip_id": "tbv2-kg005-modify-01",
+      "source_record_id": "phy-force-kunge-005",
+      "teacher_key": "kunge_bilibili",
+      "source_url": "https://www.bilibili.com/video/BV1u1u3z9EcF/?p=8",
+      "source_video_path": "data/raw/physics/force-pilot/phy-force-kunge-005/source.mp4",
+      "source_metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-005/source.json",
+      "source_sha256": "127ed9323274d0dd00f3cc39c4a3b68f3109d74dbfd7fb2d08f87cab008f7241",
+      "board_medium": "digital_ink_over_slides",
+      "start_seconds": 2134,
+      "end_seconds": 2166,
+      "start_time": "00:35:34",
+      "end_time": "00:36:06",
+      "duration_seconds": 32,
+      "neighboring_teaching_content": "同一道比例系数单位题中清除旧推导，并在同一区域重写以 k 开头的新表达式。",
+      "observed_board_action_types": [
+        "erase_old_formula",
+        "add_new_formula",
+        "erase_and_rewrite_same_content",
+        "negative_example_for_modify"
+      ],
+      "candidate_value": "A/B 双标均未发现实质 MODIFY；现作为‘同槽擦后重写不等于语义修改’的困难负例，5 组候选待人工签字。",
+      "evidence": {
+        "video_path": "data/raw/physics/force-pilot/phy-force-kunge-005/source.mp4",
+        "metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-005/source.json",
+        "transcript_path": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/asr/clip-2134-2166.json",
+        "transcript_coverage": "machine_time_aligned_asr_unadjudicated",
+        "visual_review_sampling_seconds": 0.5
+      },
+      "risks": [
+        "same_region_not_sufficient_for_modify",
+        "same_text_rewrite_has_no_semantic_change",
+        "burned_in_subtitle_not_transcript_evidence"
+      ],
+      "rights_status": "internal_review_only",
+      "oracle_labels": {
+        "board_state_before": null,
+        "board_deltas": [],
+        "board_state_after": null,
+        "needs_review": true,
+        "review_status": "independent_a_b_aligned_pending_human_signoff",
+        "annotation_a_path": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/annotator-a.json",
+        "annotation_b_path": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/annotator-b.json",
+        "adjudication_intake_path": "research/board2skill/KG005_MODIFY_AB_ADJUDICATION_INPUT_2134_2166.json"
+      }
+    },
+    {
+      "clip_id": "tbv2-kg003-erase-01",
+      "source_record_id": "phy-force-kunge-003",
+      "teacher_key": "kunge_bilibili",
+      "source_url": "https://www.bilibili.com/video/BV1fChAzBE2r/?p=7",
+      "source_video_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.mp4",
+      "source_metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.json",
+      "source_sha256": "e4409e94aab76ed26501ebd24e51b09d3454944a09d4a6b37365a75fb9d080e4",
+      "board_medium": "digital_ink_over_slides",
+      "start_seconds": 4422,
+      "end_seconds": 4428,
+      "start_time": "01:13:42",
+      "end_time": "01:13:48",
+      "duration_seconds": 6,
+      "neighboring_teaching_content": "同一题页上右侧红色推导被逐步清除，而左侧题图和推导保持不动。",
+      "observed_board_action_types": [
+        "erase_formula_region",
+        "verify_persistent_absence"
+      ],
+      "candidate_value": "提供底图稳定、局部数字墨迹持续消失的 ERASE 候选。",
+      "evidence": {
+        "video_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.mp4",
+        "metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.json",
+        "transcript_path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/asr/clip-4422-4428.json",
+        "transcript_coverage": "machine_time_aligned_asr_unadjudicated",
+        "visual_review_sampling_seconds": 0.5
+      },
+      "risks": [
+        "short_stable_after_before_viewport_change",
+        "erase_tool_type_not_observable",
+        "stability_gate_may_abstain"
+      ],
+      "rights_status": "internal_review_only",
+      "oracle_labels": {
+        "board_state_before": null,
+        "board_deltas": [],
+        "board_state_after": null,
+        "needs_review": true,
+        "review_status": "independent_a_b2_aligned_pending_human_signoff",
+        "annotation_a_path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/annotator-a.json",
+        "annotation_b_path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/annotator-b2.json",
+        "adjudication_intake_path": "research/board2skill/KG003_ERASE_AB2_ADJUDICATION_INPUT_4422_4428.json",
+        "quarantined_annotation_log_path": "research/board2skill/KG003_ERASE_ANNOTATOR_B_LOG.md"
+      }
+    },
+    {
+      "clip_id": "tbv2-kg005-erase-add-hardnegative-01",
+      "source_record_id": "phy-force-kunge-005",
+      "teacher_key": "kunge_bilibili",
+      "source_url": "https://www.bilibili.com/video/BV1u1u3z9EcF/?p=8",
+      "source_video_path": "data/raw/physics/force-pilot/phy-force-kunge-005/source.mp4",
+      "source_metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-005/source.json",
+      "source_sha256": "127ed9323274d0dd00f3cc39c4a3b68f3109d74dbfd7fb2d08f87cab008f7241",
+      "board_medium": "digital_ink_over_slides",
+      "start_seconds": 1888,
+      "end_seconds": 1905,
+      "start_time": "00:31:28",
+      "end_time": "00:31:45",
+      "duration_seconds": 17,
+      "neighboring_teaching_content": "擦除上一候选项的量纲草算后，在同一区域计算下一候选项。",
+      "observed_board_action_types": [
+        "erase_previous_scratch_work",
+        "add_next_candidate_work",
+        "negative_example_for_modify"
+      ],
+      "candidate_value": "空间复用但语义槽不同，应作为 ERASE + ADD 困难负例，防止误标 MODIFY。",
+      "evidence": {
+        "video_path": "data/raw/physics/force-pilot/phy-force-kunge-005/source.mp4",
+        "metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-005/source.json",
+        "transcript_path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/asr/clip-1888-1905.json",
+        "transcript_coverage": "machine_time_aligned_asr_unadjudicated",
+        "visual_review_sampling_seconds": 0.5
+      },
+      "risks": [
+        "same_region_false_modify",
+        "requires_full_page_option_anchors",
+        "burned_in_subtitle_not_transcript_evidence"
+      ],
+      "rights_status": "internal_review_only",
+      "oracle_labels": {
+        "board_state_before": null,
+        "board_deltas": [],
+        "board_state_after": null,
+        "needs_review": true,
+        "review_status": "dense_visual_verified_pending_independent_double_annotation"
       }
     }
   ]

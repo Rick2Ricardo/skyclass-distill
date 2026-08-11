@@ -1,0 +1,384 @@
+{
+  "schema_version": "board2skill-ab2-adjudication-input-v1",
+  "case_id": "kg003-erase-ab2-4422-4428",
+  "source_video_id": "phy-force-kunge-003",
+  "visual_window_absolute_seconds": {
+    "start": 4422,
+    "end": 4428
+  },
+  "governance": {
+    "alignment_mode": "one_to_one_independent_a_vs_strict_blind_b2",
+    "adjudication_mode": "human_signoff_required",
+    "legacy_contaminated_pass": "A contaminated legacy B pass exists but is quarantined; it was not read and is not an input, source, evidence item, voter, or tie-breaker for this case.",
+    "allowed_final_candidates": [
+      "ERASE",
+      "reject",
+      "not_an_event",
+      "unknown"
+    ],
+    "automatic_acceptance": false,
+    "accepted_count": 0,
+    "gold_status": "blocked",
+    "gold_block_reasons": [
+      "event decision review pending",
+      "boundary review pending",
+      "before-state left-censor review pending",
+      "after-state stability review pending",
+      "erase-persistence review pending",
+      "required signoffs pending"
+    ]
+  },
+  "input_files": [
+    {
+      "role": "runtime_contract",
+      "path": "packages/contracts/src/temporal-board.ts",
+      "actual_sha256": "db231fc43433624252d8d014a64264173ef770e63c0b362b5397dbaf0b0f29f8"
+    },
+    {
+      "role": "annotation_specification",
+      "path": "research/board2skill/DATA_AND_ANNOTATION_SPEC.md",
+      "actual_sha256": "4068892dd320772a1743ba2b464a92a1d66084abcfd2c0c3d2d2edb287ad57d3"
+    },
+    {
+      "role": "source_video",
+      "path": "data/raw/physics/force-pilot/phy-force-kunge-003/source.mp4",
+      "actual_sha256": "e4409e94aab76ed26501ebd24e51b09d3454944a09d4a6b37365a75fb9d080e4"
+    },
+    {
+      "role": "canonical_asr_source",
+      "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/asr/clip-4422-4428.json",
+      "actual_sha256": "fad1323b0ea85dd9f9b1fdf8e91b2933a28c6308ad7f22584ad96df245d5de03"
+    },
+    {
+      "role": "annotator_a_bundle",
+      "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/annotator-a.json",
+      "actual_sha256": "6d8c5d2314df1667df76934cf64b8021e1bf355137a9bc3401829951b0e61aed"
+    },
+    {
+      "role": "strict_blind_annotator_b2_bundle",
+      "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/annotator-b2.json",
+      "actual_sha256": "81b934663d7573b6e1b4da66bd2f8d31e424bdb6645f6b537088e443e8165ec9"
+    },
+    {
+      "role": "strict_blind_b2_visual_freeze",
+      "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/b2-visual-annotator-b2-20260812/visual-freeze.json",
+      "actual_sha256": "c18eeb9cb8b57e3cf282e0a34910380c7a11021885eb45fd104dfc1af8a9f5ff"
+    }
+  ],
+  "bundle_validation": {
+    "annotator_a": {
+      "contract_valid": true,
+      "contract_issue_count": 0,
+      "declared_payload_sha256": "2f78499602e304a34e8a2922840566fb6bf5b9d7bec839b9c32896e48cb0a81a",
+      "recomputed_payload_sha256": "2f78499602e304a34e8a2922840566fb6bf5b9d7bec839b9c32896e48cb0a81a",
+      "payload_hash_match": true,
+      "declared_asset_count": 10,
+      "all_asset_paths_relative": true,
+      "all_assets_exist": true,
+      "all_asset_hashes_match": true
+    },
+    "annotator_b2": {
+      "contract_valid": true,
+      "contract_issue_count": 0,
+      "declared_payload_sha256": "574f8a38e9fc302a27991a27ef132038345ccdd2a1c27c593956713a73fc7751",
+      "recomputed_payload_sha256": "574f8a38e9fc302a27991a27ef132038345ccdd2a1c27c593956713a73fc7751",
+      "payload_hash_match": true,
+      "declared_asset_count": 20,
+      "all_asset_paths_relative": true,
+      "all_assets_exist": true,
+      "all_asset_hashes_match": true
+    }
+  },
+  "canonical_asr_trace": {
+    "raw_text": "这两个情况连立起来",
+    "source_segment_indexes": [0],
+    "local_time": {
+      "start": 0,
+      "end": 6.14
+    },
+    "absolute_time": {
+      "start": 4422,
+      "end": 4428.14
+    },
+    "normalization": "none",
+    "normalized_text": null,
+    "source_integrity": "verified_against_canonical_asr_source",
+    "visual_effect": "none",
+    "annotator_a_bundle_time": {
+      "start": 4422,
+      "end": 4428,
+      "difference_from_canonical": "end clipped by 0.14 seconds"
+    },
+    "annotator_b2_bundle_time": {
+      "start": 4422,
+      "end": 4428.14,
+      "difference_from_canonical": "none"
+    }
+  },
+  "alignment": {
+    "pair_count": 1,
+    "unmatched_a_event_ids": [],
+    "unmatched_b2_event_ids": [],
+    "pairs": [
+      {
+        "pair_id": "kg003-erase-ab2-pair-1",
+        "alignment_type": "one_to_one",
+        "annotator_a": {
+          "alias": "A1",
+          "delta_id": "a-delta-erase-01",
+          "operation": "erase",
+          "time": {
+            "start": 4423,
+            "end": 4425.167,
+            "duration": 2.167
+          },
+          "region": {
+            "x": 0.64,
+            "y": 0.32,
+            "width": 0.31,
+            "height": 0.32
+          },
+          "before_state": {
+            "stable_during": {
+              "start": 4422,
+              "end": 4423,
+              "duration": 1
+            },
+            "left_censored": true,
+            "minimum_stable_seconds": 2,
+            "meets_own_minimum": false
+          },
+          "after_state": {
+            "stable_during": {
+              "start": 4425.2,
+              "end": 4427.933,
+              "duration": 2.733
+            }
+          },
+          "erase_persistence": {
+            "visibility_restored": true,
+            "absent_from_after_state": true,
+            "confirmed_until": 4427.933,
+            "horizon_after_delta_end": 2.766
+          },
+          "status": "needs_review"
+        },
+        "annotator_b2": {
+          "alias": "B2-1",
+          "delta_id": "kg003-b2-delta-erase-1",
+          "operation": "erase",
+          "time": {
+            "start": 4423.033,
+            "end": 4424.933,
+            "duration": 1.9
+          },
+          "region": {
+            "x": 0.655,
+            "y": 0.34,
+            "width": 0.27,
+            "height": 0.3
+          },
+          "before_state": {
+            "stable_during": {
+              "start": 4422,
+              "end": 4423.033,
+              "duration": 1.033
+            },
+            "left_censored": true,
+            "minimum_stable_seconds": 1,
+            "meets_own_minimum": true
+          },
+          "after_state": {
+            "stable_during": {
+              "start": 4424.933,
+              "end": 4427.967,
+              "duration": 3.034
+            }
+          },
+          "erase_persistence": {
+            "visibility_restored": true,
+            "absent_from_after_state": true,
+            "confirmed_until": 4427.967,
+            "horizon_after_delta_end": 3.034
+          },
+          "status": "needs_review"
+        },
+        "agreement_metrics": {
+          "event_count_agreement": true,
+          "operation_agreement": true,
+          "temporal_intersection_seconds": 1.9,
+          "temporal_union_seconds": 2.167,
+          "temporal_iou": 0.876788,
+          "region_iou": 0.816532,
+          "start_delta_b2_minus_a_seconds": 0.033,
+          "end_delta_b2_minus_a_seconds": -0.234,
+          "after_start_delta_a_minus_b2_seconds": 0.267,
+          "persistence_confirmation_delta_b2_minus_a_seconds": 0.034
+        },
+        "agreed_observations": [
+          "one real board-change candidate occurs in the window",
+          "the candidate affects the same right-side red handwritten derivation block",
+          "both independent passes classify the visual operation as erase",
+          "the affected ink is absent from the later unobstructed state",
+          "visibility is restored and no teacher-body occlusion explains the disappearance",
+          "the surface remains a fixed digital-ink viewport",
+          "before evidence is left-censored by the task window",
+          "no learner observation is present",
+          "pedagogical role and teacher intent remain unknown"
+        ],
+        "review_disagreements": [
+          {
+            "issue_id": "boundary_start",
+            "status": "pending",
+            "a_value": 4423,
+            "b2_value": 4423.033,
+            "difference_seconds": 0.033,
+            "question": "Should the event begin at A's 4423.000 operation envelope or B2's 4423.033 last-intact/first-change boundary?"
+          },
+          {
+            "issue_id": "boundary_end",
+            "status": "pending",
+            "a_value": 4425.167,
+            "b2_value": 4424.933,
+            "difference_seconds_b2_minus_a": -0.234,
+            "question": "Should the event close at first full absence (B2) or include A's later operation-end interval?"
+          },
+          {
+            "issue_id": "frame_4424p933_interpretation",
+            "status": "pending",
+            "a_value": "last_visible",
+            "b2_value": "first_fully_absent",
+            "question": "Review the independently extracted 4424.933 assets and decide whether any affected red ink remains."
+          },
+          {
+            "issue_id": "before_left_censor_policy",
+            "status": "pending",
+            "a_value": "1.000 seconds observed; below A minimum 2 seconds",
+            "b2_value": "1.033 seconds observed; meets B2 minimum 1 second",
+            "question": "Does left-censored before evidence suffice for an ERASE candidate, and which minimum-stability policy governs?"
+          },
+          {
+            "issue_id": "after_stable_start",
+            "status": "pending",
+            "a_value": 4425.2,
+            "b2_value": 4424.933,
+            "difference_seconds_a_minus_b2": 0.267,
+            "question": "Should the after state begin at first full absence or after A's later operation-end buffer?"
+          },
+          {
+            "issue_id": "erase_persistence_horizon",
+            "status": "pending",
+            "a_value": 2.766,
+            "b2_value": 3.034,
+            "unit": "seconds after each delta end",
+            "question": "Both passes support persistence; confirm that the horizon is sufficient under the chosen event end and minimum-stability policy."
+          }
+        ],
+        "candidate_decision": null,
+        "candidate_options": [
+          "ERASE",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "review_status": "pending",
+        "signoff_status": "pending",
+        "accepted": false
+      }
+    ]
+  },
+  "critical_evidence_links": {
+    "annotator_a": [
+      {
+        "label": "A comparison",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/a-assets/derived/a-erase-comparison.png",
+        "actual_sha256": "c26c140f936379cf68d58c79125d6cd9c5d1987d21e8ad0c49ad34b015b7c001"
+      },
+      {
+        "label": "A delta mask",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/a-assets/derived/a-erase-mask.png",
+        "actual_sha256": "978fb90fd0ad54f1bd6648eba181fb152372071f13a14db93c1d565362e6b40d"
+      },
+      {
+        "label": "A 4424.933 frame",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/a-assets/frames/a-frame-089.png",
+        "actual_sha256": "cbebf9625fc4cc6077fbb60636d159f1468d96f1dbaffdadf14a14118e2f9ed7"
+      },
+      {
+        "label": "A 4425.167 operation-end frame",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/a-assets/frames/a-frame-096.png",
+        "actual_sha256": "7d9893b4356c7a9a4c47b72d59b264f034cd7f33545d2283631d6a071d0f05db"
+      },
+      {
+        "label": "A 4425.200 after-start frame",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/a-assets/frames/a-frame-097.png",
+        "actual_sha256": "c3163cc1829832e663f7b74e3026319ca606ccc985781407971baeb6b65a1323"
+      },
+      {
+        "label": "A 4427.933 confirmation frame",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/a-assets/frames/a-frame-179.png",
+        "actual_sha256": "37c2c10c61f02581a1275dde77d7c429d2bd23b1c3b206234a82412399fe887d"
+      }
+    ],
+    "annotator_b2": [
+      {
+        "label": "B2 comparison",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/b2-visual-annotator-b2-20260812/board-assets/comparison-4423.033-4424.933.png",
+        "actual_sha256": "125a65beb5c760c7c2f7807dc82510785189b691bdb9929ee560657716662a80"
+      },
+      {
+        "label": "B2 delta mask",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/b2-visual-annotator-b2-20260812/board-assets/delta-mask-4423.033-4424.933.png",
+        "actual_sha256": "440851c7d022f17f7d0847c17ca13b34eedbce2b6e2de9e8c75c66c5cdbfa38a"
+      },
+      {
+        "label": "B2 4423.033 last-intact frame",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/b2-visual-annotator-b2-20260812/evidence-frames/frame-4423.033.jpg",
+        "actual_sha256": "d61e5dc0afccc246419daa6393d2ce15c10537f7ad08eaa63f8493064e03c181"
+      },
+      {
+        "label": "B2 4423.067 first-change frame",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/b2-visual-annotator-b2-20260812/evidence-frames/frame-4423.067.jpg",
+        "actual_sha256": "9b27011a6363c96c02ca34e848d48e4e4c4c1d4a1029d9354969be83810c4007"
+      },
+      {
+        "label": "B2 4424.900 last-residual frame",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/b2-visual-annotator-b2-20260812/evidence-frames/frame-4424.900.jpg",
+        "actual_sha256": "2b0955200dbf0aea3928eead24cef70b9a3d95b2fe426b0c9a67df00e26ff210"
+      },
+      {
+        "label": "B2 4424.933 first-absent frame",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/b2-visual-annotator-b2-20260812/evidence-frames/frame-4424.933.jpg",
+        "actual_sha256": "51131649113385e5ff93a714664363ae0b7c406bdd4dd5ee778e56cd6857e488"
+      },
+      {
+        "label": "B2 4427.967 confirmation frame",
+        "path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/b2-visual-annotator-b2-20260812/evidence-frames/frame-4427.967.jpg",
+        "actual_sha256": "6473ed99920b6a47b9b94e6762e39af0b2c2326625c34119bf6d869144863781"
+      }
+    ]
+  },
+  "learner_observations": [],
+  "pedagogy": {
+    "role": "unknown",
+    "teacher_intent": "unknown",
+    "expected_learner_change": "unknown",
+    "observed_learner_response": null
+  },
+  "review_gates": [
+    {"gate": "event_candidate", "status": "pending", "reviewer": null, "reviewed_at": null, "notes": null},
+    {"gate": "temporal_boundaries", "status": "pending", "reviewer": null, "reviewed_at": null, "notes": null},
+    {"gate": "before_left_censor", "status": "pending", "reviewer": null, "reviewed_at": null, "notes": null},
+    {"gate": "after_stability", "status": "pending", "reviewer": null, "reviewed_at": null, "notes": null},
+    {"gate": "erase_persistence", "status": "pending", "reviewer": null, "reviewed_at": null, "notes": null},
+    {"gate": "canonical_asr_trace", "status": "pending", "reviewer": null, "reviewed_at": null, "notes": null},
+    {"gate": "evidence_and_hash_integrity", "status": "pending", "reviewer": null, "reviewed_at": null, "notes": null}
+  ],
+  "signoffs": [
+    {"role": "visual_adjudicator", "status": "pending", "name": null, "signed_at": null, "decision": null},
+    {"role": "data_governance_reviewer", "status": "pending", "name": null, "signed_at": null, "decision": null}
+  ],
+  "final_decision": null,
+  "accepted": false,
+  "immutable": true
+}

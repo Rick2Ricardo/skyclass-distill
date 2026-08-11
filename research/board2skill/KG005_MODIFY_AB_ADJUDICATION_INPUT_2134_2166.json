@@ -1,0 +1,2773 @@
+{
+  "schema_version": "temporal-board-adjudication-intake-v1",
+  "package_id": "kg005-modify-ab-adjudication-2134-2166",
+  "intake_id": "KG005_MODIFY_AB_ADJUDICATION_INPUT_2134_2166",
+  "created_at": "2026-08-12",
+  "source_video_id": "phy-force-kunge-005",
+  "clip": {
+    "source_record_id": "phy-force-kunge-005",
+    "source_video_path": "data/raw/physics/force-pilot/phy-force-kunge-005/source.mp4",
+    "source_metadata_path": "data/raw/physics/force-pilot/phy-force-kunge-005/source.json",
+    "source_video_sha256": "127ed9323274d0dd00f3cc39c4a3b68f3109d74dbfd7fb2d08f87cab008f7241",
+    "source_metadata_sha256": "8540a80865d667ccf7fd84372f50b479f475466269a7aabe4316ed0dfa4c5e92",
+    "duration_seconds": 8790.021451,
+    "annotated_source_window": {
+      "start": 2134,
+      "end": 2166
+    },
+    "time_basis": "full_source_absolute_seconds"
+  },
+  "scope": {
+    "task": "independent A/B alignment and human adjudication intake",
+    "teacher_only_recording": true,
+    "visual_event_freeze_preserved": true,
+    "excluded_as_events": [
+      "page_change",
+      "scroll",
+      "viewport_change",
+      "zoom",
+      "toolbar_or_toolbox",
+      "pointing_only"
+    ],
+    "operation_policy": "Do not infer MODIFY from spatial coincidence. MODIFY requires a same semantic slot, explicit old and new objects, substantive old→new semantic or relation change, and closed relation evidence.",
+    "speech_policy": "Canonical ASR is preserved verbatim for trace only and cannot change operation or supply role, intent, student, or learner claims."
+  },
+  "decision_status": "pending_human",
+  "human_review_status": "pending",
+  "human_signoff_status": "pending",
+  "paper_gold_status": "blocked_pending_human_signoff",
+  "accepted_count": 0,
+  "not_gold": true,
+  "review_states": [
+    "pending"
+  ],
+  "governance": {
+    "default_group_status": "pending_human",
+    "automatic_promotion_allowed": false,
+    "visual_facts_only": true,
+    "allowed_final_decisions": [
+      "ERASE",
+      "ADD",
+      "atomic_ERASE+ADD",
+      "MODIFY",
+      "unknown",
+      "reject",
+      "not_an_event"
+    ],
+    "modify_gate": {
+      "same_semantic_slot_required": true,
+      "old_object_required": true,
+      "new_object_required": true,
+      "substantive_old_to_new_change_required": true,
+      "relation_closure_required": true,
+      "same_space_alone_sufficient": false,
+      "same_text_rewrite_sufficient": false
+    },
+    "pedagogical_role": {
+      "value": "unknown",
+      "evidence_refs": []
+    },
+    "teacher_intent": {
+      "value": "unknown",
+      "evidence_refs": []
+    },
+    "learner_observations": [],
+    "learner_effect": {
+      "value": "unknown",
+      "evidence_refs": []
+    },
+    "learner_evidence_used": [],
+    "constraints": [
+      "This is an adjudication intake ledger, not a temporal-board-v2 Gold bundle.",
+      "Every group and candidate remains pending until explicit human review and sign-off.",
+      "No candidate is accepted; accepted_count must remain 0 before sign-off.",
+      "Preserve canonical ASR segment indexes, relative times, absolute source times, and raw text exactly; do not correct ASR.",
+      "ASR cannot change the frozen visual operation and cannot supply pedagogical role, teacher intent, student presence, learner observation, or learner effect.",
+      "Same space, same slot, handwriting replacement, or textual equality alone never establishes MODIFY.",
+      "MODIFY requires old/new objects, a same semantic slot, a substantive old→new semantic or relation change, and relation closure.",
+      "Page changes, scrolling, viewport/zoom changes, toolbars/toolboxes, and pointing-only actions are not board events."
+    ],
+    "blocked_outputs_until_signoff": [
+      "temporal_board_v2_gold_bundle",
+      "accepted_board_delta",
+      "adjudicated_board_delta",
+      "accepted_teaching_transition",
+      "paper_gold_claim"
+    ]
+  },
+  "sources": {
+    "data_and_annotation_spec": {
+      "path": "research/board2skill/DATA_AND_ANNOTATION_SPEC.md",
+      "sha256": "4068892dd320772a1743ba2b464a92a1d66084abcfd2c0c3d2d2edb287ad57d3"
+    },
+    "temporal_board_contract": {
+      "path": "packages/contracts/src/temporal-board.ts",
+      "sha256": "db231fc43433624252d8d014a64264173ef770e63c0b362b5397dbaf0b0f29f8"
+    },
+    "source_metadata": {
+      "path": "data/raw/physics/force-pilot/phy-force-kunge-005/source.json",
+      "sha256": "8540a80865d667ccf7fd84372f50b479f475466269a7aabe4316ed0dfa4c5e92"
+    },
+    "canonical_asr": {
+      "path": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/asr/clip-2134-2166.json",
+      "sha256": "72a435476427fceb9c23acd01092bed0566387fc64f4c1c6ffab91f358d87d76"
+    },
+    "alignment_ledger": {
+      "path": "research/board2skill/KG005_MODIFY_AB_ALIGNMENT_2134_2166.md",
+      "sha256": "c005eaeb71dedd7998c07bf2fe67b3475aa5c34010f292a1eac0471dc0298a6f"
+    }
+  },
+  "inputs": {
+    "annotator_a": {
+      "path": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/annotator-a.json",
+      "file_sha256": "ddf5c619fc53c5ac8f329660897387e9e5b9895be572e5ba19f45e09dbd39c85",
+      "bundle_id": "tbv2-kg005-modify-2134-2166-annotator-a",
+      "declared_payload_sha256": "ac301ff70c74d1a6c4fea7852cf3ce952d15cc7c9cc11d544afcd65d541bf40a",
+      "recomputed_payload_sha256": "ac301ff70c74d1a6c4fea7852cf3ce952d15cc7c9cc11d544afcd65d541bf40a",
+      "contract_valid": true,
+      "contract_issues": [],
+      "payload_valid": true,
+      "asset_validation": {
+        "reference_count": 53,
+        "unique_asset_count": 29,
+        "missing_count": 0,
+        "path_violation_count": 0,
+        "sha256_mismatch_count": 0
+      },
+      "event_count": 4,
+      "event_ids": [
+        "kg005-a-delta-01",
+        "kg005-a-delta-02",
+        "kg005-a-delta-03",
+        "kg005-a-delta-04"
+      ],
+      "accepted_count": 0,
+      "statuses": [
+        "needs_review"
+      ]
+    },
+    "annotator_b": {
+      "path": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/annotator-b.json",
+      "file_sha256": "53e6dc47c13685a4865556980780a27375a9a4cdcbe51956b627f0f62cfc146c",
+      "bundle_id": "tbv2-kg005-modify-2134-2166-annotator-b",
+      "declared_payload_sha256": "d085bc5b0bd64c15d247570295b2b842f9b412ba5b3a41db2418bc13b4783265",
+      "recomputed_payload_sha256": "d085bc5b0bd64c15d247570295b2b842f9b412ba5b3a41db2418bc13b4783265",
+      "contract_valid": true,
+      "contract_issues": [],
+      "payload_valid": true,
+      "asset_validation": {
+        "reference_count": 82,
+        "unique_asset_count": 43,
+        "missing_count": 0,
+        "path_violation_count": 0,
+        "sha256_mismatch_count": 0
+      },
+      "event_count": 8,
+      "event_ids": [
+        "kg005-b-d01",
+        "kg005-b-d02",
+        "kg005-b-d03",
+        "kg005-b-d04",
+        "kg005-b-d05",
+        "kg005-b-d06",
+        "kg005-b-d07",
+        "kg005-b-d08"
+      ],
+      "accepted_count": 0,
+      "statuses": [
+        "needs_review"
+      ]
+    }
+  },
+  "canonical_asr": {
+    "path": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/asr/clip-2134-2166.json",
+    "sha256": "72a435476427fceb9c23acd01092bed0566387fc64f4c1c6ffab91f358d87d76",
+    "normalization": "none",
+    "original_time_basis": "clip_relative_seconds",
+    "absolute_source_offset_seconds": 2134,
+    "segment_count": 19,
+    "full_raw_text": "乘以比平方除以千克的平方就推出来 同样道理这一道题也是啊对不对 你就先推码这才第二道题 k 他就等于fr平方 就是力乘以距离的平方 再除以之一道 i1i2然后delta有1delta有2这还挺长的对不对 i1i2 然后是delta 相当于delta有1 delta有2 delta有2 那你现在来看 他的单位 就只看单位啊 那么 仔细观察一下选项里面没有牛顿 所以他肯定是把利用千克米每23秒",
+    "segments": [
+      {
+        "index": 0,
+        "relative_time": {
+          "start": 0,
+          "end": 2.3
+        },
+        "absolute_source_time": {
+          "start": 2134,
+          "end": 2136.3
+        },
+        "raw_text": "乘以比平方除以千克的平方就推出来"
+      },
+      {
+        "index": 1,
+        "relative_time": {
+          "start": 2.56,
+          "end": 4.1
+        },
+        "absolute_source_time": {
+          "start": 2136.56,
+          "end": 2138.1
+        },
+        "raw_text": "同样道理这一道题也是啊对不对"
+      },
+      {
+        "index": 2,
+        "relative_time": {
+          "start": 4.36,
+          "end": 5.88
+        },
+        "absolute_source_time": {
+          "start": 2138.36,
+          "end": 2139.88
+        },
+        "raw_text": "你就先推码这才第二道题"
+      },
+      {
+        "index": 3,
+        "relative_time": {
+          "start": 6.14,
+          "end": 6.64
+        },
+        "absolute_source_time": {
+          "start": 2140.14,
+          "end": 2140.64
+        },
+        "raw_text": "k"
+      },
+      {
+        "index": 4,
+        "relative_time": {
+          "start": 6.9,
+          "end": 8.44
+        },
+        "absolute_source_time": {
+          "start": 2140.9,
+          "end": 2142.44
+        },
+        "raw_text": "他就等于fr平方"
+      },
+      {
+        "index": 5,
+        "relative_time": {
+          "start": 8.7,
+          "end": 9.98
+        },
+        "absolute_source_time": {
+          "start": 2142.7,
+          "end": 2143.98
+        },
+        "raw_text": "就是力乘以距离的平方"
+      },
+      {
+        "index": 6,
+        "relative_time": {
+          "start": 10.24,
+          "end": 11.26
+        },
+        "absolute_source_time": {
+          "start": 2144.24,
+          "end": 2145.26
+        },
+        "raw_text": "再除以之一道"
+      },
+      {
+        "index": 7,
+        "relative_time": {
+          "start": 11.52,
+          "end": 14.6
+        },
+        "absolute_source_time": {
+          "start": 2145.52,
+          "end": 2148.6
+        },
+        "raw_text": "i1i2然后delta有1delta有2这还挺长的对不对"
+      },
+      {
+        "index": 8,
+        "relative_time": {
+          "start": 14.86,
+          "end": 15.88
+        },
+        "absolute_source_time": {
+          "start": 2148.86,
+          "end": 2149.88
+        },
+        "raw_text": "i1i2"
+      },
+      {
+        "index": 9,
+        "relative_time": {
+          "start": 16.14,
+          "end": 16.9
+        },
+        "absolute_source_time": {
+          "start": 2150.14,
+          "end": 2150.9
+        },
+        "raw_text": "然后是delta"
+      },
+      {
+        "index": 10,
+        "relative_time": {
+          "start": 17.16,
+          "end": 18.18
+        },
+        "absolute_source_time": {
+          "start": 2151.16,
+          "end": 2152.18
+        },
+        "raw_text": "相当于delta有1"
+      },
+      {
+        "index": 11,
+        "relative_time": {
+          "start": 18.44,
+          "end": 19.46
+        },
+        "absolute_source_time": {
+          "start": 2152.44,
+          "end": 2153.46
+        },
+        "raw_text": "delta有2"
+      },
+      {
+        "index": 12,
+        "relative_time": {
+          "start": 21.24,
+          "end": 22.02
+        },
+        "absolute_source_time": {
+          "start": 2155.24,
+          "end": 2156.02
+        },
+        "raw_text": "delta有2"
+      },
+      {
+        "index": 13,
+        "relative_time": {
+          "start": 22.28,
+          "end": 23.04
+        },
+        "absolute_source_time": {
+          "start": 2156.28,
+          "end": 2157.04
+        },
+        "raw_text": "那你现在来看"
+      },
+      {
+        "index": 14,
+        "relative_time": {
+          "start": 23.56,
+          "end": 24.06
+        },
+        "absolute_source_time": {
+          "start": 2157.56,
+          "end": 2158.06
+        },
+        "raw_text": "他的单位"
+      },
+      {
+        "index": 15,
+        "relative_time": {
+          "start": 24.32,
+          "end": 25.08
+        },
+        "absolute_source_time": {
+          "start": 2158.32,
+          "end": 2159.08
+        },
+        "raw_text": "就只看单位啊"
+      },
+      {
+        "index": 16,
+        "relative_time": {
+          "start": 25.86,
+          "end": 26.36
+        },
+        "absolute_source_time": {
+          "start": 2159.86,
+          "end": 2160.36
+        },
+        "raw_text": "那么"
+      },
+      {
+        "index": 17,
+        "relative_time": {
+          "start": 26.62,
+          "end": 28.16
+        },
+        "absolute_source_time": {
+          "start": 2160.62,
+          "end": 2162.16
+        },
+        "raw_text": "仔细观察一下选项里面没有牛顿"
+      },
+      {
+        "index": 18,
+        "relative_time": {
+          "start": 28.42,
+          "end": 31.76
+        },
+        "absolute_source_time": {
+          "start": 2162.42,
+          "end": 2165.76
+        },
+        "raw_text": "所以他肯定是把利用千克米每23秒"
+      }
+    ],
+    "group_segment_map": {
+      "KG005-AB-G01": [
+        0
+      ],
+      "KG005-AB-G02": [
+        1
+      ],
+      "KG005-AB-G03": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "KG005-AB-G04": [
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "KG005-AB-G05": [
+        18
+      ]
+    },
+    "unmapped_context_segment_indexes": [
+      2,
+      17
+    ],
+    "use": "canonical_raw_trace_only_not_adjudicated"
+  },
+  "coverage": {
+    "alignment_group_count": 5,
+    "matched_group_count": 4,
+    "a_only_group_count": 0,
+    "b_only_group_count": 1,
+    "a_event_count": 4,
+    "b_event_count": 8,
+    "a_event_ids": [
+      "kg005-a-delta-01",
+      "kg005-a-delta-02",
+      "kg005-a-delta-03",
+      "kg005-a-delta-04"
+    ],
+    "b_event_ids": [
+      "kg005-b-d01",
+      "kg005-b-d02",
+      "kg005-b-d03",
+      "kg005-b-d04",
+      "kg005-b-d05",
+      "kg005-b-d06",
+      "kg005-b-d07",
+      "kg005-b-d08"
+    ],
+    "matched_a_event_ids": [
+      "kg005-a-delta-01",
+      "kg005-a-delta-02",
+      "kg005-a-delta-03",
+      "kg005-a-delta-04"
+    ],
+    "matched_b_event_ids": [
+      "kg005-b-d02",
+      "kg005-b-d03",
+      "kg005-b-d04",
+      "kg005-b-d05",
+      "kg005-b-d06",
+      "kg005-b-d07",
+      "kg005-b-d08"
+    ],
+    "unmatched_a_event_ids": [],
+    "unmatched_b_event_ids": [
+      "kg005-b-d01"
+    ],
+    "unmatched_b_classification": [
+      {
+        "event_id": "kg005-b-d01",
+        "status": "pending_human_b_only_candidate"
+      }
+    ],
+    "unique_coverage_required": true,
+    "a_duplicate_coverage_count": 0,
+    "b_duplicate_coverage_count": 0,
+    "canonical_asr_segment_count": 19,
+    "canonical_asr_unmapped_context_segment_indexes": [
+      2,
+      17
+    ],
+    "proposed_candidate_group_count": 5,
+    "accepted_count": 0
+  },
+  "items": [
+    {
+      "group_id": "KG005-AB-G01",
+      "alignment_class": "b_only_candidate",
+      "a_event_ids": [],
+      "b_event_ids": [
+        "kg005-b-d01"
+      ],
+      "alignment_window": {
+        "start": 2134.1,
+        "end": 2135.1
+      },
+      "temporal_iou": null,
+      "a_side": {
+        "event_ids": [],
+        "events": [],
+        "objects": [],
+        "speech_ids": []
+      },
+      "b_side": {
+        "event_ids": [
+          "kg005-b-d01"
+        ],
+        "events": [
+          {
+            "delta_id": "kg005-b-d01",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2134.1,
+              "end": 2135.1
+            },
+            "operation": "add",
+            "region": {
+              "x": 0.71,
+              "y": 0.67,
+              "width": 0.18,
+              "height": 0.25
+            },
+            "affected_object_ids": [
+              "kg005-b-obj-circle-completion"
+            ],
+            "semantic_label": "complete two lower red emphasis circles",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "left_window_censored",
+              "manual_temporal_boundary"
+            ],
+            "evidence_refs": [
+              "kg005-b-ev-f00",
+              "kg005-b-ev-f01"
+            ]
+          }
+        ],
+        "objects": [
+          {
+            "object_id": "kg005-b-obj-circle-completion",
+            "kind": "mark",
+            "semantic_text": null,
+            "first_visible": 2134.1,
+            "last_visible": 2137.7,
+            "region": {
+              "x": 0.71,
+              "y": 0.67,
+              "width": 0.18,
+              "height": 0.25
+            },
+            "evidence_refs": [
+              "kg005-b-ev-s1"
+            ]
+          }
+        ],
+        "speech_ids": [
+          "kg005-b-sp00"
+        ]
+      },
+      "evidence_assets": [
+        {
+          "annotator": "B",
+          "kind": "delta_comparison",
+          "event_id": "kg005-b-d01",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d01-comparison.png",
+          "sha256": "52029713d934b2240d6a208247c11cc11c2b73110c49c0f563929cb40979e99c"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_mask",
+          "event_id": "kg005-b-d01",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d01-mask.png",
+          "sha256": "52b2718fcb6943f26d7671c3332c1f1e21e00e35b9730b09df07df890fb6fbd3"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f00",
+          "time": {
+            "start": 2134,
+            "end": 2134.001
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2134_000.png",
+          "sha256": "274a1f4497ce8a6d86e0845a3eacd105485bb0653527a2af16395d3b9cac6bd4"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f01",
+          "time": {
+            "start": 2135.5,
+            "end": 2135.501
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2135_500.png",
+          "sha256": "25c881d80534a723921bcf1f2849c6408e3bc3f8eda1097f904d912c089ceed2"
+        }
+      ],
+      "speech_trace": {
+        "normalization": "none",
+        "use": "context_only_not_operation_or_role_inference",
+        "segment_indexes": [
+          0
+        ],
+        "segments": [
+          {
+            "index": 0,
+            "relative_time": {
+              "start": 0,
+              "end": 2.3
+            },
+            "absolute_source_time": {
+              "start": 2134,
+              "end": 2136.3
+            },
+            "raw_text": "乘以比平方除以千克的平方就推出来"
+          }
+        ],
+        "raw_text": "乘以比平方除以千克的平方就推出来",
+        "a_speech_ids": [],
+        "b_speech_ids": [
+          "kg005-b-sp00"
+        ]
+      },
+      "disagreements": {
+        "boundary": "B starts 0.10 s after the left edge; the beginning is left-window-censored. A has no event.",
+        "operation": "A has no event; B proposes ADD.",
+        "object": "B isolates two lower red circle-completion marks; A subsumes the area into the pre-existing composite working block.",
+        "old_new_semantic_slot": "No aligned A old/new pair. A MODIFY decision is not closed.",
+        "relation": "No changed relation is identified."
+      },
+      "adjudication_options": {
+        "allowed_decisions": [
+          "ERASE",
+          "ADD",
+          "atomic_ERASE+ADD",
+          "MODIFY",
+          "unknown",
+          "reject",
+          "not_an_event"
+        ],
+        "modify_gate": {
+          "same_semantic_slot_required": true,
+          "old_object_required": true,
+          "new_object_required": true,
+          "substantive_old_to_new_change_required": true,
+          "relation_closure_required": true,
+          "same_space_alone_sufficient": false,
+          "same_text_rewrite_sufficient": false
+        },
+        "decision_status": "pending_human",
+        "candidate_resolutions": [
+          {
+            "candidate_id": "G01-C1",
+            "label": "retain B-only ADD",
+            "sequence": [
+              {
+                "operation": "ADD",
+                "time": {
+                  "start": 2134.1,
+                  "end": 2135.1
+                },
+                "object_slot": "lower_red_circle_completion"
+              }
+            ],
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G01-C2",
+            "label": "uncertain left-censored activity",
+            "sequence": [
+              {
+                "operation": "unknown",
+                "time": {
+                  "start": 2134.1,
+                  "end": 2135.1
+                },
+                "object_slot": "lower_red_circle_completion"
+              }
+            ],
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G01-C3",
+            "label": "exclude as continuation or non-event",
+            "disposition_options": [
+              "reject",
+              "not_an_event"
+            ],
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G01-C4",
+            "label": "conditional other operation",
+            "operation_options": [
+              "ERASE",
+              "atomic_ERASE+ADD",
+              "MODIFY"
+            ],
+            "modify_requirements": "all modify_gate fields must be evidenced",
+            "status": "pending_human"
+          }
+        ]
+      },
+      "proposed": {
+        "selected_candidate_id": null,
+        "selected_decision": null,
+        "canonical_events": [],
+        "status": "pending_human"
+      },
+      "human_review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "selected_decision": null,
+        "selected_candidate_id": null,
+        "canonical_time": null,
+        "canonical_region": null,
+        "canonical_object_ids": [],
+        "old_object_id": null,
+        "new_object_id": null,
+        "substantive_semantic_change": null,
+        "relation_closure": null,
+        "rationale": null,
+        "evidence_refs": []
+      },
+      "human_signoff": {
+        "status": "pending",
+        "signer": null,
+        "signed_at": null,
+        "signature": null
+      }
+    },
+    {
+      "group_id": "KG005-AB-G02",
+      "alignment_class": "matched_visual_object",
+      "a_event_ids": [
+        "kg005-a-delta-01"
+      ],
+      "b_event_ids": [
+        "kg005-b-d02"
+      ],
+      "alignment_window": {
+        "start": 2136.3,
+        "end": 2137.8
+      },
+      "temporal_iou": 0.866667,
+      "a_side": {
+        "event_ids": [
+          "kg005-a-delta-01"
+        ],
+        "events": [
+          {
+            "delta_id": "kg005-a-delta-01",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2136.3,
+              "end": 2137.6
+            },
+            "operation": "erase",
+            "region": {
+              "x": 0.72,
+              "y": 0.54,
+              "width": 0.23,
+              "height": 0.39
+            },
+            "affected_object_ids": [
+              "kg005-a-object-prior-working"
+            ],
+            "semantic_label": "清除右下旧演算块",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "rectangular_delta_mask"
+            ],
+            "evidence_refs": [
+              "kg005-a-ev-frame-2136-200",
+              "kg005-a-ev-frame-2137-800",
+              "kg005-a-ev-frame-2140-100"
+            ]
+          }
+        ],
+        "objects": [
+          {
+            "object_id": "kg005-a-object-prior-working",
+            "kind": "formula",
+            "semantic_text": "旧演算块：F、r²、m₁、m₂ 等量纲拆分与圈注",
+            "first_visible": 2134,
+            "last_visible": 2137.5,
+            "region": {
+              "x": 0.72,
+              "y": 0.54,
+              "width": 0.23,
+              "height": 0.39
+            },
+            "evidence_refs": [
+              "kg005-a-ev-frame-2134-500",
+              "kg005-a-ev-frame-2136-200"
+            ]
+          }
+        ],
+        "speech_ids": [
+          "kg005-a-speech-01"
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "kg005-b-d02"
+        ],
+        "events": [
+          {
+            "delta_id": "kg005-b-d02",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2136.3,
+              "end": 2137.8
+            },
+            "operation": "erase",
+            "region": {
+              "x": 0.71,
+              "y": 0.53,
+              "width": 0.24,
+              "height": 0.4
+            },
+            "affected_object_ids": [
+              "kg005-b-obj-prior-working",
+              "kg005-b-obj-circle-completion"
+            ],
+            "semantic_label": "erase prior right-side and lower red working",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "manual_temporal_boundary"
+            ],
+            "evidence_refs": [
+              "kg005-b-ev-f01",
+              "kg005-b-ev-f02",
+              "kg005-b-ev-f03"
+            ]
+          }
+        ],
+        "objects": [
+          {
+            "object_id": "kg005-b-obj-prior-working",
+            "kind": "formula",
+            "semantic_text": null,
+            "first_visible": 2134,
+            "last_visible": 2137.7,
+            "region": {
+              "x": 0.72,
+              "y": 0.53,
+              "width": 0.23,
+              "height": 0.4
+            },
+            "evidence_refs": [
+              "kg005-b-ev-s0",
+              "kg005-b-ev-s1"
+            ]
+          },
+          {
+            "object_id": "kg005-b-obj-circle-completion",
+            "kind": "mark",
+            "semantic_text": null,
+            "first_visible": 2134.1,
+            "last_visible": 2137.7,
+            "region": {
+              "x": 0.71,
+              "y": 0.67,
+              "width": 0.18,
+              "height": 0.25
+            },
+            "evidence_refs": [
+              "kg005-b-ev-s1"
+            ]
+          }
+        ],
+        "speech_ids": [
+          "kg005-b-sp01"
+        ]
+      },
+      "evidence_assets": [
+        {
+          "annotator": "A",
+          "kind": "delta_comparison",
+          "event_id": "kg005-a-delta-01",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/deltas/delta-01-comparison.png",
+          "sha256": "6f086dca7c770dd1181b839f3552a6215425f2817525a4375818b4964892f094"
+        },
+        {
+          "annotator": "A",
+          "kind": "delta_mask",
+          "event_id": "kg005-a-delta-01",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/deltas/delta-01-mask.png",
+          "sha256": "1e1f0fe0626908cac0995c7b6c4b3e9a89aa3cb1ba5b5b9b1ccc1515ee93c4bc"
+        },
+        {
+          "annotator": "A",
+          "kind": "frame",
+          "evidence_id": "kg005-a-ev-frame-2136-200",
+          "time": {
+            "start": 2136.1899999999996,
+            "end": 2136.21
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/frames/t2136_200.png",
+          "sha256": "8ea49f8c8b7423e77818b891e7eedf3c31da6a66a75be9ebff4c79aa2e5e8090"
+        },
+        {
+          "annotator": "A",
+          "kind": "frame",
+          "evidence_id": "kg005-a-ev-frame-2137-800",
+          "time": {
+            "start": 2137.79,
+            "end": 2137.8100000000004
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/frames/t2137_800.png",
+          "sha256": "64d7ff3a1fc67f009d6472f0e86ccc8060560f7cd1a4bb1b47af3a753d520fcf"
+        },
+        {
+          "annotator": "A",
+          "kind": "frame",
+          "evidence_id": "kg005-a-ev-frame-2140-100",
+          "time": {
+            "start": 2140.0899999999997,
+            "end": 2140.11
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/frames/t2140_100.png",
+          "sha256": "deda1f075f960af257edfc4fc7b0571760b2de3709eb67a31ac936764f7253a5"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_comparison",
+          "event_id": "kg005-b-d02",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d02-comparison.png",
+          "sha256": "d54c14279c385cd8fc974200075b082a10adc29c26a9a835592362d9fc0d2a7f"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_mask",
+          "event_id": "kg005-b-d02",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d02-mask.png",
+          "sha256": "d647e064bb0709ec471ddfec1c0521b01aa3acda5a470fe0c641c2ca920dfa78"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f01",
+          "time": {
+            "start": 2135.5,
+            "end": 2135.501
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2135_500.png",
+          "sha256": "25c881d80534a723921bcf1f2849c6408e3bc3f8eda1097f904d912c089ceed2"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f02",
+          "time": {
+            "start": 2138.5,
+            "end": 2138.501
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2138_500.png",
+          "sha256": "1e3ea3f39efec48e7027c2594231c6808373dc21ffd423759a34807e29983db7"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f03",
+          "time": {
+            "start": 2140,
+            "end": 2140.001
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2140_000.png",
+          "sha256": "479be7038f2df5ad8ffe9a1ce1a4a67a9cbdd3ea662ba62d5026c95c6c8ad6e6"
+        }
+      ],
+      "speech_trace": {
+        "normalization": "none",
+        "use": "context_only_not_operation_or_role_inference",
+        "segment_indexes": [
+          1
+        ],
+        "segments": [
+          {
+            "index": 1,
+            "relative_time": {
+              "start": 2.56,
+              "end": 4.1
+            },
+            "absolute_source_time": {
+              "start": 2136.56,
+              "end": 2138.1
+            },
+            "raw_text": "同样道理这一道题也是啊对不对"
+          }
+        ],
+        "raw_text": "同样道理这一道题也是啊对不对",
+        "a_speech_ids": [
+          "kg005-a-speech-01"
+        ],
+        "b_speech_ids": [
+          "kg005-b-sp01"
+        ]
+      },
+      "disagreements": {
+        "boundary": "Start agrees at 2136.30 s; B ends 0.20 s later than A.",
+        "operation": "Both propose ERASE.",
+        "object": "A erases one composite prior-working object; B also includes the G01 circle-completion object.",
+        "old_new_semantic_slot": "Old objects are present and no new object is paired, so MODIFY is not closed.",
+        "relation": "No changed relation is identified."
+      },
+      "adjudication_options": {
+        "allowed_decisions": [
+          "ERASE",
+          "ADD",
+          "atomic_ERASE+ADD",
+          "MODIFY",
+          "unknown",
+          "reject",
+          "not_an_event"
+        ],
+        "modify_gate": {
+          "same_semantic_slot_required": true,
+          "old_object_required": true,
+          "new_object_required": true,
+          "substantive_old_to_new_change_required": true,
+          "relation_closure_required": true,
+          "same_space_alone_sufficient": false,
+          "same_text_rewrite_sufficient": false
+        },
+        "decision_status": "pending_human",
+        "candidate_resolutions": [
+          {
+            "candidate_id": "G02-C1",
+            "label": "consensus ERASE with human-selected end/object set",
+            "sequence": [
+              {
+                "operation": "ERASE",
+                "time_options": [
+                  {
+                    "start": 2136.3,
+                    "end": 2137.6
+                  },
+                  {
+                    "start": 2136.3,
+                    "end": 2137.8
+                  }
+                ],
+                "object_slot": "prior_right_lower_working"
+              }
+            ],
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G02-C2",
+            "label": "alternative or exclusion",
+            "operation_or_disposition_options": [
+              "ADD",
+              "atomic_ERASE+ADD",
+              "MODIFY",
+              "unknown",
+              "reject",
+              "not_an_event"
+            ],
+            "status": "pending_human"
+          }
+        ]
+      },
+      "proposed": {
+        "selected_candidate_id": null,
+        "selected_decision": null,
+        "canonical_events": [],
+        "status": "pending_human"
+      },
+      "human_review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "selected_decision": null,
+        "selected_candidate_id": null,
+        "canonical_time": null,
+        "canonical_region": null,
+        "canonical_object_ids": [],
+        "old_object_id": null,
+        "new_object_id": null,
+        "substantive_semantic_change": null,
+        "relation_closure": null,
+        "rationale": null,
+        "evidence_refs": []
+      },
+      "human_signoff": {
+        "status": "pending",
+        "signer": null,
+        "signed_at": null,
+        "signature": null
+      }
+    },
+    {
+      "group_id": "KG005-AB-G03",
+      "alignment_class": "matched_visual_object",
+      "a_event_ids": [
+        "kg005-a-delta-02"
+      ],
+      "b_event_ids": [
+        "kg005-b-d03"
+      ],
+      "alignment_window": {
+        "start": 2140.2,
+        "end": 2154.9
+      },
+      "temporal_iou": 0.986395,
+      "a_side": {
+        "event_ids": [
+          "kg005-a-delta-02"
+        ],
+        "events": [
+          {
+            "delta_id": "kg005-a-delta-02",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2140.27,
+              "end": 2154.77
+            },
+            "operation": "add",
+            "region": {
+              "x": 0.33,
+              "y": 0.59,
+              "width": 0.27,
+              "height": 0.18
+            },
+            "affected_object_ids": [
+              "kg005-a-object-k-shell",
+              "kg005-a-object-numerator-v1"
+            ],
+            "semantic_label": "新增 k = F r² / (I₁ I₂ Δl₁ Δl₂)",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "rectangular_delta_mask"
+            ],
+            "evidence_refs": [
+              "kg005-a-ev-frame-2140-100",
+              "kg005-a-ev-frame-2154-900"
+            ]
+          }
+        ],
+        "objects": [
+          {
+            "object_id": "kg005-a-object-k-shell",
+            "kind": "formula",
+            "semantic_text": "k = [分数线] / (I₁ I₂ Δl₁ Δl₂)",
+            "first_visible": 2140.27,
+            "last_visible": 2166,
+            "region": {
+              "x": 0.33,
+              "y": 0.59,
+              "width": 0.27,
+              "height": 0.18
+            },
+            "evidence_refs": [
+              "kg005-a-ev-frame-2154-900",
+              "kg005-a-ev-frame-2165-900"
+            ]
+          },
+          {
+            "object_id": "kg005-a-object-numerator-v1",
+            "kind": "formula",
+            "semantic_text": "F r²",
+            "first_visible": 2141.7,
+            "last_visible": 2163.17,
+            "region": {
+              "x": 0.39,
+              "y": 0.59,
+              "width": 0.13,
+              "height": 0.09
+            },
+            "evidence_refs": [
+              "kg005-a-ev-frame-2154-900",
+              "kg005-a-ev-frame-2162-700"
+            ]
+          }
+        ],
+        "speech_ids": [
+          "kg005-a-speech-03",
+          "kg005-a-speech-04",
+          "kg005-a-speech-05",
+          "kg005-a-speech-06",
+          "kg005-a-speech-07",
+          "kg005-a-speech-08",
+          "kg005-a-speech-09",
+          "kg005-a-speech-10",
+          "kg005-a-speech-11"
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "kg005-b-d03"
+        ],
+        "events": [
+          {
+            "delta_id": "kg005-b-d03",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2140.2,
+              "end": 2154.9
+            },
+            "operation": "add",
+            "region": {
+              "x": 0.33,
+              "y": 0.57,
+              "width": 0.23,
+              "height": 0.21
+            },
+            "affected_object_ids": [
+              "kg005-b-obj-formula-core",
+              "kg005-b-obj-numerator-1"
+            ],
+            "semantic_label": "write a red fraction-form expression beginning with k and F r-squared",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "composite_continuous_add",
+              "handwriting_transcription_uncertain",
+              "manual_temporal_boundary"
+            ],
+            "evidence_refs": [
+              "kg005-b-ev-f02",
+              "kg005-b-ev-f04"
+            ]
+          }
+        ],
+        "objects": [
+          {
+            "object_id": "kg005-b-obj-formula-core",
+            "kind": "formula",
+            "semantic_text": "k = [fraction bar] / (I1 I2 Δl1 Δl2)",
+            "first_visible": 2140.2,
+            "last_visible": 2166,
+            "region": {
+              "x": 0.33,
+              "y": 0.57,
+              "width": 0.23,
+              "height": 0.21
+            },
+            "evidence_refs": [
+              "kg005-b-ev-s3",
+              "kg005-b-ev-s8"
+            ]
+          },
+          {
+            "object_id": "kg005-b-obj-numerator-1",
+            "kind": "formula",
+            "semantic_text": "F r²",
+            "first_visible": 2141.6,
+            "last_visible": 2163.2,
+            "region": {
+              "x": 0.4,
+              "y": 0.57,
+              "width": 0.1,
+              "height": 0.11
+            },
+            "evidence_refs": [
+              "kg005-b-ev-s3",
+              "kg005-b-ev-s6"
+            ]
+          }
+        ],
+        "speech_ids": [
+          "kg005-b-sp03",
+          "kg005-b-sp04",
+          "kg005-b-sp05",
+          "kg005-b-sp06",
+          "kg005-b-sp07",
+          "kg005-b-sp08",
+          "kg005-b-sp09",
+          "kg005-b-sp10",
+          "kg005-b-sp11"
+        ]
+      },
+      "evidence_assets": [
+        {
+          "annotator": "A",
+          "kind": "delta_comparison",
+          "event_id": "kg005-a-delta-02",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/deltas/delta-02-comparison.png",
+          "sha256": "36af1a01cce82833a2a217cee3d24177cb269ba9b005dd05f1db6c8b53586e67"
+        },
+        {
+          "annotator": "A",
+          "kind": "delta_mask",
+          "event_id": "kg005-a-delta-02",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/deltas/delta-02-mask.png",
+          "sha256": "8fee4aba65ccab2d8eb3c37ec947d49f5488194379a050b8ee593eac104079c3"
+        },
+        {
+          "annotator": "A",
+          "kind": "frame",
+          "evidence_id": "kg005-a-ev-frame-2140-100",
+          "time": {
+            "start": 2140.0899999999997,
+            "end": 2140.11
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/frames/t2140_100.png",
+          "sha256": "deda1f075f960af257edfc4fc7b0571760b2de3709eb67a31ac936764f7253a5"
+        },
+        {
+          "annotator": "A",
+          "kind": "frame",
+          "evidence_id": "kg005-a-ev-frame-2154-900",
+          "time": {
+            "start": 2154.89,
+            "end": 2154.9100000000003
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/frames/t2154_900.png",
+          "sha256": "ffaafc6c9269d81bfaa018755c5921fb01006fc8160efd3bf3b2fa2ca758ee40"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_comparison",
+          "event_id": "kg005-b-d03",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d03-comparison.png",
+          "sha256": "beef9ad0c0dd6eaa7beb248c63f79df8342e8019e7e884ded39afe27c84602a8"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_mask",
+          "event_id": "kg005-b-d03",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d03-mask.png",
+          "sha256": "41bca695586c40be7e1402f0e1d5440781cbc3f564fff345df31a01dbc4c61a7"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f02",
+          "time": {
+            "start": 2138.5,
+            "end": 2138.501
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2138_500.png",
+          "sha256": "1e3ea3f39efec48e7027c2594231c6808373dc21ffd423759a34807e29983db7"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f04",
+          "time": {
+            "start": 2155.3,
+            "end": 2155.3010000000004
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2155_300.png",
+          "sha256": "4bc6c5cce9ade8afcf527b44ce4b69498cbb17baa942f34efcc8527ac23223e5"
+        }
+      ],
+      "speech_trace": {
+        "normalization": "none",
+        "use": "context_only_not_operation_or_role_inference",
+        "segment_indexes": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "segments": [
+          {
+            "index": 3,
+            "relative_time": {
+              "start": 6.14,
+              "end": 6.64
+            },
+            "absolute_source_time": {
+              "start": 2140.14,
+              "end": 2140.64
+            },
+            "raw_text": "k"
+          },
+          {
+            "index": 4,
+            "relative_time": {
+              "start": 6.9,
+              "end": 8.44
+            },
+            "absolute_source_time": {
+              "start": 2140.9,
+              "end": 2142.44
+            },
+            "raw_text": "他就等于fr平方"
+          },
+          {
+            "index": 5,
+            "relative_time": {
+              "start": 8.7,
+              "end": 9.98
+            },
+            "absolute_source_time": {
+              "start": 2142.7,
+              "end": 2143.98
+            },
+            "raw_text": "就是力乘以距离的平方"
+          },
+          {
+            "index": 6,
+            "relative_time": {
+              "start": 10.24,
+              "end": 11.26
+            },
+            "absolute_source_time": {
+              "start": 2144.24,
+              "end": 2145.26
+            },
+            "raw_text": "再除以之一道"
+          },
+          {
+            "index": 7,
+            "relative_time": {
+              "start": 11.52,
+              "end": 14.6
+            },
+            "absolute_source_time": {
+              "start": 2145.52,
+              "end": 2148.6
+            },
+            "raw_text": "i1i2然后delta有1delta有2这还挺长的对不对"
+          },
+          {
+            "index": 8,
+            "relative_time": {
+              "start": 14.86,
+              "end": 15.88
+            },
+            "absolute_source_time": {
+              "start": 2148.86,
+              "end": 2149.88
+            },
+            "raw_text": "i1i2"
+          },
+          {
+            "index": 9,
+            "relative_time": {
+              "start": 16.14,
+              "end": 16.9
+            },
+            "absolute_source_time": {
+              "start": 2150.14,
+              "end": 2150.9
+            },
+            "raw_text": "然后是delta"
+          },
+          {
+            "index": 10,
+            "relative_time": {
+              "start": 17.16,
+              "end": 18.18
+            },
+            "absolute_source_time": {
+              "start": 2151.16,
+              "end": 2152.18
+            },
+            "raw_text": "相当于delta有1"
+          },
+          {
+            "index": 11,
+            "relative_time": {
+              "start": 18.44,
+              "end": 19.46
+            },
+            "absolute_source_time": {
+              "start": 2152.44,
+              "end": 2153.46
+            },
+            "raw_text": "delta有2"
+          }
+        ],
+        "raw_text": "k他就等于fr平方就是力乘以距离的平方再除以之一道i1i2然后delta有1delta有2这还挺长的对不对i1i2然后是delta相当于delta有1delta有2",
+        "a_speech_ids": [
+          "kg005-a-speech-03",
+          "kg005-a-speech-04",
+          "kg005-a-speech-05",
+          "kg005-a-speech-06",
+          "kg005-a-speech-07",
+          "kg005-a-speech-08",
+          "kg005-a-speech-09",
+          "kg005-a-speech-10",
+          "kg005-a-speech-11"
+        ],
+        "b_speech_ids": [
+          "kg005-b-sp03",
+          "kg005-b-sp04",
+          "kg005-b-sp05",
+          "kg005-b-sp06",
+          "kg005-b-sp07",
+          "kg005-b-sp08",
+          "kg005-b-sp09",
+          "kg005-b-sp10",
+          "kg005-b-sp11"
+        ]
+      },
+      "disagreements": {
+        "boundary": "A starts 0.07 s later and ends 0.13 s earlier than B.",
+        "operation": "Both propose ADD.",
+        "object": "A partitions shell plus numerator-v1; B partitions formula-core plus numerator-1. Regions and OCR wording differ slightly.",
+        "old_new_semantic_slot": "Both point to the new formula slot; no old object exists, so MODIFY is not closed.",
+        "relation": "No connector/relation operation is claimed."
+      },
+      "adjudication_options": {
+        "allowed_decisions": [
+          "ERASE",
+          "ADD",
+          "atomic_ERASE+ADD",
+          "MODIFY",
+          "unknown",
+          "reject",
+          "not_an_event"
+        ],
+        "modify_gate": {
+          "same_semantic_slot_required": true,
+          "old_object_required": true,
+          "new_object_required": true,
+          "substantive_old_to_new_change_required": true,
+          "relation_closure_required": true,
+          "same_space_alone_sufficient": false,
+          "same_text_rewrite_sufficient": false
+        },
+        "decision_status": "pending_human",
+        "candidate_resolutions": [
+          {
+            "candidate_id": "G03-C1",
+            "label": "consensus formula ADD with human-normalized boundary and object partition",
+            "sequence": [
+              {
+                "operation": "ADD",
+                "time_options": [
+                  {
+                    "start": 2140.27,
+                    "end": 2154.77
+                  },
+                  {
+                    "start": 2140.2,
+                    "end": 2154.9
+                  }
+                ],
+                "object_slot": "k_fraction_formula"
+              }
+            ],
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G03-C2",
+            "label": "alternative or exclusion",
+            "operation_or_disposition_options": [
+              "ERASE",
+              "atomic_ERASE+ADD",
+              "MODIFY",
+              "unknown",
+              "reject",
+              "not_an_event"
+            ],
+            "status": "pending_human"
+          }
+        ]
+      },
+      "proposed": {
+        "selected_candidate_id": null,
+        "selected_decision": null,
+        "canonical_events": [],
+        "status": "pending_human"
+      },
+      "human_review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "selected_decision": null,
+        "selected_candidate_id": null,
+        "canonical_time": null,
+        "canonical_region": null,
+        "canonical_object_ids": [],
+        "old_object_id": null,
+        "new_object_id": null,
+        "substantive_semantic_change": null,
+        "relation_closure": null,
+        "rationale": null,
+        "evidence_refs": []
+      },
+      "human_signoff": {
+        "status": "pending",
+        "signer": null,
+        "signed_at": null,
+        "signature": null
+      }
+    },
+    {
+      "group_id": "KG005-AB-G04",
+      "alignment_class": "matched_compound_granularity_dispute",
+      "a_event_ids": [
+        "kg005-a-delta-03"
+      ],
+      "b_event_ids": [
+        "kg005-b-d04",
+        "kg005-b-d05",
+        "kg005-b-d06"
+      ],
+      "alignment_window": {
+        "start": 2156.6,
+        "end": 2160.2
+      },
+      "temporal_iou": 0.047222,
+      "a_side": {
+        "event_ids": [
+          "kg005-a-delta-03"
+        ],
+        "events": [
+          {
+            "delta_id": "kg005-a-delta-03",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2158.1,
+              "end": 2158.27
+            },
+            "operation": "add",
+            "region": {
+              "x": 0.55,
+              "y": 0.64,
+              "width": 0.04,
+              "height": 0.05
+            },
+            "affected_object_ids": [
+              "kg005-a-object-equals-tail"
+            ],
+            "semantic_label": "在公式右侧新增等号",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "right_endpoint_not_yet_present",
+              "rectangular_delta_mask"
+            ],
+            "evidence_refs": [
+              "kg005-a-ev-frame-2157-800",
+              "kg005-a-ev-frame-2158-500"
+            ]
+          }
+        ],
+        "objects": [
+          {
+            "object_id": "kg005-a-object-equals-tail",
+            "kind": "mark",
+            "semantic_text": "=",
+            "first_visible": 2158.1,
+            "last_visible": 2166,
+            "region": {
+              "x": 0.55,
+              "y": 0.64,
+              "width": 0.04,
+              "height": 0.05
+            },
+            "evidence_refs": [
+              "kg005-a-ev-frame-2158-500",
+              "kg005-a-ev-frame-2165-900"
+            ]
+          }
+        ],
+        "speech_ids": [
+          "kg005-a-speech-14",
+          "kg005-a-speech-15"
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "kg005-b-d04",
+          "kg005-b-d05",
+          "kg005-b-d06"
+        ],
+        "events": [
+          {
+            "delta_id": "kg005-b-d04",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2156.6,
+              "end": 2158.3
+            },
+            "operation": "add",
+            "region": {
+              "x": 0.49,
+              "y": 0.61,
+              "width": 0.1,
+              "height": 0.09
+            },
+            "affected_object_ids": [
+              "kg005-b-obj-bar-extension",
+              "kg005-b-obj-equals-1"
+            ],
+            "semantic_label": "extend the fraction bar and add an equals sign",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "short_after_state",
+              "manual_temporal_boundary"
+            ],
+            "evidence_refs": [
+              "kg005-b-ev-f04",
+              "kg005-b-ev-f05"
+            ]
+          },
+          {
+            "delta_id": "kg005-b-d05",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2158.9,
+              "end": 2159
+            },
+            "operation": "erase",
+            "region": {
+              "x": 0.55,
+              "y": 0.61,
+              "width": 0.04,
+              "height": 0.09
+            },
+            "affected_object_ids": [
+              "kg005-b-obj-equals-1"
+            ],
+            "semantic_label": "erase the first equals sign",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "subsecond_erase",
+              "manual_temporal_boundary"
+            ],
+            "evidence_refs": [
+              "kg005-b-ev-f05",
+              "kg005-b-ev-f06",
+              "kg005-b-ev-f07"
+            ]
+          },
+          {
+            "delta_id": "kg005-b-d06",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2159.9,
+              "end": 2160.2
+            },
+            "operation": "add",
+            "region": {
+              "x": 0.55,
+              "y": 0.61,
+              "width": 0.04,
+              "height": 0.09
+            },
+            "affected_object_ids": [
+              "kg005-b-obj-equals-2"
+            ],
+            "semantic_label": "rewrite the equals sign",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "subsecond_add",
+              "manual_temporal_boundary"
+            ],
+            "evidence_refs": [
+              "kg005-b-ev-f07",
+              "kg005-b-ev-f09"
+            ]
+          }
+        ],
+        "objects": [
+          {
+            "object_id": "kg005-b-obj-bar-extension",
+            "kind": "mark",
+            "semantic_text": null,
+            "first_visible": 2156.6,
+            "last_visible": 2166,
+            "region": {
+              "x": 0.49,
+              "y": 0.62,
+              "width": 0.08,
+              "height": 0.06
+            },
+            "evidence_refs": [
+              "kg005-b-ev-s4",
+              "kg005-b-ev-s8"
+            ]
+          },
+          {
+            "object_id": "kg005-b-obj-equals-1",
+            "kind": "mark",
+            "semantic_text": "=",
+            "first_visible": 2158.2,
+            "last_visible": 2158.9,
+            "region": {
+              "x": 0.55,
+              "y": 0.61,
+              "width": 0.04,
+              "height": 0.09
+            },
+            "evidence_refs": [
+              "kg005-b-ev-s4"
+            ]
+          },
+          {
+            "object_id": "kg005-b-obj-equals-2",
+            "kind": "mark",
+            "semantic_text": "=",
+            "first_visible": 2159.9,
+            "last_visible": 2166,
+            "region": {
+              "x": 0.55,
+              "y": 0.61,
+              "width": 0.04,
+              "height": 0.09
+            },
+            "evidence_refs": [
+              "kg005-b-ev-s6",
+              "kg005-b-ev-s8"
+            ]
+          }
+        ],
+        "speech_ids": [
+          "kg005-b-sp12",
+          "kg005-b-sp13",
+          "kg005-b-sp14",
+          "kg005-b-sp15",
+          "kg005-b-sp16"
+        ]
+      },
+      "evidence_assets": [
+        {
+          "annotator": "A",
+          "kind": "delta_comparison",
+          "event_id": "kg005-a-delta-03",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/deltas/delta-03-comparison.png",
+          "sha256": "e591bad9daaa3f1f7c622705a673189630908affd25cd468d363ea97ac09bd8a"
+        },
+        {
+          "annotator": "A",
+          "kind": "delta_mask",
+          "event_id": "kg005-a-delta-03",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/deltas/delta-03-mask.png",
+          "sha256": "5c7ae4efafaaa043eae07357424aa7c644472d830ae499aed8d09ca30ba03c96"
+        },
+        {
+          "annotator": "A",
+          "kind": "frame",
+          "evidence_id": "kg005-a-ev-frame-2157-800",
+          "time": {
+            "start": 2157.79,
+            "end": 2157.8100000000004
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/frames/t2157_800.png",
+          "sha256": "31ebec3a73dbecd028baab03b15faf5fb38c3a404803920fc235b2bf9ddd89bc"
+        },
+        {
+          "annotator": "A",
+          "kind": "frame",
+          "evidence_id": "kg005-a-ev-frame-2158-500",
+          "time": {
+            "start": 2158.49,
+            "end": 2158.51
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/frames/t2158_500.png",
+          "sha256": "ff53b192e3c280bf2603f895a278972302ea8b4fa67445ab14aecad863fa20b9"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_comparison",
+          "event_id": "kg005-b-d04",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d04-comparison.png",
+          "sha256": "2ee7d202f3af94a207f2ca76953a9c626c78ffd24dc993b163fd4aeec451d4e3"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_mask",
+          "event_id": "kg005-b-d04",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d04-mask.png",
+          "sha256": "17a9fa398f64ac70fcede2e433785c17f9d90ff5312e7ecd1c5411e0a365f527"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f04",
+          "time": {
+            "start": 2155.3,
+            "end": 2155.3010000000004
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2155_300.png",
+          "sha256": "4bc6c5cce9ade8afcf527b44ce4b69498cbb17baa942f34efcc8527ac23223e5"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f05",
+          "time": {
+            "start": 2158.5,
+            "end": 2158.501
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2158_500.png",
+          "sha256": "2c7b52e6ba7c6733f2702bcc883df321f444f2f07d1d08e4b5461cb84991680d"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_comparison",
+          "event_id": "kg005-b-d05",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d05-comparison.png",
+          "sha256": "c3b2962f5dbc9a43e98465bc61cbd92965a42faf5f2abccae47aec8fd1a7fff4"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_mask",
+          "event_id": "kg005-b-d05",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d05-mask.png",
+          "sha256": "84ec2a495756d1fd74d92f174d1986373c76fade7bd3dc93fb0e300d04b8c154"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f06",
+          "time": {
+            "start": 2159.4,
+            "end": 2159.4010000000003
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2159_400.png",
+          "sha256": "3fb9ca537157f12f215cda9554591257ce659ce83daadc001c4b639c8ddb9055"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f07",
+          "time": {
+            "start": 2159.8,
+            "end": 2159.8010000000004
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2159_800.png",
+          "sha256": "3991acd4dd291c28e89b267eba2df5e67cd8dde34bc55a33fb0bc7dc72b75610"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_comparison",
+          "event_id": "kg005-b-d06",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d06-comparison.png",
+          "sha256": "c593c3c080ba1b7397dbd6c05d4cfffd2c70ce84774d2e9f58e49bd1ea738fc4"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_mask",
+          "event_id": "kg005-b-d06",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d06-mask.png",
+          "sha256": "8cd51c98a7257e19614212028401a19c19c224f843c7ca04a26dbd77b59f3591"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f09",
+          "time": {
+            "start": 2162.5,
+            "end": 2162.501
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2162_500.png",
+          "sha256": "42f7aaed4c654c06cb9f7fb63a41c8867c4572db765ca9e4f0094f156fafa5f7"
+        }
+      ],
+      "speech_trace": {
+        "normalization": "none",
+        "use": "context_only_not_operation_or_role_inference",
+        "segment_indexes": [
+          12,
+          13,
+          14,
+          15,
+          16
+        ],
+        "segments": [
+          {
+            "index": 12,
+            "relative_time": {
+              "start": 21.24,
+              "end": 22.02
+            },
+            "absolute_source_time": {
+              "start": 2155.24,
+              "end": 2156.02
+            },
+            "raw_text": "delta有2"
+          },
+          {
+            "index": 13,
+            "relative_time": {
+              "start": 22.28,
+              "end": 23.04
+            },
+            "absolute_source_time": {
+              "start": 2156.28,
+              "end": 2157.04
+            },
+            "raw_text": "那你现在来看"
+          },
+          {
+            "index": 14,
+            "relative_time": {
+              "start": 23.56,
+              "end": 24.06
+            },
+            "absolute_source_time": {
+              "start": 2157.56,
+              "end": 2158.06
+            },
+            "raw_text": "他的单位"
+          },
+          {
+            "index": 15,
+            "relative_time": {
+              "start": 24.32,
+              "end": 25.08
+            },
+            "absolute_source_time": {
+              "start": 2158.32,
+              "end": 2159.08
+            },
+            "raw_text": "就只看单位啊"
+          },
+          {
+            "index": 16,
+            "relative_time": {
+              "start": 25.86,
+              "end": 26.36
+            },
+            "absolute_source_time": {
+              "start": 2159.86,
+              "end": 2160.36
+            },
+            "raw_text": "那么"
+          }
+        ],
+        "raw_text": "delta有2那你现在来看他的单位就只看单位啊那么",
+        "a_speech_ids": [
+          "kg005-a-speech-14",
+          "kg005-a-speech-15"
+        ],
+        "b_speech_ids": [
+          "kg005-b-sp12",
+          "kg005-b-sp13",
+          "kg005-b-sp14",
+          "kg005-b-sp15",
+          "kg005-b-sp16"
+        ]
+      },
+      "disagreements": {
+        "boundary": "A records only 2158.10–2158.27; B spans 2156.60–2160.20 with a bar extension and an equals lifecycle. A/B-envelope tIoU is 0.047222; A versus B d04 is 0.100000.",
+        "operation": "A proposes one persistent ADD; B proposes ADD then ERASE then ADD.",
+        "object": "B separates a persistent fraction-bar extension and equals-1/equals-2; A retains one equals-tail object.",
+        "old_new_semantic_slot": "B equals-1 and equals-2 share one spatial/semantic slot and both read '='. This supports an atomic rewrite description, not substantive MODIFY by itself.",
+        "relation": "No changed relation type is identified. Same-space replacement is insufficient for MODIFY."
+      },
+      "adjudication_options": {
+        "allowed_decisions": [
+          "ERASE",
+          "ADD",
+          "atomic_ERASE+ADD",
+          "MODIFY",
+          "unknown",
+          "reject",
+          "not_an_event"
+        ],
+        "modify_gate": {
+          "same_semantic_slot_required": true,
+          "old_object_required": true,
+          "new_object_required": true,
+          "substantive_old_to_new_change_required": true,
+          "relation_closure_required": true,
+          "same_space_alone_sufficient": false,
+          "same_text_rewrite_sufficient": false
+        },
+        "decision_status": "pending_human",
+        "candidate_resolutions": [
+          {
+            "candidate_id": "G04-C1",
+            "label": "one persistent equals-tail ADD",
+            "sequence": [
+              {
+                "operation": "ADD",
+                "time": {
+                  "start": 2158.1,
+                  "end": 2158.27
+                },
+                "object_slot": "equals_tail"
+              }
+            ],
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G04-C2",
+            "label": "fraction-bar ADD plus atomic equals rewrite",
+            "sequence": [
+              {
+                "operation": "ADD",
+                "time": {
+                  "start": 2156.6,
+                  "end": 2158.3
+                },
+                "object_slot": "fraction_bar_extension"
+              },
+              {
+                "operation": "ERASE",
+                "time": {
+                  "start": 2158.9,
+                  "end": 2159
+                },
+                "object_slot": "equals_v1"
+              },
+              {
+                "operation": "ADD",
+                "time": {
+                  "start": 2159.9,
+                  "end": 2160.2
+                },
+                "object_slot": "equals_v2"
+              }
+            ],
+            "compound_label": "atomic_ERASE+ADD for equals slot",
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G04-C3",
+            "label": "retain all B atomic events",
+            "sequence": [
+              {
+                "operation": "ADD",
+                "time": {
+                  "start": 2156.6,
+                  "end": 2158.3
+                }
+              },
+              {
+                "operation": "ERASE",
+                "time": {
+                  "start": 2158.9,
+                  "end": 2159
+                }
+              },
+              {
+                "operation": "ADD",
+                "time": {
+                  "start": 2159.9,
+                  "end": 2160.2
+                }
+              }
+            ],
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G04-C4",
+            "label": "conditional MODIFY",
+            "sequence": [
+              {
+                "operation": "MODIFY",
+                "time": null,
+                "old_object_id": null,
+                "new_object_id": null,
+                "substantive_semantic_change": null,
+                "relation_closure": null
+              }
+            ],
+            "eligibility": "blocked unless every modify_gate field is evidenced",
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G04-C5",
+            "label": "uncertain or exclude",
+            "operation_or_disposition_options": [
+              "unknown",
+              "reject",
+              "not_an_event"
+            ],
+            "status": "pending_human"
+          }
+        ]
+      },
+      "proposed": {
+        "selected_candidate_id": null,
+        "selected_decision": null,
+        "canonical_events": [],
+        "status": "pending_human"
+      },
+      "human_review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "selected_decision": null,
+        "selected_candidate_id": null,
+        "canonical_time": null,
+        "canonical_region": null,
+        "canonical_object_ids": [],
+        "old_object_id": null,
+        "new_object_id": null,
+        "substantive_semantic_change": null,
+        "relation_closure": null,
+        "rationale": null,
+        "evidence_refs": []
+      },
+      "human_signoff": {
+        "status": "pending",
+        "signer": null,
+        "signed_at": null,
+        "signature": null
+      }
+    },
+    {
+      "group_id": "KG005-AB-G05",
+      "alignment_class": "matched_compound_granularity_dispute",
+      "a_event_ids": [
+        "kg005-a-delta-04"
+      ],
+      "b_event_ids": [
+        "kg005-b-d07",
+        "kg005-b-d08"
+      ],
+      "alignment_window": {
+        "start": 2162.9,
+        "end": 2165.1
+      },
+      "temporal_iou": 0.954545,
+      "a_side": {
+        "event_ids": [
+          "kg005-a-delta-04"
+        ],
+        "events": [
+          {
+            "delta_id": "kg005-a-delta-04",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2162.9,
+              "end": 2165.1
+            },
+            "operation": "unknown",
+            "region": {
+              "x": 0.39,
+              "y": 0.59,
+              "width": 0.13,
+              "height": 0.09
+            },
+            "affected_object_ids": [
+              "kg005-a-object-numerator-v1",
+              "kg005-a-object-numerator-v2"
+            ],
+            "semantic_label": "同槽擦除并重写分子；前后均读作 F r²，未见实质语义变化",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "same_slot_rewrite",
+              "semantic_equivalence_blocks_modify",
+              "rectangular_delta_mask"
+            ],
+            "evidence_refs": [
+              "kg005-a-ev-frame-2162-700",
+              "kg005-a-ev-frame-2165-300",
+              "kg005-a-ev-frame-2165-900"
+            ]
+          }
+        ],
+        "objects": [
+          {
+            "object_id": "kg005-a-object-numerator-v1",
+            "kind": "formula",
+            "semantic_text": "F r²",
+            "first_visible": 2141.7,
+            "last_visible": 2163.17,
+            "region": {
+              "x": 0.39,
+              "y": 0.59,
+              "width": 0.13,
+              "height": 0.09
+            },
+            "evidence_refs": [
+              "kg005-a-ev-frame-2154-900",
+              "kg005-a-ev-frame-2162-700"
+            ]
+          },
+          {
+            "object_id": "kg005-a-object-numerator-v2",
+            "kind": "formula",
+            "semantic_text": "F r²",
+            "first_visible": 2164.3,
+            "last_visible": 2166,
+            "region": {
+              "x": 0.39,
+              "y": 0.59,
+              "width": 0.13,
+              "height": 0.09
+            },
+            "evidence_refs": [
+              "kg005-a-ev-frame-2165-300",
+              "kg005-a-ev-frame-2165-900"
+            ]
+          }
+        ],
+        "speech_ids": [
+          "kg005-a-speech-18"
+        ]
+      },
+      "b_side": {
+        "event_ids": [
+          "kg005-b-d07",
+          "kg005-b-d08"
+        ],
+        "events": [
+          {
+            "delta_id": "kg005-b-d07",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2163,
+              "end": 2163.3
+            },
+            "operation": "erase",
+            "region": {
+              "x": 0.4,
+              "y": 0.57,
+              "width": 0.1,
+              "height": 0.11
+            },
+            "affected_object_ids": [
+              "kg005-b-obj-numerator-1"
+            ],
+            "semantic_label": "erase the first F r-squared numerator",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "subsecond_erase",
+              "manual_temporal_boundary"
+            ],
+            "evidence_refs": [
+              "kg005-b-ev-f09",
+              "kg005-b-ev-f10",
+              "kg005-b-ev-f11"
+            ]
+          },
+          {
+            "delta_id": "kg005-b-d08",
+            "source_video_id": "phy-force-kunge-005",
+            "time": {
+              "start": 2164.2,
+              "end": 2165.1
+            },
+            "operation": "add",
+            "region": {
+              "x": 0.4,
+              "y": 0.57,
+              "width": 0.1,
+              "height": 0.11
+            },
+            "affected_object_ids": [
+              "kg005-b-obj-numerator-2"
+            ],
+            "semantic_label": "rewrite the F r-squared numerator",
+            "relation": null,
+            "modification": null,
+            "status": "needs_review",
+            "uncertainty_codes": [
+              "independent_annotation",
+              "manual_temporal_boundary"
+            ],
+            "evidence_refs": [
+              "kg005-b-ev-f11",
+              "kg005-b-ev-f12"
+            ]
+          }
+        ],
+        "objects": [
+          {
+            "object_id": "kg005-b-obj-numerator-1",
+            "kind": "formula",
+            "semantic_text": "F r²",
+            "first_visible": 2141.6,
+            "last_visible": 2163.2,
+            "region": {
+              "x": 0.4,
+              "y": 0.57,
+              "width": 0.1,
+              "height": 0.11
+            },
+            "evidence_refs": [
+              "kg005-b-ev-s3",
+              "kg005-b-ev-s6"
+            ]
+          },
+          {
+            "object_id": "kg005-b-obj-numerator-2",
+            "kind": "formula",
+            "semantic_text": "F r²",
+            "first_visible": 2164.2,
+            "last_visible": 2166,
+            "region": {
+              "x": 0.4,
+              "y": 0.57,
+              "width": 0.1,
+              "height": 0.11
+            },
+            "evidence_refs": [
+              "kg005-b-ev-s8"
+            ]
+          }
+        ],
+        "speech_ids": [
+          "kg005-b-sp18"
+        ]
+      },
+      "evidence_assets": [
+        {
+          "annotator": "A",
+          "kind": "delta_comparison",
+          "event_id": "kg005-a-delta-04",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/deltas/delta-04-comparison.png",
+          "sha256": "9d9e3a6f5a99a2da104f9bb50ce9f9dd80b9408b2063ba2e93e9957f37e29528"
+        },
+        {
+          "annotator": "A",
+          "kind": "delta_mask",
+          "event_id": "kg005-a-delta-04",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/deltas/delta-04-mask.png",
+          "sha256": "bcf6f2b47a05642ec07a25184ac506d215a11eca862e838b44336383fff86c2e"
+        },
+        {
+          "annotator": "A",
+          "kind": "frame",
+          "evidence_id": "kg005-a-ev-frame-2162-700",
+          "time": {
+            "start": 2162.6899999999996,
+            "end": 2162.71
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/frames/t2162_700.png",
+          "sha256": "7b8ad42b676d820eb8c0ada8eaa4ac18f779254ea1224bade7941b89a1473709"
+        },
+        {
+          "annotator": "A",
+          "kind": "frame",
+          "evidence_id": "kg005-a-ev-frame-2165-300",
+          "time": {
+            "start": 2165.29,
+            "end": 2165.3100000000004
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/frames/t2165_300.png",
+          "sha256": "0a81555a48c48f1f79d65803ee2aac5fb5b05e20480a18c29f183848ef1a8133"
+        },
+        {
+          "annotator": "A",
+          "kind": "frame",
+          "evidence_id": "kg005-a-ev-frame-2165-900",
+          "time": {
+            "start": 2165.89,
+            "end": 2165.9100000000003
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/assets/frames/t2165_900.png",
+          "sha256": "c0fa80f8047ee28a450ae883d8bf29aa7c06121559bc8a6e508a3e93318001e9"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_comparison",
+          "event_id": "kg005-b-d07",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d07-comparison.png",
+          "sha256": "5db77188e30f237b8fb254dc31516f0bee88217a7b3492975303a777a09f7cf6"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_mask",
+          "event_id": "kg005-b-d07",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d07-mask.png",
+          "sha256": "b0d6f98db879d8e3241c097ac7eb365129248e615acfd6eb10e0a5b57a5ebbea"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f09",
+          "time": {
+            "start": 2162.5,
+            "end": 2162.501
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2162_500.png",
+          "sha256": "42f7aaed4c654c06cb9f7fb63a41c8867c4572db765ca9e4f0094f156fafa5f7"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f10",
+          "time": {
+            "start": 2163.7,
+            "end": 2163.701
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2163_700.png",
+          "sha256": "2dc6c979bc010d9f3359de5fe13a67831bac588a1daa3a1e968c5b11d5426f72"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f11",
+          "time": {
+            "start": 2164.1,
+            "end": 2164.101
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2164_100.png",
+          "sha256": "0f9887ed17f5ca02d57b95ddf93152ffb1fb47bf834f4fe464472ced84612e3a"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_comparison",
+          "event_id": "kg005-b-d08",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d08-comparison.png",
+          "sha256": "9a0f8a5b5c342f8494d2fcf0ced5caa6be6ef67de4af9ad600b0246885fe343d"
+        },
+        {
+          "annotator": "B",
+          "kind": "delta_mask",
+          "event_id": "kg005-b-d08",
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-deltas/b-d08-mask.png",
+          "sha256": "bd0b1cb5da49e03ecccea45bb57e15b48ecd7c04c2621f10d2ececb7de95b7a8"
+        },
+        {
+          "annotator": "B",
+          "kind": "frame",
+          "evidence_id": "kg005-b-ev-f12",
+          "time": {
+            "start": 2165.5,
+            "end": 2165.501
+          },
+          "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-modify-2134-2166/b-boards/b-t2165_500.png",
+          "sha256": "52f9ea0ae5f0ec1a6a22507b80768f65c93258737d9ae981b1b3e694c2a7e31d"
+        }
+      ],
+      "speech_trace": {
+        "normalization": "none",
+        "use": "context_only_not_operation_or_role_inference",
+        "segment_indexes": [
+          18
+        ],
+        "segments": [
+          {
+            "index": 18,
+            "relative_time": {
+              "start": 28.42,
+              "end": 31.76
+            },
+            "absolute_source_time": {
+              "start": 2162.42,
+              "end": 2165.76
+            },
+            "raw_text": "所以他肯定是把利用千克米每23秒"
+          }
+        ],
+        "raw_text": "所以他肯定是把利用千克米每23秒",
+        "a_speech_ids": [
+          "kg005-a-speech-18"
+        ],
+        "b_speech_ids": [
+          "kg005-b-sp18"
+        ]
+      },
+      "disagreements": {
+        "boundary": "A begins 0.10 s before B's ERASE; both envelopes end at 2165.10 s.",
+        "operation": "A preserves unknown for the compound rewrite; B separates ERASE then ADD.",
+        "object": "Both sides pair numerator v1/v2 in the same formula slot.",
+        "old_new_semantic_slot": "Old and new both visually read 'F r²'. Old/new objects and a spatial slot exist, but no substantive semantic difference is observed.",
+        "relation": "No changed relation type is identified; same slot and same text block MODIFY."
+      },
+      "adjudication_options": {
+        "allowed_decisions": [
+          "ERASE",
+          "ADD",
+          "atomic_ERASE+ADD",
+          "MODIFY",
+          "unknown",
+          "reject",
+          "not_an_event"
+        ],
+        "modify_gate": {
+          "same_semantic_slot_required": true,
+          "old_object_required": true,
+          "new_object_required": true,
+          "substantive_old_to_new_change_required": true,
+          "relation_closure_required": true,
+          "same_space_alone_sufficient": false,
+          "same_text_rewrite_sufficient": false
+        },
+        "decision_status": "pending_human",
+        "candidate_resolutions": [
+          {
+            "candidate_id": "G05-C1",
+            "label": "atomic numerator ERASE+ADD",
+            "sequence": [
+              {
+                "operation": "ERASE",
+                "time": {
+                  "start": 2163,
+                  "end": 2163.3
+                },
+                "object_slot": "numerator_v1"
+              },
+              {
+                "operation": "ADD",
+                "time": {
+                  "start": 2164.2,
+                  "end": 2165.1
+                },
+                "object_slot": "numerator_v2"
+              }
+            ],
+            "compound_label": "atomic_ERASE+ADD",
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G05-C2",
+            "label": "retain compound uncertainty",
+            "sequence": [
+              {
+                "operation": "unknown",
+                "time": {
+                  "start": 2162.9,
+                  "end": 2165.1
+                },
+                "object_slot": "numerator_rewrite"
+              }
+            ],
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G05-C3",
+            "label": "conditional MODIFY",
+            "sequence": [
+              {
+                "operation": "MODIFY",
+                "time": null,
+                "old_object_id": null,
+                "new_object_id": null,
+                "substantive_semantic_change": null,
+                "relation_closure": null
+              }
+            ],
+            "eligibility": "blocked unless a substantive old→new semantic or relation change is evidenced",
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G05-C4",
+            "label": "exclude action",
+            "disposition_options": [
+              "reject",
+              "not_an_event"
+            ],
+            "status": "pending_human"
+          },
+          {
+            "candidate_id": "G05-C5",
+            "label": "alternative atomic operation",
+            "operation_options": [
+              "ERASE",
+              "ADD"
+            ],
+            "status": "pending_human"
+          }
+        ]
+      },
+      "proposed": {
+        "selected_candidate_id": null,
+        "selected_decision": null,
+        "canonical_events": [],
+        "status": "pending_human"
+      },
+      "human_review": {
+        "status": "pending",
+        "reviewer": null,
+        "reviewed_at": null,
+        "selected_decision": null,
+        "selected_candidate_id": null,
+        "canonical_time": null,
+        "canonical_region": null,
+        "canonical_object_ids": [],
+        "old_object_id": null,
+        "new_object_id": null,
+        "substantive_semantic_change": null,
+        "relation_closure": null,
+        "rationale": null,
+        "evidence_refs": []
+      },
+      "human_signoff": {
+        "status": "pending",
+        "signer": null,
+        "signed_at": null,
+        "signature": null
+      }
+    }
+  ],
+  "validation_assertions": {
+    "source_video_id_consistent": true,
+    "source_duration_matches_source_json_ffprobe": true,
+    "absolute_time_basis_only": true,
+    "both_contracts_valid": true,
+    "both_payload_hashes_match": true,
+    "all_referenced_assets_exist": true,
+    "all_referenced_asset_paths_controlled_relative": true,
+    "all_referenced_asset_hashes_match": true,
+    "all_a_events_covered_once": true,
+    "all_b_events_covered_once": true,
+    "canonical_asr_raw_index_relative_and_absolute_times_match": true,
+    "teacher_only_and_no_learner_observations": true,
+    "role_unknown": true,
+    "intent_unknown": true,
+    "accepted_count_zero": true,
+    "all_human_review_pending": true,
+    "all_human_signoff_pending": true,
+    "paper_gold_blocked": true,
+    "markdown_links_valid": true,
+    "no_absolute_paths": true
+  },
+  "package_signoff": {
+    "status": "pending",
+    "reviewer": null,
+    "reviewed_at": null,
+    "signer": null,
+    "signed_at": null,
+    "signature": null,
+    "accepted_group_ids": [],
+    "rejected_group_ids": [],
+    "notes": null,
+    "gold_promotion": "blocked_pending_human_signoff"
+  }
+}
