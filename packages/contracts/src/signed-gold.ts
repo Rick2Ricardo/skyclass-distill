@@ -131,14 +131,15 @@ function isNonEmpty(value: unknown): value is string {
 function isSafeRelativeUri(value: unknown): value is string {
   if (!isNonEmpty(value) || value.includes("\\") || value.includes("\0") || value.startsWith("/")) return false;
   let decoded = value;
+  let stable = false;
   try {
     for (let index = 0; index < 16; index += 1) {
       const next = decodeURIComponent(decoded);
-      if (next === decoded) break;
+      if (next === decoded) { stable = true; break; }
       decoded = next;
     }
   } catch { return false; }
-  if (!decoded || decoded.includes("\\") || decoded.includes("\0") || decoded.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(decoded)) return false;
+  if (!stable || !decoded || decoded.includes("\\") || decoded.includes("\0") || decoded.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(decoded)) return false;
   return decoded.split("/").every((part) => Boolean(part) && part !== "." && part !== "..");
 }
 

@@ -1,0 +1,890 @@
+{
+  "schema_version": "temporal-board-v2-ab-adjudication-input-v1",
+  "artifact_id": "kg005-erase-add-ab-adjudication-input-1888-1905",
+  "gold_review_intake_schema_version": "temporal-board-adjudication-intake-v1",
+  "package_id": "kg005-erase-add-ab-1888-1905",
+  "source_video_id": "phy-force-kunge-005",
+  "created_at": "2026-08-11T20:49:42Z",
+  "status": "needs_review",
+  "automatic_adjudication_performed": false,
+  "source": {
+    "source_video_id": "phy-force-kunge-005",
+    "asset_uri": "data/raw/physics/force-pilot/phy-force-kunge-005/source.mp4",
+    "sha256": "127ed9323274d0dd00f3cc39c4a3b68f3109d74dbfd7fb2d08f87cab008f7241",
+    "absolute_window_seconds": {
+      "start": 1888,
+      "end": 1905
+    }
+  },
+  "inputs": {
+    "annotator_a": {
+      "bundle_uri": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/annotator-a.json",
+      "bundle_sha256": "e27bb4187f9e45dc48b43f7c3fff99a3626b72fb935f8339d389237d18a1ff06",
+      "canonical_payload_sha256": "54bfdc993c966231c9ed565e1a4b92a3078f61561623884c6561e8722dcc74a5",
+      "visual_freeze_uri": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-visual-freeze.json",
+      "visual_freeze_sha256": "006e27f4408ae28d814ea11d7aaeb74b13ed881b538d8c8098c5db67804b0c63",
+      "annotation_log_uri": "research/board2skill/KG005_ERASE_ADD_ANNOTATOR_A_LOG.md",
+      "annotation_log_sha256": "bdd658badf5b493d25be7e35177182922606e4062e48a131d86329b9d56df526",
+      "independently_frozen": true
+    },
+    "annotator_b": {
+      "bundle_uri": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/annotator-b.json",
+      "bundle_sha256": "7d9ac1416bd716c4df117d4d3fcaa0fc270e0a4081ef107afa36ef37b43a8abd",
+      "canonical_payload_sha256": "16fcbfd3753bb2a159ad5a232bdbc973484af90613185aa8dd35bf42a20ef928",
+      "visual_freeze_uri": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-visual-freeze.json",
+      "visual_freeze_sha256": "bfa65dd244961fc1ce6bd17f243fa9fae995ab4a9cb959bd602a68ce4d70d986",
+      "annotation_log_uri": "research/board2skill/KG005_ERASE_ADD_ANNOTATOR_B_LOG.md",
+      "annotation_log_sha256": "3ce4630146e8ae482d6887631b30bd85c326a13c5d1a7867a4f27efd17a4cec8",
+      "independently_frozen": true
+    },
+    "canonical_asr": {
+      "asset_uri": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/asr/clip-1888-1905.json",
+      "sha256": "c96ffbe3a8077736046d78c8f14c47f41d700c99efb894ba16143bfc678a4a77",
+      "segment_count": 2,
+      "usage": "context_not_adjudicated"
+    }
+  },
+  "revalidation": {
+    "annotator_a": {
+      "contract_valid": true,
+      "contract_issue_count": 0,
+      "canonical_payload_matches": true,
+      "referenced_asset_occurrences": 47,
+      "unique_referenced_asset_paths": 23,
+      "referenced_asset_error_count": 0,
+      "time_error_count": 0,
+      "freeze_operation_time_mismatch_count": 0,
+      "asr_traceability_error_count": 0,
+      "asr_speech_segments_checked": 2,
+      "asset_manifest_uri": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/a-asset-manifest.sha256",
+      "asset_manifest_sha256": "124c28d1d914cbd7ba19e0307aca4498e964b5ee5e8f294e7c119f90d7428d0f",
+      "asset_manifest_entries_checked": 533,
+      "asset_manifest_errors": 0,
+      "needs_review_artifact_count": 11,
+      "accepted_count": 0,
+      "learner_observation_count": 0,
+      "known_role_or_intent_count": 0
+    },
+    "annotator_b": {
+      "contract_valid": true,
+      "contract_issue_count": 0,
+      "canonical_payload_matches": true,
+      "referenced_asset_occurrences": 60,
+      "unique_referenced_asset_paths": 33,
+      "referenced_asset_error_count": 0,
+      "time_error_count": 0,
+      "freeze_operation_time_mismatch_count": 0,
+      "asr_traceability_error_count": 0,
+      "asr_speech_segments_checked": 2,
+      "asset_root_file_count": 569,
+      "fullframe_count": 510,
+      "fullframe_tree_sha256": "515fd9f35dde702b903131ece652414209770d1d223ba28d7ca7a40764f50b7f",
+      "contact_detail_tree_sha256": "98dc04556c97185e2d44e48420f7472ce3ea588aa4136100d525f53962879dea",
+      "tree_hashes_match_freeze": true,
+      "needs_review_artifact_count": 11,
+      "accepted_count": 0,
+      "learner_observation_count": 0,
+      "known_role_or_intent_count": 0
+    }
+  },
+  "alignment_policy": {
+    "assignment": "same source plus positive temporal overlap, with region and object corroboration",
+    "temporal_iou": "intersection_duration / union_duration",
+    "native_region_iou": "axis-aligned rectangle IoU in each bundle's stored board-surface-normalized coordinates",
+    "video_region_iou": "map each rectangle through its annotator surface polygon to common video-normalized coordinates, then compute axis-aligned rectangle IoU",
+    "off_diagonal_positive_temporal_overlap_count": 0,
+    "automatic_decision": false,
+    "candidate_decision_vocabulary": [
+      "ERASE",
+      "ADD",
+      "reject",
+      "not_an_event",
+      "unknown"
+    ],
+    "pending_decision_representation": null
+  },
+  "coverage": {
+    "annotator_a_delta_count": 3,
+    "annotator_b_delta_count": 3,
+    "unique_matched_pair_count": 3,
+    "annotator_a_covered_count": 3,
+    "annotator_b_covered_count": 3,
+    "annotator_a_unmatched_count": 0,
+    "annotator_b_unmatched_count": 0,
+    "duplicate_coverage_count": 0,
+    "annotator_a_coverage_ratio": 1,
+    "annotator_b_coverage_ratio": 1
+  },
+  "summary_metrics": {
+    "mean_matched_temporal_iou": 0.8868979581,
+    "mean_native_region_iou": 0.494706213943,
+    "mean_video_region_iou": 0.622569511065,
+    "mean_absolute_boundary_error_seconds": 0.055722166667,
+    "operation_exact_agreement_count": 2,
+    "operation_disagreement_count": 1,
+    "operation_exact_agreement_ratio": 0.666666666667
+  },
+  "items": [
+    {
+      "group_id": "KG005-AB-001",
+      "pair_id": "KG005-AB-001",
+      "alignment_class": "matched_operation_agreement_unadjudicated",
+      "alignment_window": {
+        "start": 1892.166667,
+        "end": 1893.366667
+      },
+      "a_side": {
+        "events": [
+          {
+            "event_id": "kg005-a-d1-erase",
+            "delta_id": "kg005-a-d1-erase",
+            "operation": "erase",
+            "time": {
+              "start": 1892.367,
+              "end": 1893.333
+            },
+            "region": {
+              "x": 0.333,
+              "y": 0.579,
+              "width": 0.225,
+              "height": 0.194
+            },
+            "semantic_label": "progressive deletion of two stable formula objects",
+            "status": "needs_review",
+            "affected_object_ids": [
+              "kg005-a-o-old-left",
+              "kg005-a-o-old-right"
+            ]
+          }
+        ]
+      },
+      "b_side": {
+        "events": [
+          {
+            "event_id": "B-DELTA-001",
+            "delta_id": "B-DELTA-001",
+            "operation": "erase",
+            "time": {
+              "start": 1892.166667,
+              "end": 1893.366667
+            },
+            "region": {
+              "x": 0.32,
+              "y": 0.54,
+              "width": 0.25,
+              "height": 0.205
+            },
+            "semantic_label": "erase prior red dimensional formulas and circle mark",
+            "status": "needs_review",
+            "affected_object_ids": [
+              "B-O-OLD-L2M-T2",
+              "B-O-OLD-V2M",
+              "B-O-OLD-CIRCLE"
+            ]
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "evidence_id": "KG005-AB-001-A-COMPARISON",
+          "side": "A",
+          "kind": "comparison",
+          "label": "A delta comparison",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/deltas/a-d1-comparison.png",
+          "sha256": "3e19685cb45a63bfd5c9692be7e1650653db0db82a711b226b412cb444617e68"
+        },
+        {
+          "evidence_id": "KG005-AB-001-A-MASK",
+          "side": "A",
+          "kind": "delta_mask",
+          "label": "A delta mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/deltas/a-d1-mask.png",
+          "sha256": "fa9a877ac564d078a6795459e699bc79bcf6e2a441841d0ba03ef8fe82e6234c"
+        },
+        {
+          "evidence_id": "KG005-AB-001-A-BEFORE",
+          "side": "A",
+          "kind": "before_state",
+          "label": "A stable before state",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/raw-frames/a-raw-0130.png",
+          "sha256": "5548395d7d3f4669f70eeeaf4809e9b711313167bbc06af6c5aee2c1522bb75e"
+        },
+        {
+          "evidence_id": "KG005-AB-001-A-AFTER",
+          "side": "A",
+          "kind": "after_state",
+          "label": "A stable blank after state",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/raw-frames/a-raw-0165.png",
+          "sha256": "da0cb21a67d5eafae3db7f3744f1da2e1ae2021bd843958d51e9db021c9ab4b5"
+        },
+        {
+          "evidence_id": "KG005-AB-001-B-COMPARISON",
+          "side": "B",
+          "kind": "comparison",
+          "label": "B delta comparison",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-delta-001-comparison.png",
+          "sha256": "125233ab91090b4fc2bcbc6d0dbc24105ae3519eac610083c6f574dd84d17ba2"
+        },
+        {
+          "evidence_id": "KG005-AB-001-B-MASK",
+          "side": "B",
+          "kind": "delta_mask",
+          "label": "B delta mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-delta-001-mask.png",
+          "sha256": "81853d8e330689ab58d5087d3a0c60ad9d53040b31de5d4bd6be0f25d0bc9c02"
+        },
+        {
+          "evidence_id": "KG005-AB-001-B-BEFORE",
+          "side": "B",
+          "kind": "before_state",
+          "label": "B stable before state",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-state-001.png",
+          "sha256": "956e9188049c1d9adaac2cc37c04750258522d7e27f2accc46aa5c396dd9b199"
+        },
+        {
+          "evidence_id": "KG005-AB-001-B-AFTER",
+          "side": "B",
+          "kind": "after_state",
+          "label": "B stable blank after state",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-state-002.png",
+          "sha256": "c3d6c090991ee65e4c3e18af5fec5ff735b8c38e659d99cb9ccc9da147375de4"
+        }
+      ],
+      "proposal": {
+        "candidate_events": [
+          {
+            "candidate_id": "KG005-AB-001-C1",
+            "source_event_refs": [
+              "kg005-a-d1-erase",
+              "B-DELTA-001"
+            ],
+            "operation": "ERASE",
+            "time": {
+              "start": 1892.166667,
+              "end": 1893.366667
+            },
+            "semantic_label": "progressive removal of the prior stable formula objects",
+            "acceptance_ready": true,
+            "acceptance_blockers": []
+          }
+        ],
+        "review_options": [
+          "ERASE",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ]
+      },
+      "unresolved_fields": [
+        "start_boundary_includes_or_excludes_transient_toolbar_selection",
+        "object_granularity_for_circled_formula",
+        "region_coordinates_require_surface-aware_review"
+      ],
+      "human_review": {
+        "status": "pending",
+        "decision": null,
+        "reviewer_id": null,
+        "reviewed_at": null
+      },
+      "human_signoff": {
+        "status": "pending",
+        "signed_by": null,
+        "signed_at": null
+      },
+      "accepted": false
+    },
+    {
+      "group_id": "KG005-AB-002",
+      "pair_id": "KG005-AB-002",
+      "alignment_class": "matched_operation_agreement_unadjudicated",
+      "alignment_window": {
+        "start": 1896.2,
+        "end": 1898.333
+      },
+      "a_side": {
+        "events": [
+          {
+            "event_id": "kg005-a-d2-add",
+            "delta_id": "kg005-a-d2-add",
+            "operation": "add",
+            "time": {
+              "start": 1896.2,
+              "end": 1898.333
+            },
+            "region": {
+              "x": 0.407,
+              "y": 0.605,
+              "width": 0.078,
+              "height": 0.166
+            },
+            "semantic_label": "new fraction-form formula written after a stable blank interval",
+            "status": "needs_review",
+            "affected_object_ids": [
+              "kg005-a-o-new-formula"
+            ]
+          }
+        ]
+      },
+      "b_side": {
+        "events": [
+          {
+            "event_id": "B-DELTA-002",
+            "delta_id": "B-DELTA-002",
+            "operation": "add",
+            "time": {
+              "start": 1896.2,
+              "end": 1898.266667
+            },
+            "region": {
+              "x": 0.39,
+              "y": 0.55,
+              "width": 0.12,
+              "height": 0.19
+            },
+            "semantic_label": "add red formula Lm²/t² after a stable blank interval",
+            "status": "needs_review",
+            "affected_object_ids": [
+              "B-O-NEW-LM2-T2"
+            ]
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "evidence_id": "KG005-AB-002-A-COMPARISON",
+          "side": "A",
+          "kind": "comparison",
+          "label": "A delta comparison",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/deltas/a-d2-comparison.png",
+          "sha256": "8d6cc9ab586bfa53b46287a7af2550da40884d6b9373044be2c35fcf9a833ac2"
+        },
+        {
+          "evidence_id": "KG005-AB-002-A-MASK",
+          "side": "A",
+          "kind": "delta_mask",
+          "label": "A delta mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/deltas/a-d2-mask.png",
+          "sha256": "dde1d6bee0e818395f37fb2e87394cba0d5aff47db6c567a4d3ab0e37e83a2c8"
+        },
+        {
+          "evidence_id": "KG005-AB-002-A-BEFORE",
+          "side": "A",
+          "kind": "before_state",
+          "label": "A stable blank before state",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/raw-frames/a-raw-0165.png",
+          "sha256": "da0cb21a67d5eafae3db7f3744f1da2e1ae2021bd843958d51e9db021c9ab4b5"
+        },
+        {
+          "evidence_id": "KG005-AB-002-A-AFTER",
+          "side": "A",
+          "kind": "after_state",
+          "label": "A stable new-formula after state",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/raw-frames/a-raw-0320.png",
+          "sha256": "b14afd9b0a46551c0c9ae489393147e49c42d235ff54ff74f177f3f71509c97f"
+        },
+        {
+          "evidence_id": "KG005-AB-002-B-COMPARISON",
+          "side": "B",
+          "kind": "comparison",
+          "label": "B delta comparison",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-delta-002-comparison.png",
+          "sha256": "2206fd2847117d0b2902da61aecba81dd73f18e33dd6a65327f6ef5ae15c27eb"
+        },
+        {
+          "evidence_id": "KG005-AB-002-B-MASK",
+          "side": "B",
+          "kind": "delta_mask",
+          "label": "B delta mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-delta-002-mask.png",
+          "sha256": "8f6901222000d8d5b880186f33da6268a1e9539fea281b82355a74fa94504ce1"
+        },
+        {
+          "evidence_id": "KG005-AB-002-B-BEFORE",
+          "side": "B",
+          "kind": "before_state",
+          "label": "B stable blank before state",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-state-002.png",
+          "sha256": "c3d6c090991ee65e4c3e18af5fec5ff735b8c38e659d99cb9ccc9da147375de4"
+        },
+        {
+          "evidence_id": "KG005-AB-002-B-AFTER",
+          "side": "B",
+          "kind": "after_state",
+          "label": "B stable new-formula after state",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-state-003.png",
+          "sha256": "0e7dda90b89da13cba0e67c4f68eb1e13e2921006d6454322ee7b043a56dff88"
+        }
+      ],
+      "proposal": {
+        "candidate_events": [
+          {
+            "candidate_id": "KG005-AB-002-C1",
+            "source_event_refs": [
+              "kg005-a-d2-add",
+              "B-DELTA-002"
+            ],
+            "operation": "ADD",
+            "time": {
+              "start": 1896.2,
+              "end": 1898.333
+            },
+            "semantic_label": "new fraction-form formula written after a stable blank interval",
+            "acceptance_ready": true,
+            "acceptance_blockers": []
+          }
+        ],
+        "review_options": [
+          "ADD",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ]
+      },
+      "unresolved_fields": [
+        "end_boundary_differs_by_0.066333_seconds",
+        "region_coordinates_require_surface-aware_review"
+      ],
+      "human_review": {
+        "status": "pending",
+        "decision": null,
+        "reviewer_id": null,
+        "reviewed_at": null
+      },
+      "human_signoff": {
+        "status": "pending",
+        "signed_by": null,
+        "signed_at": null
+      },
+      "accepted": false
+    },
+    {
+      "group_id": "KG005-AB-003",
+      "pair_id": "KG005-AB-003",
+      "alignment_class": "matched_operation_disagreement_right_censored_unadjudicated",
+      "alignment_window": {
+        "start": 1904.666667,
+        "end": 1904.967
+      },
+      "a_side": {
+        "events": [
+          {
+            "event_id": "kg005-a-d3-clip-end-unknown",
+            "delta_id": "kg005-a-d3-clip-end-unknown",
+            "operation": "unknown",
+            "time": {
+              "start": 1904.667,
+              "end": 1904.967
+            },
+            "region": {
+              "x": 0.407,
+              "y": 0.605,
+              "width": 0.078,
+              "height": 0.166
+            },
+            "semantic_label": null,
+            "visual_candidate_label": "terminal disappearance of the new formula, with persistence unverified at clip end",
+            "status": "needs_review",
+            "affected_object_ids": []
+          }
+        ]
+      },
+      "b_side": {
+        "events": [
+          {
+            "event_id": "B-DELTA-003",
+            "delta_id": "B-DELTA-003",
+            "operation": "erase",
+            "time": {
+              "start": 1904.666667,
+              "end": 1904.933333
+            },
+            "region": {
+              "x": 0.39,
+              "y": 0.55,
+              "width": 0.12,
+              "height": 0.19
+            },
+            "semantic_label": "erase short-lived red formula Lm²/t²",
+            "status": "needs_review",
+            "affected_object_ids": [
+              "B-O-NEW-LM2-T2"
+            ]
+          }
+        ]
+      },
+      "evidence_assets": [
+        {
+          "evidence_id": "KG005-AB-003-A-COMPARISON",
+          "side": "A",
+          "kind": "comparison",
+          "label": "A terminal comparison",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/deltas/a-d3-comparison.png",
+          "sha256": "4ce962ea209a386fd6d1557eea0ae682569c77c7b658d3794d3a94c879a433ee"
+        },
+        {
+          "evidence_id": "KG005-AB-003-A-MASK",
+          "side": "A",
+          "kind": "delta_mask",
+          "label": "A terminal delta mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/deltas/a-d3-mask.png",
+          "sha256": "526d666b49d12e5a19dadaa86c15079b276fa264ffb7f17d646b504af820dbb0"
+        },
+        {
+          "evidence_id": "KG005-AB-003-A-BEFORE",
+          "side": "A",
+          "kind": "before_state",
+          "label": "A stable new-formula before state",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/raw-frames/a-raw-0320.png",
+          "sha256": "b14afd9b0a46551c0c9ae489393147e49c42d235ff54ff74f177f3f71509c97f"
+        },
+        {
+          "evidence_id": "KG005-AB-003-A-AFTER",
+          "side": "A",
+          "kind": "after_state",
+          "label": "A right-censored terminal blank observation",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/a-assets/raw-frames/a-raw-0510.png",
+          "sha256": "07989469e7536e9c110d2a6add940575304a9581342960d814a0daac561a7dec"
+        },
+        {
+          "evidence_id": "KG005-AB-003-B-COMPARISON",
+          "side": "B",
+          "kind": "comparison",
+          "label": "B terminal comparison",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-delta-003-comparison.png",
+          "sha256": "fb6a17175d6cdf76d7f28af885bd0c127ad77edd0e4322789520bfb2a1090663"
+        },
+        {
+          "evidence_id": "KG005-AB-003-B-MASK",
+          "side": "B",
+          "kind": "delta_mask",
+          "label": "B terminal delta mask",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-delta-003-mask.png",
+          "sha256": "2a3c0f3bc463948dfc4e1df8009680dbb610bf91c2e4b726fe1ac1b5ab736503"
+        },
+        {
+          "evidence_id": "KG005-AB-003-B-BEFORE",
+          "side": "B",
+          "kind": "before_state",
+          "label": "B stable new-formula before state",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-state-003.png",
+          "sha256": "0e7dda90b89da13cba0e67c4f68eb1e13e2921006d6454322ee7b043a56dff88"
+        },
+        {
+          "evidence_id": "KG005-AB-003-B-AFTER",
+          "side": "B",
+          "kind": "after_state",
+          "label": "B clip-end-limited blank after state",
+          "path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/b-assets/b-state-004.png",
+          "sha256": "da0ec2288d7c953414cd5bf8f29e06483927b85c29c668150741da7e7e28d3c1"
+        }
+      ],
+      "proposal": {
+        "candidate_events": [
+          {
+            "candidate_id": "KG005-AB-003-C1",
+            "source_event_refs": [
+              "kg005-a-d3-clip-end-unknown",
+              "B-DELTA-003"
+            ],
+            "operation": "unknown",
+            "time": {
+              "start": 1904.666667,
+              "end": 1904.967
+            },
+            "semantic_label": "terminal disappearance of the new formula, right-censored at clip end",
+            "acceptance_ready": false,
+            "acceptance_blockers": [
+              "操作类型尚未确定"
+            ]
+          }
+        ],
+        "review_options": [
+          "ERASE",
+          "reject",
+          "not_an_event",
+          "unknown"
+        ],
+        "acceptance_rule": "Only a human-reviewed explicit final_event with operation ERASE may be accepted; the unresolved unknown candidate itself is not acceptance-ready."
+      },
+      "unresolved_fields": [
+        "operation",
+        "right_censored_after_state_persistence",
+        "end_boundary_at_clip_limit",
+        "region_coordinates_require_surface-aware_review"
+      ],
+      "operation_disagreement": {
+        "annotator_a": "unknown",
+        "annotator_b": "ERASE",
+        "resolved": false,
+        "blocker": "操作类型尚未确定"
+      },
+      "human_review": {
+        "status": "pending",
+        "decision": null,
+        "reviewer_id": null,
+        "reviewed_at": null
+      },
+      "human_signoff": {
+        "status": "pending",
+        "signed_by": null,
+        "signed_at": null
+      },
+      "accepted": false
+    }
+  ],
+  "candidates": [
+    {
+      "alignment_id": "KG005-AB-001",
+      "status": "needs_review",
+      "accepted": false,
+      "paper_gold_eligible": false,
+      "annotator_a": {
+        "delta_id": "kg005-a-d1-erase",
+        "time": {
+          "start": 1892.367,
+          "end": 1893.333
+        },
+        "operation": "erase",
+        "region": {
+          "x": 0.333,
+          "y": 0.579,
+          "width": 0.225,
+          "height": 0.194
+        },
+        "affected_object_ids": [
+          "kg005-a-o-old-left",
+          "kg005-a-o-old-right"
+        ]
+      },
+      "annotator_b": {
+        "delta_id": "B-DELTA-001",
+        "time": {
+          "start": 1892.166667,
+          "end": 1893.366667
+        },
+        "operation": "erase",
+        "region": {
+          "x": 0.32,
+          "y": 0.54,
+          "width": 0.25,
+          "height": 0.205
+        },
+        "affected_object_ids": [
+          "B-O-OLD-L2M-T2",
+          "B-O-OLD-V2M",
+          "B-O-OLD-CIRCLE"
+        ]
+      },
+      "metrics": {
+        "start_difference_a_minus_b_seconds": 0.200333,
+        "end_difference_a_minus_b_seconds": -0.033667,
+        "temporal_iou": 0.805,
+        "native_region_iou": 0.64900086881,
+        "video_region_iou": 0.80037413458
+      },
+      "object_correspondence": [
+        {
+          "annotator_a_object_id": "kg005-a-o-old-left",
+          "annotator_b_object_id": "B-O-OLD-L2M-T2",
+          "native_region_iou": 0.5824964132,
+          "video_region_iou": 0.8874091644
+        },
+        {
+          "annotator_a_object_id": "kg005-a-o-old-right",
+          "annotator_b_object_id": "B-O-OLD-V2M",
+          "native_region_iou": 0.2579617834,
+          "video_region_iou": 0.3140074869,
+          "note": "B splits the formula text from its circle; A groups the circled formula."
+        },
+        {
+          "annotator_a_object_id": "kg005-a-o-old-right",
+          "annotator_b_object_id": "B-O-OLD-CIRCLE",
+          "native_region_iou": 0.6495327103,
+          "video_region_iou": 0.9662753368,
+          "note": "B splits the circle from its formula text; A groups the circled formula."
+        }
+      ],
+      "annotator_operation_relation": "agreement_unadjudicated",
+      "review_note": "B includes the transient eraser-toolbar selection in its earlier start; both locate first persistent removal at approximately 1892.366667. Boundary and object granularity remain for human review.",
+      "candidate_decision": null,
+      "human_review": {
+        "status": "pending",
+        "reviewer_id": null,
+        "decision": null,
+        "rationale": null,
+        "reviewed_at": null
+      },
+      "human_signoff": {
+        "status": "pending",
+        "signed_by": null,
+        "signed_at": null
+      }
+    },
+    {
+      "alignment_id": "KG005-AB-002",
+      "status": "needs_review",
+      "accepted": false,
+      "paper_gold_eligible": false,
+      "annotator_a": {
+        "delta_id": "kg005-a-d2-add",
+        "time": {
+          "start": 1896.2,
+          "end": 1898.333
+        },
+        "operation": "add",
+        "region": {
+          "x": 0.407,
+          "y": 0.605,
+          "width": 0.078,
+          "height": 0.166
+        },
+        "affected_object_ids": [
+          "kg005-a-o-new-formula"
+        ]
+      },
+      "annotator_b": {
+        "delta_id": "B-DELTA-002",
+        "time": {
+          "start": 1896.2,
+          "end": 1898.266667
+        },
+        "operation": "add",
+        "region": {
+          "x": 0.39,
+          "y": 0.55,
+          "width": 0.12,
+          "height": 0.19
+        },
+        "affected_object_ids": [
+          "B-O-NEW-LM2-T2"
+        ]
+      },
+      "metrics": {
+        "start_difference_a_minus_b_seconds": 0,
+        "end_difference_a_minus_b_seconds": 0.066333,
+        "temporal_iou": 0.968901547117,
+        "native_region_iou": 0.41755888651,
+        "video_region_iou": 0.533667199308
+      },
+      "object_correspondence": [
+        {
+          "annotator_a_object_id": "kg005-a-o-new-formula",
+          "annotator_b_object_id": "B-O-NEW-LM2-T2",
+          "native_region_iou": 0.5804262412,
+          "video_region_iou": 0.8915197532
+        }
+      ],
+      "annotator_operation_relation": "agreement_unadjudicated",
+      "review_note": "Both annotators observe a stable blank interval before the new formula and independently reject spatial-reuse-as-MODIFY reasoning. No human decision has been recorded.",
+      "candidate_decision": null,
+      "human_review": {
+        "status": "pending",
+        "reviewer_id": null,
+        "decision": null,
+        "rationale": null,
+        "reviewed_at": null
+      },
+      "human_signoff": {
+        "status": "pending",
+        "signed_by": null,
+        "signed_at": null
+      }
+    },
+    {
+      "alignment_id": "KG005-AB-003",
+      "status": "needs_review",
+      "accepted": false,
+      "paper_gold_eligible": false,
+      "right_censored": true,
+      "annotator_a": {
+        "delta_id": "kg005-a-d3-clip-end-unknown",
+        "time": {
+          "start": 1904.667,
+          "end": 1904.967
+        },
+        "operation": "unknown",
+        "region": {
+          "x": 0.407,
+          "y": 0.605,
+          "width": 0.078,
+          "height": 0.166
+        },
+        "affected_object_ids": [],
+        "uncertainty": "erase persistence unverified before clip end"
+      },
+      "annotator_b": {
+        "delta_id": "B-DELTA-003",
+        "time": {
+          "start": 1904.666667,
+          "end": 1904.933333
+        },
+        "operation": "erase",
+        "region": {
+          "x": 0.39,
+          "y": 0.55,
+          "width": 0.12,
+          "height": 0.19
+        },
+        "affected_object_ids": [
+          "B-O-NEW-LM2-T2"
+        ],
+        "uncertainty": "after-state persistence limited by clip end"
+      },
+      "metrics": {
+        "start_difference_a_minus_b_seconds": 0.000333,
+        "end_difference_a_minus_b_seconds": 0.033667,
+        "temporal_iou": 0.886792327183,
+        "native_region_iou": 0.41755888651,
+        "video_region_iou": 0.533667199308
+      },
+      "object_correspondence": [
+        {
+          "annotator_a_before_state_object_id": "kg005-a-o-new-formula",
+          "annotator_b_object_id": "B-O-NEW-LM2-T2",
+          "native_region_iou": 0.5804262412,
+          "video_region_iou": 0.8915197532,
+          "note": "A affected_object_ids is empty by construction because A froze the operation as unknown; this is correspondence evidence only."
+        }
+      ],
+      "annotator_operation_relation": "disagreement_unadjudicated",
+      "disagreement": {
+        "preserve": true,
+        "annotator_a_position": "unknown because persistence cannot be verified beyond the right clip boundary",
+        "annotator_b_position": "erase based on visible removal in terminal frames, with persistence explicitly clip-end limited",
+        "automatic_resolution": null
+      },
+      "candidate_decision": null,
+      "human_review": {
+        "status": "pending",
+        "reviewer_id": null,
+        "decision": null,
+        "rationale": null,
+        "reviewed_at": null
+      },
+      "human_signoff": {
+        "status": "pending",
+        "signed_by": null,
+        "signed_at": null
+      }
+    }
+  ],
+  "decision_gate": {
+    "candidate_decisions_recorded": 0,
+    "human_reviews_completed": 0,
+    "human_review_status": "pending",
+    "human_signoff_status": "pending",
+    "accepted_count": 0,
+    "paper_gold_status": "blocked",
+    "paper_gold_block_reason": "All candidates require human review and signoff; KG005-AB-003 retains an unresolved right-censored unknown-versus-ERASE disagreement.",
+    "signed_by": null,
+    "signed_at": null
+  },
+  "warnings": [
+    "This is an adjudication input, not an adjudication result.",
+    "Agreement fields report annotator relation only and do not constitute a decision.",
+    "ASR is context_not_adjudicated and must not be used to retroactively change frozen visual annotations.",
+    "Spatial reuse does not imply MODIFY; MODIFY is not in the permitted candidate decision vocabulary.",
+    "The right-censored A=unknown versus B=ERASE disagreement is intentionally unresolved.",
+    "No candidate is accepted and Paper Gold is blocked."
+  ]
+}

@@ -3,6 +3,7 @@ export type JsonObject = { [key: string]: JsonValue | undefined };
 
 export * from "./board2skill.js";
 export * from "./gold-review.js";
+export * from "./oracle-gate-formal.js";
 export * from "./signed-gold.js";
 export * from "./skill-distillation.js";
 export * from "./temporal-board.js";

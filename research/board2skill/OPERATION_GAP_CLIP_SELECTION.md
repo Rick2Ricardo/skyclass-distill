@@ -1,17 +1,17 @@
 # Temporal Board v2：ERASE / MODIFY 缺口片段筛选
 
 > 复核日期：2026-08-12
-> 状态：**scouting 完成；假 MODIFY 与真实 ERASE 已完成独立双标/对齐并待人工签字，ERASE+ADD 困难负例尚未双标；全部未进入 Gold**
+> 状态：**scouting 完成；假 MODIFY、真实 ERASE 与 ERASE+ADD 困难负例均已完成独立双标/对齐并待人工签字；全部未进入 Gold**
 > 范围：只复核本地已有视频；不根据语音或烧录字幕单独推断操作类型。
 > 权利边界：源视频和派生帧均为 `private_noncommercial_research_only / internal_review_only`，不得提交到公开 Git 或数据发布包。
 
 ## 1. 结论
 
-scouting 阶段找到一个视觉上疑似 `MODIFY` 的首选窗，以及两个真实擦除窗。后续 A/B 双标已经否定首选窗的 `MODIFY` 假设：两侧都只支持 `ERASE`、`ADD`、原子 `ERASE+ADD` 或 `unknown`，没有实质 old→new 语义变化。第三个窗继续保留为 `ERASE + ADD` 困难负例，防止把所有“擦后再写”错误合并成 `MODIFY`。
+scouting 阶段找到一个视觉上疑似 `MODIFY` 的首选窗，以及两个真实擦除窗。后续 A/B 双标已经否定首选窗的 `MODIFY` 假设：两侧都只支持 `ERASE`、`ADD`、原子 `ERASE+ADD` 或 `unknown`，没有实质 old→new 语义变化。第三个窗也已完成 A/B 对齐，前两组一致支持 `ERASE → ADD`，用于防止把所有“擦后再写”错误合并成 `MODIFY`；片尾第三组因右删失继续保持未决。
 
 1. **假 MODIFY 困难负例：`phy-force-kunge-005`，`2134–2166 s`（`00:35:34–00:36:06`）**。同一道比例系数单位题中，已有推导被清除，随后同一区域写出以 `k = ...` 开头的新表达式，并出现等号和 `F r²` 的同槽擦除重写。A 标为 `ERASE×1 / ADD×2 / unknown×1`，B 标为 `ERASE×3 / ADD×5`，双方均为 `MODIFY×0`；现已形成 5 组待人工签字的对齐输入。
 2. **真实 ERASE 待签：`phy-force-kunge-003`，`4422–4428 s`（`01:13:42–01:13:48`）**。课件底图、题图和左侧已有推导保持不动，右侧红色推导被逐步移除，之后保持为空。A 与严格盲标 B2 都识别为 `ERASE`，现已形成 1 组待签仲裁输入；旧 B 因意外看到 scout 元数据被明确隔离，不参与一致性或 Gold。
-3. **困难负例：`phy-force-kunge-005`，`1888–1905 s`（`00:31:28–00:31:45`）**。前一候选式的量纲计算被擦除，随后在同一区域开始计算下一候选式。空间复用不等于语义槽延续，因此应拆为 `ERASE` 和后续 `ADD`，**不得标成 MODIFY**。
+3. **ERASE→ADD 困难负例待签：`phy-force-kunge-005`，`1888–1905 s`（`00:31:28–00:31:45`）**。前一候选式的量纲计算被擦除，随后在同一区域开始计算下一候选式。A/B 对齐为 3 组：前两组一致支持 `ERASE`、`ADD`，第三组保留 A=`unknown`、B=`ERASE` 的右删失分歧。空间复用不等于语义槽延续，前两组必须保持有序 `ERASE → ADD`，**不得标成 MODIFY**。
 
 本地没有第三位教师，也没有能打破“李永乐 = 实体绿板、坤哥 = 数字墨迹”混杂的交叉组合。四个李永乐实体绿板源的低频全课通览没有发现可信的持久 ERASE/MODIFY；`phy-force-liyongle-003` 清单里原先写的 `modify_motion_condition / modify_resultant_direction`，实际画面是另起新图继续添加，不能据此标 `MODIFY`。这一负结论受抽帧频率限制，不等于证明实体绿板视频绝对没有短暂擦改。
 
@@ -26,7 +26,7 @@ scouting 阶段找到一个视觉上疑似 `MODIFY` 的首选窗，以及两个�
 | `phy-force-liyongle-003` | `li_yongle` | physical chalkboard | `data/raw/physics/force-pilot/phy-force-liyongle-003/source.mp4` | `c7e62d680e003d9e5d28305015bd409f9e6e155e67fcaba72b73f9571de39d95` | 已有 1 个候选窗 |
 | `phy-force-liyongle-004` | `li_yongle` | physical chalkboard | `data/raw/physics/force-pilot/phy-force-liyongle-004/source.mp4` | `3811c42fb32f36e27754926062a1280b0b576edee91adca0d0a8f9a5362ad6d9` | 已有 1 个候选窗 |
 | `phy-force-kunge-003` | `kunge_bilibili` | digital ink over slides | `data/raw/physics/force-pilot/phy-force-kunge-003/source.mp4` | `e4409e94aab76ed26501ebd24e51b09d3454944a09d4a6b37365a75fb9d080e4` | 已有 2 个候选窗；本次新窗在原窗之外 |
-| `phy-force-kunge-005` | `kunge_bilibili` | digital ink over slides | `data/raw/physics/force-pilot/phy-force-kunge-005/source.mp4` | `127ed9323274d0dd00f3cc39c4a3b68f3109d74dbfd7fb2d08f87cab008f7241` | 假 MODIFY 已双标/对齐；ERASE+ADD 困难负例待双标 |
+| `phy-force-kunge-005` | `kunge_bilibili` | digital ink over slides | `data/raw/physics/force-pilot/phy-force-kunge-005/source.mp4` | `127ed9323274d0dd00f3cc39c4a3b68f3109d74dbfd7fb2d08f87cab008f7241` | 假 MODIFY 与 ERASE+ADD 困难负例均已双标/对齐，待人工签字 |
 
 ### 2.2 复核方式
 
@@ -91,11 +91,13 @@ scouting 时，这个窗口看起来满足 old→erase→new，因而被列为 `
 - **change（`1894.5 s`）**：该表达被逐步擦除，同一课件底图保持不动。
 - **after（`1900.5 s`）**：同一空白区域出现另一组幂次组合。
 
-虽然发生在同一空间且时间相邻，但 printed options 显示前后对应不同候选项；这是“清掉上一项的草算，再算下一项”，不是同一对象的 old→new 修订。推荐拆成一个 `ERASE` 和一个后续 `ADD`，并作为 MODIFY 规则的困难负例。
+虽然发生在同一空间且时间相邻，但 printed options 显示前后对应不同候选项；这是“清掉上一项的草算，再算下一项”，不是同一对象的 old→new 修订。A/B 前两组已经一致支持一个 `ERASE` 和一个后续 `ADD`，可作为 MODIFY 规则的困难负例；片尾事件因窗口右边界没有完整 after，继续保留 `unknown`/`ERASE` 分歧。
+
+A/B 对齐统计：前两组 tIoU 分别为 `0.805000`、`0.968902`；片尾右删失组 tIoU 为 `0.886792`。三组全部仍为 `pending_human`，accepted=0。
 
 ### 5.2 ASR、风险与派生证据
 
-- scouting 完成后已用本地 whisper.cpp 生成机器时间戳 ASR 草稿：2 个 segments，文件为 `data/board2skill/oracle-pilot/tbv2-kg005-erase-add-hardnegative-1888-1905/asr/clip-1888-1905.json`，SHA-256 为 `c96ffbe3a8077736046d78c8f14c47f41d700c99efb894ba16143bfc678a4a77`。它尚未人工校对；不得仅凭机器转写或烧录字幕推断教师是在“纠错”还是“切换选项”。
+- scouting 完成后已用本地 whisper.cpp 生成机器时间戳 ASR 草稿：2 个 segments，文件为 `data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/asr/clip-1888-1905.json`，SHA-256 为 `c96ffbe3a8077736046d78c8f14c47f41d700c99efb894ba16143bfc678a4a77`。它尚未人工校对；不得仅凭机器转写或烧录字幕推断教师是在“纠错”还是“切换选项”。clip ID 保留 `tbv2-kg005-erase-add-hardnegative-01`，但 evidence storage 统一使用实际存在的 `tbv2-kg005-hardnegative-1888-1905/` 目录。
 - 风险：若标注员只看局部 ROI，容易因空间重用误判为 MODIFY；必须同时保留 printed option anchors 和完整页面状态。
 
 | phase | local frame | SHA-256 |
@@ -140,8 +142,8 @@ scouting 时，这个窗口看起来满足 old→erase→new，因而被列为 `
 
 1. 对 `kg005 / 2134–2166 s` 的 5 组假 MODIFY 候选执行人工签字；没有新证据时只能选择 ERASE、ADD、atomic ERASE+ADD 或 unknown，不能回填 MODIFY。
 2. 对 `kg003 / 4422–4428 s` 的唯一 A/B2 ERASE 配对统一边界、before 左删失策略、after 稳定起点和 persistence 门槛；旧污染 B 永久排除。
-3. 为 `kg005 / 1888–1905 s` 完成两份严格独立标注和对齐，检验是否能稳定拒绝“同空间即 MODIFY”。
+3. 对 `kg005 / 1888–1905 s` 的 3 组 A/B 对齐执行人工裁决：前两组保持有序 `ERASE → ADD`，第三组不得越过右删失证据自动补成 ERASE。
 4. 并行补采第三位教师、且复用 physical 或 digital 现有介质。未完成交叉介质设计前，不把这些片段用于跨教师结论。
 5. 只有人工签字后的 accepted 事件才能进入正式 operation 指标与四组实验。
 
-当前可以声称“ERASE 与假 MODIFY 已有可签字的双标候选”，仍不能声称它们已经成为 Gold。
+当前可以声称“ERASE、假 MODIFY 与 ERASE→ADD 困难负例均已有可签字的双标候选”，仍不能声称它们已经成为 Gold。

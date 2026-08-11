@@ -17,8 +17,8 @@
       "physical_chalkboard",
       "digital_ink_over_slides"
     ],
-    "review_method": "先低频通览，再对候选窗口做1–5秒视觉复核；5 个片段已完成独立 A/B（含严格盲标 B2）和待人工签字的对齐包，新增 operation-gap 窗已密集视觉复核并生成本地 ASR。",
-    "actual_verification_level": "five_clips_independent_a_b_aligned_49_review_groups_51_events_pending_human_signoff",
+    "review_method": "先低频通览，再对候选窗口做1–5秒视觉复核；6 个片段已完成独立 A/B（含严格盲标 B2）和待人工签字的对齐包，operation-gap 窗均已密集视觉复核并生成本地 ASR。",
+    "actual_verification_level": "six_clips_independent_a_b_aligned_52_review_groups_54_candidates_pending_human_signoff",
     "delta_ground_truth_complete": false
   },
   "clips": [
@@ -515,7 +515,8 @@
       "risks": [
         "same_region_false_modify",
         "requires_full_page_option_anchors",
-        "burned_in_subtitle_not_transcript_evidence"
+        "burned_in_subtitle_not_transcript_evidence",
+        "right_censored_final_erase"
       ],
       "rights_status": "internal_review_only",
       "oracle_labels": {
@@ -523,7 +524,10 @@
         "board_deltas": [],
         "board_state_after": null,
         "needs_review": true,
-        "review_status": "dense_visual_verified_pending_independent_double_annotation"
+        "review_status": "independent_a_b_aligned_pending_human_signoff",
+        "annotation_a_path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/annotator-a.json",
+        "annotation_b_path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/annotator-b.json",
+        "adjudication_intake_path": "research/board2skill/KG005_ERASE_ADD_AB_ADJUDICATION_INPUT_1888_1905.json"
       }
     }
   ]
