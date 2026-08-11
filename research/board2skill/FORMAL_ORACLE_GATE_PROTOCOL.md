@@ -1,6 +1,6 @@
 # Formal Oracle Gate v1：正式四组实验协议
 
-> 状态：`untrusted_structure_validation_implemented / execution_blocked`
+> 状态：`ledger_attestation_implemented / execution_blocked`
 >
 > 日期：2026-08-12
 >
@@ -46,7 +46,12 @@
 - 冻结最大输入/输出 token、图像数与像素、timeout、最大 attempts。
 - 确定性 planner 展开完整的 `case × 4 arms × seed` 笛卡尔积。
 - 每个请求有稳定 `request_id` 与 `idempotency_key`；缺任一请求不得出部分结论。
-- 第一层结构校验已实现，但只返回 `untrusted_structure_valid`，不把可自行重哈希的 JSON 当作预注册或可信 Gold；同时固定返回 `api_execution_allowed=false`。只有从当前 append-only 人工评审账本重新编译并获得冻结注册表 attestation，且资产/语音字节复核、私有 checkpoint store、盲评协议与统计器全部通过后才能执行。
+- 第一层结构校验只返回 `untrusted_structure_valid`，不把可自行重哈希的 JSON 当作预注册或可信 Gold。
+- 当前已实现第二层账本 attestation：在跨实例/进程全局锁内，从当前 `GoldReviewStore` 重新读取 manifest、全部 intake、每一版历史 decision 和两类 signoff，重编译 Signed Gold，并生成确定性 `gold-ledger-snapshot-v1`。
+- 账本快照只能由外部提供的 Ed25519 私钥冻结为内容寻址 registry；运行时必须从进程外获得 pinned registry SHA 与可信公钥。registry 自带的 key ID、hash 或公钥不能建立信任。撤销使用独立、追加式、外部签名记录，并与 capability callback 共用跨进程锁，防止检查后撤销的 TOCTOU。
+- 本地撤销目录只能证明“当前可见的签名撤销记录有效”，不能证明同一 OS 权限下的历史文件从未被删除。正式 API 前还必须由进程外 pinned active/revoked head、单调序列的可信审计服务或 WORM 存储证明撤销不可回滚；当前实现不宣称具备该性质。
+- 通过验证后只在持有全局账本锁的 callback 内借出不可序列化 `ledger_attested_only` capability；它不是执行令牌。registry 中 `media_bytes_verified`、`speech_bytes_verified`、`run_store_verified` 与 `api_execution_allowed` 仍强制为 `false`。
+- 只有资产/语音字节复核、私有 checkpoint store、盲评协议与统计器也在同一受控调用链内通过后才能执行正式 API。
 
 ## 5. 评分与统计
 
@@ -75,6 +80,7 @@
 | --- | --- | --- | --- |
 | P0 | 完成 Gold 人工裁决与双签 | 当前 5+ 仲裁包 | 任一包证据或签字链不闭合 |
 | P0 | 完成 formal input/spec 与结构 preflight | Signed Gold | 少于 30 事件/2 教师/3 seeds/multi-edit |
+| P0 | 冻结当前 Gold 账本 snapshot 与外部签名 registry | 结构 preflight | 账本漂移、历史缺失、签名/权限/内容地址不匹配 |
 | P0 | 字节级验证 static/uniform/oracle/语音账本 | 结构 preflight | hash、路径、解码、时间或来源不匹配 |
 | P0 | 内容寻址 checkpoint、锁、resume、私有权限 | 完整 schedule | spec 漂移、损坏 checkpoint、宽权限目录 |
 | P0 | 冻结双盲 rubric 与统计预注册 | 评分者确认 | rubric/统计规则仍可运行后修改 |

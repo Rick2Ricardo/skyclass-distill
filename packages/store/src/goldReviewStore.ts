@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { lstat, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { lstat, mkdir, open, readFile, readdir, realpath, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import type {
   GoldReviewCandidate,
@@ -22,7 +22,6 @@ import type {
 } from "../../contracts/src/index.js";
 import { canonicalGoldReviewDecisionSignaturePayload, canonicalGoldReviewPackageSignoffSignaturePayload } from "../../contracts/src/index.js";
 import { verifyImageEvidence } from "../../media/src/imageEvidence.js";
-import { ensureDir } from "./fileStore.js";
 import { buildSignedGoldDataset } from "./signedGoldCompiler.js";
 
 type JsonRecord = Record<string, unknown>;
@@ -325,11 +324,116 @@ function materializeFinalEvents(group: GoldReviewGroup, input: GoldReviewDecisio
 export class GoldReviewStore {
   readonly decisionRoot: string;
   readonly signoffRoot: string;
+  readonly ledgerLockRoot: string;
   private readonly packageLocks = new Map<string, Promise<void>>();
+  private ledgerLock = Promise.resolve();
 
   constructor(readonly root: string, readonly dataDir: string, readonly manifestPath = DEFAULT_MANIFEST) {
     this.decisionRoot = join(dataDir, "board2skill", "gold-review", "decisions");
     this.signoffRoot = join(dataDir, "board2skill", "gold-review", "package-signoffs");
+    this.ledgerLockRoot = join(dataDir, "board2skill", "gold-review");
+  }
+
+  private async assertDataRootChain(path: string, allowMissing: boolean): Promise<void> {
+    const dataRoot = resolve(this.dataDir);
+    const target = resolve(path);
+    if (!inside(dataRoot, target)) throw new Error("Gold 私有账本路径超出 data root");
+    const rootInfo = await lstat(dataRoot);
+    if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()) throw new Error("Gold data root 必须是非符号链接目录");
+    if (typeof process.getuid === "function" && rootInfo.uid !== process.getuid()) throw new Error("Gold data root owner 与服务进程不一致");
+    let current = dataRoot;
+    for (const part of relative(dataRoot, target).split(/[\\/]/).filter(Boolean)) {
+      current = join(current, part);
+      const info = await lstat(current).catch((error: NodeJS.ErrnoException) => {
+        if (allowMissing && error.code === "ENOENT") return null;
+        throw error;
+      });
+      if (!info) break;
+      if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Gold 私有账本路径祖先不得是符号链接或非目录");
+      if (typeof process.getuid === "function" && info.uid !== process.getuid()) throw new Error("Gold 私有账本路径祖先 owner 无效");
+    }
+    if (!allowMissing) {
+      const dataRootReal = await realpath(dataRoot);
+      const targetReal = await realpath(target);
+      if (!inside(dataRootReal, targetReal)) throw new Error("Gold 私有账本路径真实位置超出 data root");
+    }
+  }
+
+  private async ensurePrivateDirectory(path: string): Promise<void> {
+    await this.assertDataRootChain(path, true);
+    await mkdir(path, { recursive: true, mode: 0o700 });
+    await this.assertDataRootChain(path, false);
+    const info = await lstat(path);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Gold 私有账本路径必须是非符号链接目录");
+    if ((info.mode & 0o077) !== 0) throw new Error("Gold 私有账本目录权限不得向 group/other 开放");
+    if (typeof process.getuid === "function" && info.uid !== process.getuid()) throw new Error("Gold 私有账本目录 owner 与服务进程不一致");
+  }
+
+  private async assertOptionalPrivateDirectory(path: string): Promise<void> {
+    const info = await lstat(path).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+    if (!info) return;
+    await this.assertDataRootChain(path, false);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Gold 私有账本根必须是非符号链接目录");
+    if ((info.mode & 0o077) !== 0) throw new Error("Gold 私有账本根权限不得向 group/other 开放");
+    if (typeof process.getuid === "function" && info.uid !== process.getuid()) throw new Error("Gold 私有账本根 owner 与服务进程不一致");
+    const ledgerRootReal = await realpath(this.ledgerLockRoot);
+    const pathReal = await realpath(path);
+    if (!inside(ledgerRootReal, pathReal)) throw new Error("Gold 私有账本根真实路径越界");
+  }
+
+  /**
+   * Cross-instance/process serialization point for every Gold ledger mutation and
+   * trusted snapshot. A stale lock is never stolen automatically: recovery must
+   * be explicit because an in-flight writer may still own it.
+   */
+  async withLedgerSnapshot<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.ledgerLock;
+    let release!: () => void;
+    this.ledgerLock = new Promise<void>((resolveLock) => { release = resolveLock; });
+    await previous;
+    try {
+      return await this.withGlobalLedgerFileLock(operation);
+    } finally {
+      release();
+    }
+  }
+
+  private async withGlobalLedgerFileLock<T>(operation: () => Promise<T>): Promise<T> {
+    await this.ensurePrivateDirectory(this.ledgerLockRoot);
+    await this.assertOptionalPrivateDirectory(this.decisionRoot);
+    await this.assertOptionalPrivateDirectory(this.signoffRoot);
+    const lockPath = join(this.ledgerLockRoot, ".ledger.lock");
+    const deadline = Date.now() + 10_000;
+    let handle: Awaited<ReturnType<typeof open>> | null = null;
+    while (!handle) {
+      try {
+        handle = await open(lockPath, "wx", 0o600);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        if (Date.now() >= deadline) throw new Error("Gold 账本全局锁被占用；拒绝自动偷取或覆盖 stale lock");
+        await new Promise((resolveWait) => setTimeout(resolveWait, 20));
+      }
+    }
+    const ownerNonce = randomUUID();
+    const lockBytes = `${JSON.stringify({ pid: process.pid, owner_nonce: ownerNonce, acquired_at: new Date().toISOString() })}\n`;
+    try {
+      await handle.writeFile(lockBytes, "utf8");
+      await handle.sync();
+      return await operation();
+    } finally {
+      await handle.close();
+      const current = await readFile(lockPath, "utf8").catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") throw new Error("Gold 账本全局锁在持有期间被删除");
+        throw error;
+      });
+      if (current !== lockBytes) throw new Error("Gold 账本全局锁 owner nonce 不匹配，拒绝释放他人锁");
+      await unlink(lockPath).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error;
+      });
+    }
   }
 
   private async intakePaths(): Promise<string[]> {
@@ -348,6 +452,14 @@ export class GoldReviewStore {
 
   private signoffPath(packageId: string, role: GoldReviewSignoffRole): string {
     return join(this.signoffRoot, safeId(packageId, "package_id"), `${role}.json`);
+  }
+
+  private async assertPrivateLedgerFile(path: string, label: string): Promise<void> {
+    const info = await lstat(path);
+    if (!info.isFile() || info.isSymbolicLink()) throw new Error(`${label} 必须是非符号链接普通文件`);
+    if (info.nlink !== 1) throw new Error(`${label} 不允许 hardlink`);
+    if ((info.mode & 0o077) !== 0) throw new Error(`${label} 权限不得向 group/other 开放`);
+    if (typeof process.getuid === "function" && info.uid !== process.getuid()) throw new Error(`${label} owner 与服务进程不一致`);
   }
 
   private async withPackageLock<T>(packageId: string, operation: () => Promise<T>): Promise<T> {
@@ -372,7 +484,9 @@ export class GoldReviewStore {
       .filter((name) => name.endsWith(".json")).sort();
     let previous: GoldReviewDecisionRecord | null = null;
     for (const [index, name] of names.entries()) {
-      const decision = JSON.parse(await readFile(join(directory, name), "utf8")) as GoldReviewDecisionRecord;
+      const path = join(directory, name);
+      await this.assertPrivateLedgerFile(path, `Gold 仲裁决策 ${packageId}/${groupId}/${name}`);
+      const decision = JSON.parse(await readFile(path, "utf8")) as GoldReviewDecisionRecord;
       const { signature_sha256: signature, ...base } = decision;
       if (decision.schema_version !== "gold-review-decision-v1"
         || decision.package_id !== packageId
@@ -392,11 +506,14 @@ export class GoldReviewStore {
   private async packageSignoffs(packageId: string, intakeSha256: string, decisionSignatures: string[]): Promise<GoldReviewPackageSignoff[]> {
     const output: GoldReviewPackageSignoff[] = [];
     for (const role of SIGNOFF_ROLES) {
-      const signoff = JSON.parse(await readFile(this.signoffPath(packageId, role), "utf8").catch((error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return "null";
+      const path = this.signoffPath(packageId, role);
+      const exists = await lstat(path).then(() => true).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return false;
         throw error;
-      })) as GoldReviewPackageSignoff | null;
-      if (!signoff) continue;
+      });
+      if (!exists) continue;
+      await this.assertPrivateLedgerFile(path, `Gold 仲裁包签字 ${packageId}/${role}`);
+      const signoff = JSON.parse(await readFile(path, "utf8")) as GoldReviewPackageSignoff;
       const { signature_sha256: signature, ...base } = signoff;
       const expectedDecisions = [...decisionSignatures].sort();
       if (signoff.schema_version !== "gold-review-package-signoff-v1"
@@ -477,7 +594,7 @@ export class GoldReviewStore {
   }
 
   async decide(input: GoldReviewDecisionInput): Promise<GoldReviewDecisionRecord> {
-    return this.withPackageLock(input.package_id, () => this.decideUnlocked(input));
+    return this.withLedgerSnapshot(() => this.withPackageLock(input.package_id, () => this.decideUnlocked(input)));
   }
 
   private async decideUnlocked(input: GoldReviewDecisionInput): Promise<GoldReviewDecisionRecord> {
@@ -518,14 +635,16 @@ export class GoldReviewStore {
     };
     const decision: GoldReviewDecisionRecord = { ...base, signature_sha256: sha256(canonicalGoldReviewDecisionSignaturePayload(base)) };
     const directory = this.decisionDirectory(group.package_id, group.group_id);
-    await ensureDir(directory);
+    await this.ensurePrivateDirectory(this.decisionRoot);
+    await this.ensurePrivateDirectory(dirname(directory));
+    await this.ensurePrivateDirectory(directory);
     const target = join(directory, `${String(decision.revision).padStart(4, "0")}-${decision.signature_sha256}.json`);
-    await writeFile(target, `${JSON.stringify(decision, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+    await writeFile(target, `${JSON.stringify(decision, null, 2)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
     return decision;
   }
 
   async signPackage(input: GoldReviewPackageSignoffInput): Promise<GoldReviewPackageSignoff> {
-    return this.withPackageLock(input.package_id, () => this.signPackageUnlocked(input));
+    return this.withLedgerSnapshot(() => this.withPackageLock(input.package_id, () => this.signPackageUnlocked(input)));
   }
 
   private async signPackageUnlocked(input: GoldReviewPackageSignoffInput): Promise<GoldReviewPackageSignoff> {
@@ -561,8 +680,9 @@ export class GoldReviewStore {
       signed_at: new Date().toISOString(),
     };
     const signoff: GoldReviewPackageSignoff = { ...base, signature_sha256: sha256(canonicalGoldReviewPackageSignoffSignaturePayload(base)) };
-    await ensureDir(dirname(this.signoffPath(pkg.package_id, input.signoff_role)));
-    await writeFile(this.signoffPath(pkg.package_id, input.signoff_role), `${JSON.stringify(signoff, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+    await this.ensurePrivateDirectory(this.signoffRoot);
+    await this.ensurePrivateDirectory(dirname(this.signoffPath(pkg.package_id, input.signoff_role)));
+    await writeFile(this.signoffPath(pkg.package_id, input.signoff_role), `${JSON.stringify(signoff, null, 2)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
     return signoff;
   }
 
@@ -576,17 +696,21 @@ export class GoldReviewStore {
   }
 
   async compileDataset(): Promise<SignedGoldCompileResult> {
+    return this.withLedgerSnapshot(() => this.compileDatasetUnlocked());
+  }
+
+  private async compileDatasetUnlocked(): Promise<SignedGoldCompileResult> {
     const dataset = await buildSignedGoldDataset(this.root, await this.queue());
     const directory = join(this.dataDir, "board2skill", "signed-gold", dataset.dataset_sha256);
     const serialized = `${JSON.stringify(dataset, null, 2)}\n`;
-    await ensureDir(this.dataDir);
     const dataRootReal = await realpath(this.dataDir);
-    await ensureDir(directory);
+    await this.ensurePrivateDirectory(join(this.dataDir, "board2skill", "signed-gold"));
+    await this.ensurePrivateDirectory(directory);
     const directoryReal = await realpath(directory);
     if (!inside(dataRootReal, directoryReal)) throw new Error("Signed Gold 内容寻址目录真实路径越界");
     const target = join(directoryReal, "dataset.json");
     try {
-      await writeFile(target, serialized, { encoding: "utf8", flag: "wx" });
+      await writeFile(target, serialized, { encoding: "utf8", flag: "wx", mode: 0o600 });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
       const targetStat = await lstat(target);

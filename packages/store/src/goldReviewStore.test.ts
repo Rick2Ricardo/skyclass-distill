@@ -357,7 +357,7 @@ describe("GoldReviewStore", () => {
     const contentDirectory = dirname(join(data, first.dataset_uri));
     await rm(contentDirectory, { recursive: true, force: true });
     await symlink(outside, contentDirectory);
-    await expect(store.compileDataset()).rejects.toThrow("真实路径越界");
+    await expect(store.compileDataset()).rejects.toThrow("符号链接");
   });
 
   it("re-verifies signed evidence before compiling the immutable dataset", async () => {
