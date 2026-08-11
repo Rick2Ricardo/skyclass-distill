@@ -5,6 +5,7 @@ export * from "./board2skill.js";
 export * from "./gold-review.js";
 export * from "./oracle-gate-bytes.js";
 export * from "./oracle-gate-formal.js";
+export * from "./oracle-gate-frame-derivation.js";
 export * from "./oracle-gate-run.js";
 export * from "./oracle-gate-trusted.js";
 export * from "./signed-gold.js";

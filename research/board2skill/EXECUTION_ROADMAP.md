@@ -14,7 +14,9 @@
 >
 > 2026-08-12 Formal Oracle 可信账本补充：已增加跨实例/进程全局锁、当前账本原子快照、完整历史 revision/signoff 字节树、Signed Gold 重编译比对、强制 Ed25519 的内容寻址 registry、追加式撤销，以及 callback 作用域的冻结不可序列化 capability。运行时信任只来自进程外 pinned registry SHA 与 trusted public keys，不信任 registry 自报身份；撤销检查与 callback 共用锁。该 capability 明确只表示 `ledger_attested_only`；媒体、语音、run store 和 API 四个 gate 仍为 false。正式 API 前还需外部单调/WORM 撤销 head，避免同 OS 权限下删除本地撤销历史；尚未生成任何正式结果。
 
-> 2026-08-12 Formal Oracle 媒体字节补充：已增加 strict `oracle-gate-byte-inventory-v1`、受控路径/单链接/O_NOFOLLOW/读取前后身份、来源 MP4 流式 SHA、ffprobe 元数据与冻结 ffmpeg 全流 decode、PNG/JPEG 真解码和 `oracle-rgba8-v1` 像素哈希。Whisper.cpp raw 现在必须逐字节重建 index/SRT/TXT/selected transcript；语音账本正文严格绑定 case/source/clip/五文件/segments，并由进程外 trusted reviewer key 做 canonical Ed25519 签名。任一后续 case 失败整批拒绝；输出仍为 `untrusted_media_bytes_valid`、`source_frame_derivation_verified=false`、`api_execution_allowed=false`。run/intents/attempt/commit/完整 checkpoint hash-chain/private-public blind contracts也已冻结，并拒绝 ambiguous 重试、attempt audit 重放、稀疏数组与大小写变形的私有值泄漏；但真实私有 run store、不可变工具执行副本与来源帧 PTS 派生证明仍未实现。
+> 2026-08-12 Formal Oracle 媒体字节补充：已增加 strict `oracle-gate-byte-inventory-v1`、受控路径/单链接/O_NOFOLLOW/读取前后身份、来源 MP4 流式 SHA、ffprobe 元数据与冻结 ffmpeg 全流 decode、PNG/JPEG 真解码和 `oracle-rgba8-v1` 像素哈希。Whisper.cpp raw 现在必须逐字节重建 index/SRT/TXT/selected transcript；语音账本正文严格绑定 case/source/clip/五文件/segments，并由进程外 trusted reviewer key 做 canonical Ed25519 签名。任一后续 case 失败整批拒绝；该字节层仍输出 `untrusted_media_bytes_valid`、`source_frame_derivation_verified=false`、`api_execution_allowed=false`。
+>
+> 2026-08-12 Formal Oracle 来源帧补充：在字节层之上新增独立 `oracle-gate-frame-derivation-preflight-v1`。系统把源视频复制到私有只读 staging，从目标视频流首帧 PTS 归零并从头软件解码，选择第一个 `normalized PTS >= timestamp_us` 的帧；“为何选择该时刻”的 stable/uniform 规则与“如何抽帧”的规则分别记录。Static/Uniform 必须是重新生成后完整字节和 canonical 像素都一致的 lossless PNG，任何 PTS、流、比例、像素或输出长度漂移整批拒绝。该层可证明来源帧派生，但仍固定 `api_execution_allowed=false`；真实私有 run store、ffmpeg 动态依赖/不可变工具 attestation 与外部组合 gate 尚未实现。
 
 ## 1. 项目决策
 

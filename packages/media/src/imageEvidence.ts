@@ -27,6 +27,7 @@ export interface CanonicalImagePixels {
 
 export const CANONICAL_PIXEL_HASH_VERSION = "oracle-rgba8-v1" as const;
 export const CANONICAL_PIXEL_HASH_DOMAIN = "oracle-rgba8-v1\0" as const;
+export const CANONICAL_PNG_VERSION = "pngjs-7.0.0-rgba8-default-v1" as const;
 
 export interface VerifyImageEvidenceOptions {
   root: string;
@@ -204,6 +205,17 @@ export function canonicalImagePixels(bytes: Uint8Array): CanonicalImagePixels {
     .update(rgba)
     .digest("hex");
   return { ...inspected, rgba, canonical_pixel_sha256 };
+}
+
+/** Deterministic, lossless encoding used by source-frame derivation proofs. */
+export function encodeCanonicalRgbaPng(width: number, height: number, rgba: Uint8Array): Buffer {
+  const pixels = width * height;
+  if (!Number.isSafeInteger(pixels) || pixels < 1 || pixels > 16_000_000 || rgba.byteLength !== pixels * 4) {
+    throw new Error("canonical PNG 的 RGBA8 尺寸无效");
+  }
+  const png = new PNG({ width, height });
+  png.data = Buffer.from(rgba);
+  return PNG.sync.write(png);
 }
 
 export async function verifyImageEvidence(options: VerifyImageEvidenceOptions): Promise<VerifiedImageEvidence> {

@@ -30,9 +30,10 @@ import {
   type SpeechByteFileRef,
   type VerifiedSpeechSegment,
 } from "../../media/src/speechEvidence.js";
-import type { OracleGateVideoProbe } from "../../media/src/videoEvidence.js";
+import type { OracleGateFrameDeriver } from "../../media/src/videoEvidence.js";
 import { deriveOracleGateFormalCaseId } from "./oracleFormalPreflight.js";
 import { prepareOracleGateBytePreflight } from "./oracleBytePreflight.js";
+import { prepareOracleGateFrameDerivationPreflight } from "./oracleFrameDerivationPreflight.js";
 
 function sha(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
@@ -347,7 +348,7 @@ async function buildFixture() {
     toolchain: { ...ORACLE_GATE_BYTE_TOOLCHAIN, ...toolHashes },
     sources: sourceBytes.map((bytes, zeroIndex) => ({
       source_video_id: `video-${zeroIndex + 1}`,
-      video: { asset_uri: `sources/video-${zeroIndex + 1}.mp4`, sha256: sha(bytes), byte_length: bytes.byteLength, mime_type: "video/mp4", duration_us: 120_000_000, width: 1280, height: 720, video_stream_index: 0 },
+      video: { asset_uri: `sources/video-${zeroIndex + 1}.mp4`, sha256: sha(bytes), byte_length: bytes.byteLength, mime_type: "video/mp4", duration_us: 120_000_000, width: 1, height: 1, video_stream_index: 0 },
     })),
     cases: cases.map((formalCase, zeroIndex) => {
       const index = zeroIndex + 1;
@@ -366,10 +367,27 @@ async function buildFixture() {
     }),
   };
   inventory.inventory_sha256 = sha(oracleGateByteInventorySha256Preimage(inventory));
-  const video_probe: OracleGateVideoProbe = {
+  const video_probe: OracleGateFrameDeriver = {
     toolchain: toolHashes,
-    async probe() { return { mime_type: "video/mp4", duration_us: 120_000_000, width: 1280, height: 720, video_stream_index: 0 }; },
+    async probe() { return { mime_type: "video/mp4", duration_us: 120_000_000, width: 1, height: 1, video_stream_index: 0 }; },
     async verify_decodable() { /* fixture probe */ },
+    async derive_frames(input) {
+      return input.requests.map((request) => {
+        const [caseId, role] = request.request_id.split(":") as [string, "static_final" | "uniform_frame"];
+        const caseIndex = inventory.cases.findIndex((item) => item.case_id === caseId);
+        const image = images.get(`${role === "static_final" ? "static" : "uniform"}-${caseIndex + 1}`)!;
+        return {
+          request_id: request.request_id,
+          previous_normalized_pts_us: request.timestamp_us === 0 ? null : request.timestamp_us - 1,
+          selected_normalized_pts_us: request.timestamp_us,
+          selected_frame_ordinal: Math.max(1, Math.floor(request.timestamp_us / 1_000_000)),
+          width: image.width,
+          height: image.height,
+          rgba: image.rgba,
+          argv_sha256: sha(`argv:${request.request_id}`),
+        };
+      });
+    },
   };
   return {
     root,
@@ -408,7 +426,7 @@ describe("Formal Oracle byte preflight", () => {
     await expect(prepareOracleGateBytePreflight(speech)).rejects.toThrow(/segment_ids|transcript/);
 
     const video = await buildFixture();
-    video.video_probe.probe = async () => ({ mime_type: "video/mp4", duration_us: 119_000_000, width: 1280, height: 720, video_stream_index: 0 });
+    video.video_probe.probe = async () => ({ mime_type: "video/mp4", duration_us: 119_000_000, width: 1, height: 1, video_stream_index: 0 });
     await expect(prepareOracleGateBytePreflight(video)).rejects.toThrow("duration_us");
 
     const evidence = await buildFixture();
@@ -436,5 +454,52 @@ describe("Formal Oracle byte preflight", () => {
     fixture.inventory.cases[1].uniform_frame.canonical_pixel_sha256 = "0".repeat(64);
     fixture.inventory.inventory_sha256 = sha(oracleGateByteInventorySha256Preimage(fixture.inventory));
     await expect(prepareOracleGateBytePreflight(fixture)).rejects.toThrow("canonical 像素 SHA-256 不匹配");
+  });
+});
+
+describe("Formal Oracle source-frame derivation preflight", () => {
+  it("binds Static/Uniform canonical PNG bytes to deterministic normalized PTS proofs while API stays closed", async () => {
+    const fixture = await buildFixture();
+    const result = await prepareOracleGateFrameDerivationPreflight({
+      ...fixture,
+      frame_deriver: fixture.video_probe,
+    });
+    expect(result).toMatchObject({
+      schema_version: "oracle-gate-frame-derivation-preflight-v1",
+      status: "untrusted_source_frame_derivation_valid",
+      source_frame_derivation_verified: true,
+      api_execution_allowed: false,
+      case_count: 2,
+    });
+    expect(result.cases.flatMap((item) => [item.static_final, item.uniform_frame]).every((proof) => (
+      proof.selected_normalized_pts_us >= proof.requested_timestamp_us
+      && proof.output.mime_type === "image/png"
+      && proof.proof_sha256 !== "0".repeat(64)
+    ))).toBe(true);
+  });
+
+  it("fails closed on derived pixels, PTS ordering, and lossy frame assets", async () => {
+    const pixels = await buildFixture();
+    const originalPixels = pixels.video_probe.derive_frames.bind(pixels.video_probe);
+    pixels.video_probe.derive_frames = async (input) => {
+      const result = await originalPixels(input);
+      result[0].rgba = Buffer.from(result[1].rgba);
+      return result;
+    };
+    await expect(prepareOracleGateFrameDerivationPreflight({ ...pixels, frame_deriver: pixels.video_probe })).rejects.toThrow("canonical PNG 字节");
+
+    const pts = await buildFixture();
+    const originalPts = pts.video_probe.derive_frames.bind(pts.video_probe);
+    pts.video_probe.derive_frames = async (input) => {
+      const result = await originalPts(input);
+      result[0].selected_normalized_pts_us = result[0].previous_normalized_pts_us ?? 0;
+      return result;
+    };
+    await expect(prepareOracleGateFrameDerivationPreflight({ ...pts, frame_deriver: pts.video_probe })).rejects.toThrow(/selected PTS|preflight 无效/);
+
+    const jpeg = await buildFixture();
+    jpeg.inventory.cases[0].static_final.mime_type = "image/jpeg";
+    jpeg.inventory.inventory_sha256 = sha(oracleGateByteInventorySha256Preimage(jpeg.inventory));
+    await expect(prepareOracleGateFrameDerivationPreflight({ ...jpeg, frame_deriver: jpeg.video_probe })).rejects.toThrow(/mime_type|MIME|canonical PNG/);
   });
 });

@@ -1,6 +1,6 @@
 # Formal Oracle Gate v1：正式四组实验协议
 
-> 状态：`media_byte_preflight_implemented / execution_blocked`
+> 状态：`source_frame_derivation_preflight_implemented / execution_blocked`
 >
 > 日期：2026-08-12
 >
@@ -54,6 +54,9 @@
 - 已实现第三层、但尚未外部 attested 的 `oracle-gate-byte-inventory-v1` 与 `untrusted_media_bytes_valid` 预检：来源 MP4 以单一文件句柄流式重算字节哈希，检查 `ftyp`、ffprobe 元数据并用冻结 ffmpeg 对目标视频流执行完整 decode；ffmpeg/ffprobe 的二进制、版本输出与执行前后文件身份全部固定。static、uniform 与 Oracle comparison 必须逐文件真实解码，并计算编码无关的 `oracle-rgba8-v1` canonical 像素哈希。
 - 语音预检从 Whisper.cpp raw 开始，拒绝重复 JSON key、时间戳/offset 漂移和顶层/分段双重文本，逐字节重建 index、SRT、TXT 与选中片段文本。`signed-speech-alignment-v1` 账本还必须严格闭合 case、source、clip、五份文件引用、segment ID/index/time/text hash 与选中文本；账本正文先形成域分隔 SHA-256，再由进程外 trusted reviewer key 做 canonical Ed25519 签名。不同正文不能复用签字，只验一个“ledger SHA”不算通过。
 - 媒体预检输出继续显式写 `source_frame_derivation_verified=false`：当前证明固定文件字节、真实像素、视频可解码和 ASR 派生链一致，但尚未证明 static/uniform 帧由冻结 ffmpeg 在声明 PTS 自动抽取，也未把全部媒体、语音账本和工具链组合成一个进程外 pinned attestation。当前工具与视频执行仍采用路径执行前后身份复核，不宣称具备不可变 fd/副本级 TOCTOU 证明。因此它不能把账本 capability 升格为执行令牌。
+- 在媒体字节层之上，新增独立的 `oracle-gate-frame-derivation-preflight-v1`。它不改写前一层含义，而是把每个 Static-Final / Uniform 的“时间选择规则”和“帧抽取规则”分别绑定：冻结时间按目标视频流首个可显示帧 PTS 归零，不使用 `-ss`，从流首软件解码并选择第一个 `normalized PTS >= timestamp_us` 的帧；缺失、重复、倒退 PTS、错误绝对流索引、非等比输出、非完整 RGBA8 或多/少帧均 fail-closed。
+- 来源视频先复制到权限为 `0700/0400` 的随机私有 staging，复制字节与冻结 SHA/长度一致后，才用单线程、无硬件加速、禁自动旋转、固定 edit-list/bitexact/nearest 参数抽帧。Static/Uniform 只接受 pinned `pngjs` 生成的 lossless canonical PNG，重新编码后的完整文件字节、长度、SHA、尺寸和 `oracle-rgba8-v1` 像素哈希必须同时等于冻结资产。成功输出可写 `source_frame_derivation_verified=true`，但状态仍是 `untrusted_source_frame_derivation_valid` 且 `api_execution_allowed=false`。
+- 当前仍未把 ffmpeg 动态依赖树或静态工具 capsule 纳入外部 attestation；同一 OS 用户可操作路径时，工具执行前后检查不等于不可变 FD/WORM 证明。因此新层只关闭“图片是否真的来自声明视频 PTS”的工程缺口，不能单独打开正式 API。
 - 已冻结浏览器安全的内容寻址 run/intents/attempt receipts/commits/checkpoints/private answer key/public blind package contracts；完整验证必须提交从 generation 0 到终态的连续 checkpoint 历史。确认无结果只能在剩余 attempt 预算内进入 `RETRY_READY`，ambiguous 请求不得重发，attempt audit 不得重放，verified provenance 逐字段不可变，公开盲包按大小写无关方式拒绝 private answer-key 值。当前只有 contracts 与 cross-validator，尚未实现权限为 `0700/0600` 的真实 run store。
 - 只有资产/语音字节复核、私有 checkpoint store、盲评协议与统计器也在同一受控调用链内通过后才能执行正式 API。
 
