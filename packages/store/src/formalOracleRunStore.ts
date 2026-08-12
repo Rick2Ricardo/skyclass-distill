@@ -50,11 +50,21 @@ import {
   assertFormalOracleInvalidResponseRecordV1,
   assertFormalOracleInvalidResponseArtifactV1,
   createFormalOracleInvalidResponseArtifactV1,
+  createFormalOracleTransportMetadataInvalidResponseArtifactV1,
   hashFormalOracleInvalidResponseRecordV1,
   revalidateFormalOracleInvalidResponseArtifactV1,
   type FormalOracleInvalidResponseArtifactV1,
   type FormalOracleInvalidResponseRecordV1,
 } from "../../contracts/src/oracle-gate-invalid-response.js";
+import {
+  assertFormalOracleTransportCaptureArtifactV1,
+  hashFormalOracleTransportCaptureRecordV1,
+  hashFormalOracleResponsePublicHeadersV1,
+  revalidateFormalOracleTransportCaptureArtifactV1,
+  validateFormalOracleTransportCaptureRecordV1,
+  type FormalOracleTransportCaptureArtifactV1,
+  type FormalOracleTransportCaptureRecordV1,
+} from "../../contracts/src/oracle-gate-transport-capture.js";
 import {
   FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
   FORMAL_ORACLE_USER_PROMPT_VERSION,
@@ -80,6 +90,74 @@ import {
   PrivateContentAddressedFs,
   type PrivateContentAddressedFsOptions,
 } from "./privateContentAddressedFs.js";
+import {
+  assertFormalOracleAuthoritativeTransportCaptureArtifactV1,
+  type FormalOracleAuthoritativeTransportCaptureArtifactV1,
+} from "../../llm/src/formalOracleSingleConsumeSender.js";
+
+export interface FormalOracleSingleConsumeDispatchLease {
+  readonly stage: "durable_dispatch_intent_single_consume_lease";
+  readonly run_sha256: string; readonly execution_plan_sha256: string; readonly request_id: string;
+  readonly intent_sha256: string; readonly attempt_ordinal: number; readonly request_envelope_sha256: string;
+  readonly provider_body_sha256: string; readonly dispatch_head: Readonly<FormalOracleHeadPinV1>;
+  readonly credential_present: false; readonly provider_contact_authorized: false; readonly api_execution_allowed: false;
+}
+
+export interface FormalOracleConsumedDispatchLease {
+  readonly stage: "durable_dispatch_intent_lease_consumed";
+  readonly run_sha256: string; readonly execution_plan_sha256: string; readonly request_id: string;
+  readonly intent_sha256: string; readonly attempt_ordinal: number; readonly request_envelope_sha256: string;
+  readonly provider_body_sha256: string; readonly dispatch_head: Readonly<FormalOracleHeadPinV1>;
+}
+
+type DispatchLeaseState = { status: "available" | "consumed"; receipt: FormalOracleConsumedDispatchLease | null };
+const activeDispatchLeases = new WeakMap<object, DispatchLeaseState>();
+const activeConsumedDispatchLeases = new WeakSet<object>();
+
+class SingleConsumeDispatchLease implements FormalOracleSingleConsumeDispatchLease {
+  readonly stage = "durable_dispatch_intent_single_consume_lease" as const;
+  readonly credential_present = false as const; readonly provider_contact_authorized = false as const; readonly api_execution_allowed = false as const;
+  constructor(readonly run_sha256: string, readonly execution_plan_sha256: string, readonly request_id: string,
+    readonly intent_sha256: string, readonly attempt_ordinal: number, readonly request_envelope_sha256: string,
+    readonly provider_body_sha256: string, readonly dispatch_head: Readonly<FormalOracleHeadPinV1>) { Object.freeze(this); }
+  toJSON(): never { throw new Error("Formal Oracle dispatch lease 是 callback 内临时能力，不得序列化或持久化"); }
+}
+
+class ConsumedDispatchLease implements FormalOracleConsumedDispatchLease {
+  readonly stage = "durable_dispatch_intent_lease_consumed" as const;
+  readonly run_sha256!: string; readonly execution_plan_sha256!: string; readonly request_id!: string; readonly intent_sha256!: string;
+  readonly attempt_ordinal!: number; readonly request_envelope_sha256!: string; readonly provider_body_sha256!: string;
+  readonly dispatch_head!: Readonly<FormalOracleHeadPinV1>;
+  constructor(lease: FormalOracleSingleConsumeDispatchLease) { Object.assign(this, lease); Object.freeze(this); }
+  toJSON(): never { throw new Error("Formal Oracle consumed dispatch lease 不得序列化或持久化"); }
+}
+
+/** Private issuer: only a successful RunStore durable HEAD CAS can reach it. */
+function issueFormalOracleSingleConsumeDispatchLease(input: Omit<FormalOracleSingleConsumeDispatchLease,
+  "stage" | "credential_present" | "provider_contact_authorized" | "api_execution_allowed">): FormalOracleSingleConsumeDispatchLease {
+  const lease = new SingleConsumeDispatchLease(input.run_sha256, input.execution_plan_sha256, input.request_id, input.intent_sha256,
+    input.attempt_ordinal, input.request_envelope_sha256, input.provider_body_sha256, input.dispatch_head);
+  activeDispatchLeases.set(lease, { status: "available", receipt: null });
+  return lease;
+}
+
+export function consumeFormalOracleSingleConsumeDispatchLease(value: FormalOracleSingleConsumeDispatchLease): FormalOracleConsumedDispatchLease {
+  const state = value && typeof value === "object" ? activeDispatchLeases.get(value as object) : undefined;
+  if (!state || state.status !== "available") throw new Error("Formal Oracle dispatch lease 无效、已过期、未经 RunStore HEAD CAS 或已经消费");
+  const receipt = new ConsumedDispatchLease(value); state.status = "consumed"; state.receipt = receipt;
+  activeConsumedDispatchLeases.add(receipt); return receipt;
+}
+
+export function assertActiveFormalOracleConsumedDispatchLease(value: FormalOracleConsumedDispatchLease): void {
+  if (!value || typeof value !== "object" || !activeConsumedDispatchLeases.has(value as object)) {
+    throw new Error("Formal Oracle consumed dispatch lease 无效、已过期、未经 RunStore HEAD CAS 或来自 JSON 伪造");
+  }
+}
+
+function revokeFormalOracleDispatchLease(value: FormalOracleSingleConsumeDispatchLease): void {
+  const state = activeDispatchLeases.get(value as object); activeDispatchLeases.delete(value as object);
+  if (state?.receipt) activeConsumedDispatchLeases.delete(state.receipt as object);
+}
 
 const DEFAULT_RUN_STORE_URI = "board2skill/formal-oracle/run-store";
 
@@ -168,6 +246,12 @@ export interface CommitDispatchIntentInput {
   created_at: string;
 }
 
+/**
+ * Ephemeral authority issued only to the caller that wins the durable dispatch
+ * HEAD CAS. It is deliberately not serializable and must be consumed exactly
+ * once while its callback is active. The lease contains no credential and is
+ * not, by itself, permission to contact a provider.
+ */
 export interface CommitAttemptAuditInput {
   run_sha256: string;
   expected_head: FormalOracleHeadPinV1;
@@ -175,6 +259,7 @@ export interface CommitAttemptAuditInput {
   audit: RequestAttemptAuditV3;
   response_artifact?: FormalOraclePiResponseStreamArtifactV1;
   invalid_response_artifact?: FormalOracleInvalidResponseArtifactV1;
+  transport_capture_artifact?: FormalOracleAuthoritativeTransportCaptureArtifactV1;
   parsed_response?: Record<string, unknown>;
   created_at: string;
 }
@@ -695,6 +780,12 @@ export class FormalOracleRunStore {
     return `runs/${runSha256}/objects/invalid-response-records/${recordSha256}/invalid-response.json`;
   }
 
+  transportCaptureRecordObjectUri(runSha256: string, recordSha256: string): string {
+    assertPrivateSha256(runSha256, "run_sha256");
+    assertPrivateSha256(recordSha256, "transport_capture_record_sha256");
+    return `runs/${runSha256}/objects/transport-captures/${recordSha256}/capture.json`;
+  }
+
   async createSealedRun(input: CreateSealedRunInput): Promise<FormalOracleRunSnapshot> {
     this.assertCreateSealedRunInput(input);
     const runSha = input.run.run_sha256;
@@ -936,6 +1027,32 @@ export class FormalOracleRunStore {
     });
   }
 
+  /**
+   * Commits the immutable request and dispatch intent first. Only the caller
+   * that wins that HEAD CAS receives a callback-scoped, one-shot lease. A
+   * crash or callback failure after the commit intentionally leaves the run in
+   * DISPATCH_INTENT_COMMITTED/block_ambiguous; it never guesses that no request
+   * was sent and never issues another lease for the same attempt.
+   */
+  async withSingleConsumeDispatchLease<T>(
+    input: CommitDispatchIntentInput,
+    callback: (
+      lease: FormalOracleSingleConsumeDispatchLease,
+      dispatchSnapshot: FormalOracleRunSnapshot,
+    ) => Promise<T>,
+  ): Promise<T> {
+    if (typeof callback !== "function") throw new Error("Formal Oracle dispatch lease callback 必须是函数");
+    const snapshot = await this.commitDispatchIntent(input);
+    const lease = issueFormalOracleSingleConsumeDispatchLease({
+      run_sha256: snapshot.run.run_sha256, execution_plan_sha256: snapshot.execution_plan.execution_plan_sha256,
+      request_id: input.intent.request_id, intent_sha256: input.intent.intent_sha256, attempt_ordinal: input.intent.attempt_ordinal,
+      request_envelope_sha256: input.intent.request_envelope_sha256, provider_body_sha256: input.intent.provider_body_sha256,
+      dispatch_head: Object.freeze({ ...snapshot.head_pin }),
+    });
+    try { return await callback(lease, snapshot); }
+    finally { revokeFormalOracleDispatchLease(lease); }
+  }
+
   async commitAttemptAudit(input: CommitAttemptAuditInput): Promise<FormalOracleRunSnapshot> {
     assertPrivateSha256(input.run_sha256, "run_sha256");
     assertPrivateSha256(input.expected_checkpoint_sha256, "expected_checkpoint_sha256");
@@ -962,6 +1079,64 @@ export class FormalOracleRunStore {
       const durableRequest = await this.privateFs.readFile(intent.provider_body_object_uri);
       if (digest(durableEnvelope) !== intent.request_envelope_sha256 || digest(durableRequest) !== intent.provider_body_sha256) {
         throw new Error("Attempt audit 未绑定 durable envelope/provider body bytes");
+      }
+
+      let transportCapture: FormalOracleTransportCaptureRecordV1 | null = null;
+      if (input.audit.outcome === "result_received" || input.audit.outcome === "invalid_response_received"
+        || (input.audit.outcome === "unknown" && input.transport_capture_artifact !== undefined)) {
+        if (input.transport_capture_artifact === undefined || input.audit.transport_capture_record_sha256 === null
+          || input.audit.transport_capture_record_object_uri !== this.transportCaptureRecordObjectUri(input.run_sha256, input.audit.transport_capture_record_sha256)) {
+          throw new Error("Provider response/partial unknown 必须携带当前 run 的 branded transport capture record");
+        }
+        assertFormalOracleAuthoritativeTransportCaptureArtifactV1(input.transport_capture_artifact);
+        assertFormalOracleTransportCaptureArtifactV1(input.transport_capture_artifact);
+        const capture = revalidateFormalOracleTransportCaptureArtifactV1(input.transport_capture_artifact);
+        transportCapture = capture.record;
+        const entity = capture.captured_entity_bytes;
+        const expectedEntitySha = input.audit.fetch_observed_sse_bytes_sha256;
+        if (transportCapture.capture_record_sha256 !== input.audit.transport_capture_record_sha256
+          || transportCapture.run_sha256 !== snapshot.run.run_sha256
+          || transportCapture.execution_plan_sha256 !== snapshot.execution_plan.execution_plan_sha256
+          || transportCapture.request_id !== intent.request_id || transportCapture.intent_sha256 !== intent.intent_sha256
+          || transportCapture.attempt_ordinal !== intent.attempt_ordinal
+          || transportCapture.request_envelope_sha256 !== intent.request_envelope_sha256
+          || transportCapture.provider_body_sha256 !== intent.provider_body_sha256
+          || transportCapture.model !== intent.model
+          || transportCapture.account.provider_id !== input.audit.provider_id
+          || transportCapture.provider_http_request_id !== input.audit.provider_http_request_id
+          || transportCapture.response_http_status !== input.audit.response_http_status
+          || transportCapture.response_content_type !== input.audit.response_content_type
+          || transportCapture.response_headers_commitment_sha256 !== input.audit.response_headers_commitment_sha256
+          || Date.parse(transportCapture.request_started_at) < Date.parse(input.audit.started_at)
+          || Date.parse(transportCapture.capture_finished_at) > Date.parse(input.audit.finished_at)
+          || (transportCapture.response_headers_received_at !== null
+            && (Date.parse(transportCapture.response_headers_received_at) < Date.parse(input.audit.started_at)
+              || Date.parse(transportCapture.response_headers_received_at) > Date.parse(input.audit.finished_at)))
+          || (input.audit.response_headers_commitment_sha256 !== null
+            && hashFormalOracleResponsePublicHeadersV1([...transportCapture.response_public_headers]) !== input.audit.response_headers_commitment_sha256)
+          || (entity === null) !== (transportCapture.captured_entity_bytes_sha256 === null)
+          || (entity !== null && (digest(entity) !== transportCapture.captured_entity_bytes_sha256
+            || entity.byteLength !== transportCapture.captured_entity_byte_length))
+          || ((input.audit.outcome === "result_received" || input.audit.outcome === "invalid_response_received")
+            && (transportCapture.capture_status !== "complete_fetch_entity" || transportCapture.captured_entity_bytes_sha256 !== expectedEntitySha))
+          || (input.audit.outcome === "unknown" && transportCapture.capture_status === "complete_fetch_entity")) {
+          throw new Error("Transport capture 未与 authority/run/intent/audit/entity 精确闭合");
+        }
+        if (entity !== null && transportCapture.captured_entity_bytes_sha256 !== null) {
+          await this.privateFs.publishImmutableObject(
+            this.transportCapturedEntityDirectory(input.run_sha256, transportCapture.captured_entity_bytes_sha256),
+            "entity.bin",
+            entity,
+          );
+        }
+        await this.privateFs.publishImmutableObject(
+          this.transportCaptureRecordDirectory(input.run_sha256, transportCapture.capture_record_sha256),
+          "capture.json",
+          privateCanonicalJsonBytes(transportCapture),
+        );
+      } else if (input.transport_capture_artifact !== undefined || input.audit.transport_capture_record_sha256 !== null
+        || input.audit.transport_capture_record_object_uri !== null) {
+        throw new Error("无网络 capture 的 attempt 不得携带 transport capture record");
       }
 
       if (input.audit.outcome === "result_received") {
@@ -1321,6 +1496,42 @@ export class FormalOracleRunStore {
     }
     const intent = await this.loadIntentUnlocked(run, formalSpec, executionPlan, entryIndex, audit.intent_sha256);
     validationError("Attempt audit against intent", validateRequestAttemptAgainstIntent(intent, audit));
+    if (audit.transport_capture_record_sha256) {
+      if (audit.transport_capture_record_object_uri !== this.transportCaptureRecordObjectUri(run.run_sha256, audit.transport_capture_record_sha256)) {
+        throw new Error("Attempt transport capture URI/content address 无效");
+      }
+      const captureBytes = await this.privateFs.readFile(audit.transport_capture_record_object_uri);
+      const capture = parseCanonicalDocument<FormalOracleTransportCaptureRecordV1>(captureBytes, "Transport capture record");
+      validationError("Transport capture record", validateFormalOracleTransportCaptureRecordV1(capture));
+      const capturedEntitySha = capture.captured_entity_bytes_sha256;
+      const capturedEntity = capture.captured_entity_object_uri === null
+        ? null
+        : await this.privateFs.readFile(capture.captured_entity_object_uri);
+      if (capture.capture_record_sha256 !== audit.transport_capture_record_sha256
+        || hashFormalOracleTransportCaptureRecordV1(capture) !== audit.transport_capture_record_sha256
+        || capture.run_sha256 !== run.run_sha256 || capture.execution_plan_sha256 !== executionPlan.execution_plan_sha256
+        || capture.request_id !== intent.request_id || capture.intent_sha256 !== intent.intent_sha256
+        || capture.attempt_ordinal !== intent.attempt_ordinal || capture.request_envelope_sha256 !== intent.request_envelope_sha256
+        || capture.provider_body_sha256 !== intent.provider_body_sha256 || capture.model !== intent.model
+        || capture.account.provider_id !== audit.provider_id || capture.provider_http_request_id !== audit.provider_http_request_id
+        || capture.response_http_status !== audit.response_http_status || capture.response_content_type !== audit.response_content_type
+        || capture.response_headers_commitment_sha256 !== audit.response_headers_commitment_sha256
+        || Date.parse(capture.request_started_at) < Date.parse(audit.started_at)
+        || Date.parse(capture.capture_finished_at) > Date.parse(audit.finished_at)
+        || (capture.response_headers_received_at !== null
+          && (Date.parse(capture.response_headers_received_at) < Date.parse(audit.started_at)
+            || Date.parse(capture.response_headers_received_at) > Date.parse(audit.finished_at)))
+        || (capturedEntity === null) !== (capturedEntitySha === null)
+        || (capturedEntity !== null && (digest(capturedEntity) !== capturedEntitySha || capturedEntity.byteLength !== capture.captured_entity_byte_length))
+        || (audit.outcome === "result_received" || audit.outcome === "invalid_response_received")
+          && (capture.capture_status !== "complete_fetch_entity" || capturedEntitySha !== audit.fetch_observed_sse_bytes_sha256)
+        || audit.outcome === "unknown" && capture.capture_status === "complete_fetch_entity") {
+        throw new Error("Durable transport capture 无法绑定 run/intent/audit/entity");
+      }
+    } else if (audit.outcome === "result_received" || audit.outcome === "invalid_response_received"
+      || audit.response_capture_status === "response_entity_incomplete_unknown") {
+      throw new Error("Attempt 缺少 mandatory transport capture record");
+    }
     if (audit.outcome === "result_received") await this.verifyResponseObjects(run.run_sha256, intent, audit);
     if (audit.outcome === "invalid_response_received") await this.verifyInvalidResponseObjects(run.run_sha256, executionPlan.items[entryIndex], intent, audit);
     return audit;
@@ -1410,14 +1621,17 @@ export class FormalOracleRunStore {
       throw new Error("Invalid response audit refs 无效");
     }
     const raw = await this.privateFs.readFile(audit.fetch_observed_sse_object_uri);
-    const derived = createFormalOracleInvalidResponseArtifactV1({
+    const rebuildInput = {
       raw_sse_bytes: raw, expected_model: intent.model, expected_arm: expected.arm,
       request_envelope_sha256: intent.request_envelope_sha256, provider_body_sha256: intent.provider_body_sha256,
       expected_max_input_tokens: intent.max_input_tokens, expected_max_output_tokens: intent.max_output_tokens,
-    });
+    };
     const recordBytes = await this.privateFs.readFile(audit.invalid_response_record_object_uri);
     const durableRecord = parseCanonicalDocument<FormalOracleInvalidResponseRecordV1>(recordBytes, "Invalid response record");
     assertFormalOracleInvalidResponseRecordV1(durableRecord);
+    const derived = durableRecord.failure_stage === "transport_metadata_invalid"
+      ? createFormalOracleTransportMetadataInvalidResponseArtifactV1(rebuildInput)
+      : createFormalOracleInvalidResponseArtifactV1(rebuildInput);
     if (digest(raw) !== audit.fetch_observed_sse_bytes_sha256 || raw.byteLength !== audit.fetch_observed_sse_byte_length
       || derived.record.invalid_response_record_sha256 !== audit.invalid_response_record_sha256
       || hashFormalOracleInvalidResponseRecordV1(durableRecord) !== durableRecord.invalid_response_record_sha256
@@ -1725,6 +1939,12 @@ export class FormalOracleRunStore {
   }
   private invalidResponseRecordDirectory(runSha256: string, recordSha256: string): string {
     return `${this.runPath(runSha256)}/objects/invalid-response-records/${recordSha256}`;
+  }
+  private transportCaptureRecordDirectory(runSha256: string, recordSha256: string): string {
+    return `${this.runPath(runSha256)}/objects/transport-captures/${recordSha256}`;
+  }
+  private transportCapturedEntityDirectory(runSha256: string, entitySha256: string): string {
+    return `${this.runPath(runSha256)}/objects/transport-captured-entities/${entitySha256}`;
   }
   private committedRequestDirectory(runSha256: string, committedSha256: string): string {
     return `${this.runPath(runSha256)}/objects/committed-requests/${committedSha256}`;

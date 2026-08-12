@@ -28,7 +28,7 @@ function fullProof(): FormalOraclePiFetchBoundaryProofV1 {
     normalized_usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2, cache_read_tokens: 0, cache_write_tokens: 0, reasoning_tokens: 0 },
     provider_response_scope: "untrusted_sse_entity_strict_derivation_only",
     store_integration_status: "formal_run_store_v2_abcd_integrated",
-    external_provider_response_status: "pending_endpoint_account_exactly_once_and_capture",
+    external_provider_response_status: "transport_capture_record_required_for_authoritative_source",
     api_execution_allowed: false,
   };
   sse.proof_sha256 = hashFormalOraclePiResponseStreamProofV1(sse);

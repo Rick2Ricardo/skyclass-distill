@@ -45,7 +45,7 @@ export interface FormalOraclePiResponseStreamProofV1 {
   normalized_usage: FormalOraclePiNormalizedUsageV1;
   provider_response_scope: "untrusted_sse_entity_strict_derivation_only";
   store_integration_status: "formal_run_store_v2_abcd_integrated";
-  external_provider_response_status: "pending_endpoint_account_exactly_once_and_capture";
+  external_provider_response_status: "transport_capture_record_required_for_authoritative_source";
   api_execution_allowed: false;
 }
 
@@ -119,7 +119,7 @@ export function validateFormalOraclePiResponseStreamProofV1(input: unknown): { v
   }
   if (input.provider_response_scope !== "untrusted_sse_entity_strict_derivation_only"
     || input.store_integration_status !== "formal_run_store_v2_abcd_integrated"
-    || input.external_provider_response_status !== "pending_endpoint_account_exactly_once_and_capture"
+    || input.external_provider_response_status !== "transport_capture_record_required_for_authoritative_source"
     || input.api_execution_allowed !== false) issues.push("Pi SSE proof 信任/API 边界无效");
   if (!isRecord(input.raw_usage) || !isRecord(input.normalized_usage)) issues.push("Pi SSE proof usage 缺失");
   else {
@@ -340,7 +340,7 @@ function parseStream(input: {
     }),
     provider_response_scope: "untrusted_sse_entity_strict_derivation_only",
     store_integration_status: "formal_run_store_v2_abcd_integrated",
-    external_provider_response_status: "pending_endpoint_account_exactly_once_and_capture",
+    external_provider_response_status: "transport_capture_record_required_for_authoritative_source",
     api_execution_allowed: false,
   };
   proofDraft.proof_sha256 = hashFormalOraclePiResponseStreamProofV1(proofDraft);

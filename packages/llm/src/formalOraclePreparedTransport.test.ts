@@ -59,7 +59,7 @@ describe("Formal Oracle non-production Pi fetch-boundary proof", () => {
         done_count: 1,
         provider_response_scope: "untrusted_sse_entity_strict_derivation_only",
         store_integration_status: "formal_run_store_v2_abcd_integrated",
-        external_provider_response_status: "pending_endpoint_account_exactly_once_and_capture",
+        external_provider_response_status: "transport_capture_record_required_for_authoritative_source",
         api_execution_allowed: false,
       },
     });

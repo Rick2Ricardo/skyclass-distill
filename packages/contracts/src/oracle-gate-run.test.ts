@@ -107,7 +107,7 @@ function intent(run = formalRun()): RequestIntentV1 {
 
 function attempt(request = intent()): RequestAttemptAuditV3 {
   const value: RequestAttemptAuditV3 = {
-    schema_version: "oracle-gate-request-attempt-audit-v3",
+    schema_version: "oracle-gate-request-attempt-audit-v4",
     attempt_sha256: HASH,
     run_sha256: request.run_sha256,
     request_id: request.request_id,
@@ -119,6 +119,12 @@ function attempt(request = intent()): RequestAttemptAuditV3 {
     latency_ms: 1000,
     provider_id: "fixture-provider",
     provider_http_request_id: "provider-http-request-1",
+    transport_capture_record_object_uri: `objects/transport-captures/${"8".repeat(64)}/capture.json`,
+    transport_capture_record_sha256: "8".repeat(64),
+    response_http_status: 200,
+    response_content_type: "text/event-stream",
+    response_headers_commitment_sha256: "7".repeat(64),
+    response_capture_status: "fetch_observed_complete_entity",
     completion_id: "chatcmpl-fixture-1",
     request_envelope_sha256: request.request_envelope_sha256,
     request_envelope_object_uri: request.request_envelope_object_uri,
@@ -200,6 +206,12 @@ function clearResponseChain(receipt: RequestAttemptAuditV3): void {
   receipt.canonical_response_object_uri = null;
   receipt.canonical_response_bytes_sha256 = null;
   receipt.canonical_response_commitment_sha256 = null;
+  receipt.response_http_status = null;
+  receipt.response_content_type = null;
+  receipt.response_headers_commitment_sha256 = null;
+  receipt.response_capture_status = "no_response_headers";
+  receipt.transport_capture_record_object_uri = null;
+  receipt.transport_capture_record_sha256 = null;
 }
 
 function entry(state: OracleGateCheckpointEntryV1["state"], request = intent(), receipt = attempt(request), record = committed(request, receipt)): OracleGateCheckpointEntryV1 {
@@ -333,6 +345,12 @@ describe("Formal Oracle content-addressed run contracts", () => {
     invalid.invalid_response_record_version = "formal-oracle-invalid-response-v1";
     invalid.outcome = "invalid_response_received";
     invalid.provider_response_received = true;
+    invalid.response_http_status = 200;
+    invalid.response_content_type = "text/event-stream";
+    invalid.response_headers_commitment_sha256 = "8".repeat(64);
+    invalid.response_capture_status = "fetch_observed_complete_entity";
+    invalid.transport_capture_record_object_uri = `objects/transport-captures/${"8".repeat(64)}/capture.json`;
+    invalid.transport_capture_record_sha256 = "8".repeat(64);
     invalid.stop_reason = null;
     invalid.error_code = "invalid_response_received";
     invalid.error_message = null;
@@ -350,9 +368,11 @@ describe("Formal Oracle content-addressed run contracts", () => {
     partial.attempt_sha256 = hashRequestAttemptAudit(partial);
     expect(validateRequestAttemptAudit(partial).issues.some((item) => item.message.includes("B/C"))).toBe(true);
 
-    const oldAttempt = { ...invalid, schema_version: "oracle-gate-request-attempt-audit-v2" } as unknown as RequestAttemptAuditV3;
-    oldAttempt.attempt_sha256 = hashRequestAttemptAudit(oldAttempt);
-    expect(validateRequestAttemptAudit(oldAttempt).issues.some((item) => item.path === "schema_version")).toBe(true);
+    for (const schemaVersion of ["oracle-gate-request-attempt-audit-v2", "oracle-gate-request-attempt-audit-v3"]) {
+      const oldAttempt = { ...invalid, schema_version: schemaVersion } as unknown as RequestAttemptAuditV3;
+      oldAttempt.attempt_sha256 = hashRequestAttemptAudit(oldAttempt);
+      expect(validateRequestAttemptAudit(oldAttempt).issues.some((item) => item.path === "schema_version")).toBe(true);
+    }
     const oldCommit = { ...committed(request, attempt(request)), schema_version: "oracle-gate-committed-request-v2" } as unknown as CommittedRequestV3;
     oldCommit.committed_request_sha256 = hashCommittedRequest(oldCommit);
     expect(validateCommittedRequestAgainstAttempt(request, attempt(request), oldCommit).issues.some((item) => item.path.includes("schema_version"))).toBe(true);
@@ -419,6 +439,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     const unknown = attempt(request);
     unknown.outcome = "unknown";
     unknown.provider_response_received = false;
+    unknown.provider_http_request_id = null;
     clearResponseChain(unknown);
     unknown.stop_reason = null;
     unknown.error_code = "transport_outcome_unknown";
@@ -534,6 +555,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     const firstAttempt = attempt(firstIntent);
     firstAttempt.outcome = "unknown";
     firstAttempt.provider_response_received = false;
+    firstAttempt.provider_http_request_id = null;
     clearResponseChain(firstAttempt);
     firstAttempt.stop_reason = null;
     firstAttempt.error_code = "transport_outcome_unknown";

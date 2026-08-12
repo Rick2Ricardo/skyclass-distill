@@ -12,6 +12,7 @@ export const FORMAL_ORACLE_INVALID_RESPONSE_DOMAIN = "skyclass/formal-oracle/inv
 export const FORMAL_ORACLE_INVALID_RESPONSE_DETAIL_DOMAIN = "skyclass/formal-oracle/invalid-response-detail/v1\0";
 
 export type FormalOracleInvalidResponseFailureStage =
+  | "transport_metadata_invalid"
   | "sse_protocol_invalid"
   | "assistant_json_invalid"
   | "response_schema_invalid";
@@ -35,7 +36,7 @@ export interface FormalOracleInvalidResponseRecordV1 {
   assistant_content_bytes_sha256: string | null;
   assistant_content_byte_length: number | null;
   provider_response_scope: "untrusted_complete_fetch_entity_invalid_derivation_only";
-  external_provider_response_status: "pending_endpoint_header_raw_capture_exactly_once";
+  external_provider_response_status: "transport_capture_record_required_for_authoritative_source";
   api_execution_allowed: false;
 }
 
@@ -58,6 +59,7 @@ interface InvalidResponseInput {
   provider_body_sha256: string;
   expected_max_input_tokens: number;
   expected_max_output_tokens: number;
+  failure_stage_override?: "transport_metadata_invalid";
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -109,7 +111,7 @@ function assertUnicodeScalarString(value: string, label: string): void {
 }
 
 function assertInputs(input: InvalidResponseInput): void {
-  if (!(input.raw_sse_bytes instanceof Uint8Array) || input.raw_sse_bytes.byteLength === 0
+  if (!(input.raw_sse_bytes instanceof Uint8Array)
     || input.raw_sse_bytes.byteLength > FORMAL_ORACLE_PI_RESPONSE_STREAM_MAX_BYTES) throw new Error("Invalid response raw bytes 长度无效或超限");
   if (!/^[a-f0-9]{64}$/.test(input.request_envelope_sha256) || !/^[a-f0-9]{64}$/.test(input.provider_body_sha256)) throw new Error("Invalid response 双请求根无效");
   if (!input.expected_model || input.expected_model.trim() !== input.expected_model || input.expected_model.length > 256) throw new Error("Invalid response expected model 无效");
@@ -130,7 +132,7 @@ export function assertFormalOracleInvalidResponseRecordV1(value: unknown): asser
     "external_provider_response_status", "api_execution_allowed",
   ])) throw new Error("Invalid response record 字段集合无效");
   const record = value as unknown as FormalOracleInvalidResponseRecordV1;
-  if (!Number.isSafeInteger(record.fetch_observed_sse_byte_length) || record.fetch_observed_sse_byte_length <= 0
+  if (!Number.isSafeInteger(record.fetch_observed_sse_byte_length) || record.fetch_observed_sse_byte_length < 0
     || record.fetch_observed_sse_byte_length > FORMAL_ORACLE_PI_RESPONSE_STREAM_MAX_BYTES
     || !isSha(record.request_envelope_sha256) || !isSha(record.provider_body_sha256)
     || !record.expected_model || record.expected_model.trim() !== record.expected_model || record.expected_model.length > 256
@@ -143,13 +145,13 @@ export function assertFormalOracleInvalidResponseRecordV1(value: unknown): asser
   if (record.schema_version !== FORMAL_ORACLE_INVALID_RESPONSE_VERSION
     || record.strict_sse_parser_version !== FORMAL_ORACLE_PI_RESPONSE_STREAM_VERSION
     || !isSha(record.invalid_response_record_sha256) || !isSha(record.fetch_observed_sse_bytes_sha256)
-    || !["sse_protocol_invalid", "assistant_json_invalid", "response_schema_invalid"].includes(record.failure_stage)
+    || !["transport_metadata_invalid", "sse_protocol_invalid", "assistant_json_invalid", "response_schema_invalid"].includes(record.failure_stage)
     || record.failure_code !== record.failure_stage
     || record.failure_detail_commitment_sha256 !== failureDetailCommitment(record.failure_stage)
     || record.provider_response_scope !== "untrusted_complete_fetch_entity_invalid_derivation_only"
-    || record.external_provider_response_status !== "pending_endpoint_header_raw_capture_exactly_once"
+    || record.external_provider_response_status !== "transport_capture_record_required_for_authoritative_source"
     || record.api_execution_allowed !== false) throw new Error("Invalid response record 固定字段或根绑定无效");
-  const hasDerivedLayers = record.failure_stage !== "sse_protocol_invalid";
+  const hasDerivedLayers = record.failure_stage === "assistant_json_invalid" || record.failure_stage === "response_schema_invalid";
   if ((hasDerivedLayers && (!isSha(record.sse_derivation_record_sha256) || !isSha(record.assistant_content_bytes_sha256)
       || !Number.isSafeInteger(record.assistant_content_byte_length) || Number(record.assistant_content_byte_length) <= 0))
     || (!hasDerivedLayers && (record.sse_derivation_record_sha256 !== null || record.assistant_content_bytes_sha256 !== null
@@ -165,6 +167,9 @@ function derive(input: InvalidResponseInput): {
   assistant_content_bytes: Uint8Array | null;
 } {
   assertInputs(input);
+  if (input.failure_stage_override === "transport_metadata_invalid") {
+    return make("transport_metadata_invalid", input, null, null);
+  }
   let stage: FormalOracleInvalidResponseFailureStage;
   let proof: FormalOraclePiResponseStreamProofV1 | null = null;
   let assistant: Uint8Array | null = null;
@@ -217,7 +222,7 @@ function make(
     assistant_content_bytes_sha256: proof?.assistant_content_sha256 ?? null,
     assistant_content_byte_length: proof?.assistant_content_byte_length ?? null,
     provider_response_scope: "untrusted_complete_fetch_entity_invalid_derivation_only",
-    external_provider_response_status: "pending_endpoint_header_raw_capture_exactly_once",
+    external_provider_response_status: "transport_capture_record_required_for_authoritative_source",
     api_execution_allowed: false,
   };
   draft.invalid_response_record_sha256 = hashFormalOracleInvalidResponseRecordV1(draft);
@@ -239,6 +244,31 @@ export function createFormalOracleInvalidResponseArtifactV1(input: InvalidRespon
   return artifact;
 }
 
+/**
+ * Persists a complete fetch entity whose HTTP status or content type is outside
+ * the frozen successful transport profile. The bytes remain evidence, but no
+ * SSE, assistant-content, or schema authority is claimed.
+ */
+export function createFormalOracleTransportMetadataInvalidResponseArtifactV1(
+  input: Omit<InvalidResponseInput, "failure_stage_override">,
+): FormalOracleInvalidResponseArtifactV1 {
+  const frozenInput: InvalidResponseInput = {
+    ...input,
+    raw_sse_bytes: Uint8Array.from(input.raw_sse_bytes),
+    failure_stage_override: "transport_metadata_invalid",
+  };
+  const derived = derive(frozenInput);
+  const artifact = Object.freeze({
+    record: derived.record,
+    raw_sse_bytes: Uint8Array.from(frozenInput.raw_sse_bytes),
+    sse_derivation: null,
+    assistant_content_bytes: null,
+  });
+  activeArtifacts.add(artifact);
+  artifactInputs.set(artifact, frozenInput);
+  return artifact;
+}
+
 export function assertFormalOracleInvalidResponseArtifactV1(value: FormalOracleInvalidResponseArtifactV1): void {
   if (!value || typeof value !== "object" || !activeArtifacts.has(value as object)) throw new Error("Invalid response artifact 无效或由调用方伪造");
 }
@@ -247,7 +277,9 @@ export function revalidateFormalOracleInvalidResponseArtifactV1(value: FormalOra
   assertFormalOracleInvalidResponseArtifactV1(value);
   const inputs = artifactInputs.get(value as object);
   if (!inputs) throw new Error("Invalid response artifact 缺少进程内 provenance");
-  const rebuilt = createFormalOracleInvalidResponseArtifactV1({ ...inputs, raw_sse_bytes: value.raw_sse_bytes });
+  const rebuilt = inputs.failure_stage_override === "transport_metadata_invalid"
+    ? createFormalOracleTransportMetadataInvalidResponseArtifactV1({ ...inputs, raw_sse_bytes: value.raw_sse_bytes })
+    : createFormalOracleInvalidResponseArtifactV1({ ...inputs, raw_sse_bytes: value.raw_sse_bytes });
   const sameAssistant = rebuilt.assistant_content_bytes === null && value.assistant_content_bytes === null
     || rebuilt.assistant_content_bytes !== null && value.assistant_content_bytes !== null
       && rebuilt.assistant_content_bytes.byteLength === value.assistant_content_bytes.byteLength

@@ -5,6 +5,7 @@ import {
   assertFormalOracleInvalidResponseArtifactV1,
   assertFormalOracleInvalidResponseRecordV1,
   createFormalOracleInvalidResponseArtifactV1,
+  createFormalOracleTransportMetadataInvalidResponseArtifactV1,
   hashFormalOracleInvalidResponseRecordV1,
   revalidateFormalOracleInvalidResponseArtifactV1,
 } from "./oracle-gate-invalid-response.js";
@@ -36,12 +37,35 @@ function invalid(raw_sse_bytes: Uint8Array, expected_arm = "transcript_only" as 
 }
 
 describe("formal-oracle-invalid-response-v1", () => {
+  it("records complete entities with invalid transport metadata without claiming B/C derivation", () => {
+    const raw = sse(canonicalOracleGateResponseBytes(goodResponse));
+    const artifact = createFormalOracleTransportMetadataInvalidResponseArtifactV1({
+      raw_sse_bytes: raw, expected_model: "model-v1", expected_arm: "transcript_only", ...hashes,
+      expected_max_input_tokens: 100, expected_max_output_tokens: 50,
+    });
+    expect(artifact.record).toMatchObject({
+      failure_stage: "transport_metadata_invalid",
+      failure_code: "transport_metadata_invalid",
+      fetch_observed_sse_bytes_sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      sse_derivation_record_sha256: null,
+      assistant_content_bytes_sha256: null,
+    });
+    expect(artifact.raw_sse_bytes).toEqual(raw);
+    expect(() => assertFormalOracleInvalidResponseRecordV1(artifact.record)).not.toThrow();
+    expect(revalidateFormalOracleInvalidResponseArtifactV1(artifact).record).toEqual(artifact.record);
+    expect(() => createFormalOracleInvalidResponseArtifactV1({
+      raw_sse_bytes: raw, expected_model: "model-v1", expected_arm: "transcript_only", ...hashes,
+      expected_max_input_tokens: 100, expected_max_output_tokens: 50,
+    })).toThrow("不能构造 invalid");
+  });
+
   it("rejects a response that passes SSE, assistant JSON and frozen arm schema", () => {
     expect(() => invalid(sse(canonicalOracleGateResponseBytes(goodResponse)))).toThrow("不能构造 invalid");
   });
 
   it("classifies strict SSE failures without B/C and binds a domain-addressed record", () => {
     for (const raw of [
+      new Uint8Array(),
       new TextEncoder().encode("data: {}\n\n"),
       Uint8Array.from([0xff]),
       new TextEncoder().encode('data: {"x":1,"x":2}\n\ndata: [DONE]\n\n'),
@@ -50,7 +74,7 @@ describe("formal-oracle-invalid-response-v1", () => {
       expect(artifact.record).toMatchObject({
         failure_stage: "sse_protocol_invalid", failure_code: "sse_protocol_invalid",
         sse_derivation_record_sha256: null, assistant_content_bytes_sha256: null,
-        external_provider_response_status: "pending_endpoint_header_raw_capture_exactly_once",
+        external_provider_response_status: "transport_capture_record_required_for_authoritative_source",
         api_execution_allowed: false,
       });
       expect(hashFormalOracleInvalidResponseRecordV1(artifact.record)).toBe(artifact.record.invalid_response_record_sha256);
