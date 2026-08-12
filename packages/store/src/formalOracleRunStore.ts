@@ -29,6 +29,11 @@ import {
   type FormalOraclePiRequestEnvelopeV1,
 } from "../../contracts/src/oracle-gate-request.js";
 import {
+  FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
+  FORMAL_ORACLE_USER_PROMPT_VERSION,
+  parseFormalOracleUserPromptBytes,
+} from "../../contracts/src/oracle-gate-user-prompt.js";
+import {
   hashFormalRunContract,
   hashCommittedRequest,
   hashPublicBlindResponse,
@@ -349,6 +354,10 @@ function assertStrictFormalSpec(spec: OracleGateFormalSpec, run: FormalRunContra
   if (spec.prompt.output_schema_sha256 !== ORACLE_GATE_RESPONSE_SCHEMA_SHA256) {
     throw new Error("Formal spec output_schema_sha256 未绑定共享 Oracle Gate response schema");
   }
+  if (spec.prompt.version !== FORMAL_ORACLE_USER_PROMPT_VERSION
+    || spec.prompt.user_template_sha256 !== FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256) {
+    throw new Error("Formal spec prompt 未绑定 shared deterministic user prompt renderer/template");
+  }
 }
 
 function assertScheduleVisual(raw: OracleGateRunVisualV1, label: string, spec: OracleGateFormalSpec): void {
@@ -509,6 +518,7 @@ function assertEnvelopeMatchesExecutionPlan(
   expected: FormalOracleExecutionPlanItemV1,
   spec: OracleGateFormalSpec,
 ): void {
+  const parsedUser = parseFormalOracleUserPromptBytes(new TextEncoder().encode(envelope.rendered_user_prompt));
   if (envelope.request_id !== expected.request_id || envelope.schedule_index !== expected.schedule_index
     || envelope.case_id !== expected.case_id || envelope.arm !== expected.arm || envelope.model !== expected.model
     || envelope.system_prompt_sha256 !== expected.system_prompt_sha256
@@ -521,6 +531,7 @@ function assertEnvelopeMatchesExecutionPlan(
     || envelope.transport !== expected.transport || envelope.cache_retention !== expected.cache_retention
     || envelope.tools_policy !== expected.tools_policy || envelope.inner_provider_retries !== 0
     || envelope.outer_retry_owner !== "formal_run_store" || envelope.provider_binding_status !== "pending_external_runtime_binding"
+    || parsedUser.evidence_availability["visual-1"] !== (expected.arm !== "transcript_only")
     || envelope.visuals.length !== expected.visuals.length
     || envelope.visuals.some((visual, index) => {
       const planned = expected.visuals[index];

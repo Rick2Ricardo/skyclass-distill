@@ -1,4 +1,11 @@
 import { sha256Hex } from "./sha256.js";
+import {
+  FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
+  assertFormalOracleUserPromptArtifact,
+  parseFormalOracleUserPromptBytes,
+  type FormalOracleUserPromptArtifact,
+} from "./oracle-gate-user-prompt.js";
+import { ORACLE_GATE_RESPONSE_SCHEMA_SHA256 } from "./oracle-gate-response.js";
 
 export const FORMAL_ORACLE_PI_REQUEST_ENVELOPE_VERSION = "formal-oracle-pi-request-envelope-v1" as const;
 
@@ -48,9 +55,8 @@ export interface FormalOraclePiRequestBuildInput {
   model: string;
   system_prompt_bytes: Uint8Array;
   expected_system_prompt_sha256: string;
-  rendered_user_prompt_bytes: Uint8Array;
+  user_prompt: FormalOracleUserPromptArtifact;
   expected_rendered_user_prompt_sha256: string;
-  user_template_bytes: Uint8Array;
   expected_user_template_sha256: string;
   output_schema_sha256: string;
   visuals: Array<{ label: "visual-1"; mime_type: "image/jpeg"; bytes: Uint8Array; expected_sha256: string; expected_byte_length: number }>;
@@ -235,11 +241,17 @@ function validate(value: unknown): asserts value is FormalOraclePiRequestEnvelop
   if (!["transcript_only", "static_final_board", "uniform_frame", "oracle_delta"].includes(String(value.arm))) throw new Error("Formal request arm 无效");
   if (typeof value.system_prompt !== "string" || !value.system_prompt.length || typeof value.rendered_user_prompt !== "string" || !value.rendered_user_prompt.length) throw new Error("Formal request prompt 不能为空");
   for (const field of ["system_prompt_sha256", "rendered_user_prompt_sha256", "user_template_sha256", "output_schema_sha256"] as const) if (!sha(value[field])) throw new Error("Formal request " + field + " 无效");
+  if (value.user_template_sha256 !== FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256) throw new Error("Formal request user_template_sha256 未绑定固定 template");
+  if (value.output_schema_sha256 !== ORACLE_GATE_RESPONSE_SCHEMA_SHA256) throw new Error("Formal request output_schema_sha256 未绑定共享 response schema");
   if (sha256Hex(new TextEncoder().encode(value.system_prompt)) !== value.system_prompt_sha256
     || sha256Hex(new TextEncoder().encode(value.rendered_user_prompt)) !== value.rendered_user_prompt_sha256) throw new Error("Formal request prompt text/hash 不匹配");
+  // This independently validates the embedded prompt's fixed output_schema.
+  // It applies equally to builder output and directly parsed canonical bytes.
+  const parsedUser = parseFormalOracleUserPromptBytes(new TextEncoder().encode(value.rendered_user_prompt));
   if (!dense(value.visuals)) throw new Error("Formal request visuals 必须是稠密数组");
   const count = value.arm === "transcript_only" ? 0 : 1;
   if (value.visuals.length !== count) throw new Error("Formal request arm visual 数量无效");
+  if (parsedUser.evidence_availability["visual-1"] !== (count === 1)) throw new Error("Formal request user prompt evidence availability 未绑定 arm visuals");
   value.visuals.forEach((raw, index) => {
     if (!record(raw)) throw new Error("Formal request visual 必须是对象");
     keys(raw, ["label", "mime_type", "sha256", "byte_length", "data_base64"], "Formal request visual");
@@ -265,11 +277,20 @@ function artifact(envelope: FormalOraclePiRequestEnvelopeV1, bytes: Uint8Array):
 }
 
 export function buildFormalOraclePiRequestEnvelope(input: FormalOraclePiRequestBuildInput): FormalOraclePiRequestArtifact {
-  const system = utf8(input.system_prompt_bytes, "system_prompt_bytes"), user = utf8(input.rendered_user_prompt_bytes, "rendered_user_prompt_bytes");
-  utf8(input.user_template_bytes, "user_template_bytes");
+  assertFormalOracleUserPromptArtifact(input.user_prompt);
+  if (input.output_schema_sha256 !== ORACLE_GATE_RESPONSE_SCHEMA_SHA256) throw new Error("Formal request output_schema_sha256 未绑定共享 response schema");
+  const system = utf8(input.system_prompt_bytes, "system_prompt_bytes");
+  const parsedUser = parseFormalOracleUserPromptBytes(input.user_prompt.bytes);
+  const user = utf8(input.user_prompt.bytes, "rendered_user_prompt_bytes");
   if (sha256Hex(input.system_prompt_bytes) !== input.expected_system_prompt_sha256
-    || sha256Hex(input.rendered_user_prompt_bytes) !== input.expected_rendered_user_prompt_sha256
-    || sha256Hex(input.user_template_bytes) !== input.expected_user_template_sha256) throw new Error("Formal request prompt/template bytes/hash 不匹配");
+    || sha256Hex(input.user_prompt.bytes) !== input.expected_rendered_user_prompt_sha256
+    || input.user_prompt.prompt_sha256 !== input.expected_rendered_user_prompt_sha256
+    || input.user_prompt.user_template_sha256 !== input.expected_user_template_sha256) throw new Error("Formal request prompt/template bytes/hash 不匹配");
+  const visualInputAvailable = input.arm !== "transcript_only";
+  if (input.user_prompt.visual_input_available !== visualInputAvailable
+    || parsedUser.evidence_availability["visual-1"] !== visualInputAvailable) {
+    throw new Error("Formal request user prompt evidence availability 未绑定 arm visuals");
+  }
   const envelope: FormalOraclePiRequestEnvelopeV1 = {
     schema_version: FORMAL_ORACLE_PI_REQUEST_ENVELOPE_VERSION, request_id: input.request_id, schedule_index: input.schedule_index,
     case_id: input.case_id, arm: input.arm, model: input.model, system_prompt: system, system_prompt_sha256: input.expected_system_prompt_sha256,

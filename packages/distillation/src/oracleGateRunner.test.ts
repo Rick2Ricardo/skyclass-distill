@@ -68,7 +68,7 @@ function pilot(sha256: string): OraclePilotPackage {
 const config: OracleGateSmokeConfig = {
   schema_version: "oracle-gate-smoke-config-v1",
   prompt_version: "oracle-gate-prompt-v1",
-  output_schema_version: "oracle-gate-response-v1",
+  output_schema_version: "teacher-evidence-response-v1",
   seeds: [17],
   temperature: 0,
   max_output_tokens: 1024,
@@ -126,7 +126,7 @@ describe("Oracle Gate executable smoke", () => {
         calls.push({ imageCount: images.length, control, audit });
         return {
           value: {
-            schema_version: "oracle-gate-response-v1",
+            schema_version: "teacher-evidence-response-v1",
             observed_board_actions: [],
             generalized_teaching_capability: { name: "证据约束讲解", mechanism: "先观察再抽象", action_program: ["确认可见变化"] },
             evidence_claims: [],
@@ -175,7 +175,7 @@ describe("Oracle Gate executable smoke", () => {
 
   it("rejects nested condition leakage and evidence slots unavailable to the text arm", () => {
     const response = {
-      schema_version: "oracle-gate-response-v1",
+      schema_version: "teacher-evidence-response-v1",
       observed_board_actions: [],
       generalized_teaching_capability: { name: "能力", mechanism: "机制", action_program: ["动作"] },
       evidence_claims: [{ claim: "看到了图", evidence_slot: "visual-1" }],

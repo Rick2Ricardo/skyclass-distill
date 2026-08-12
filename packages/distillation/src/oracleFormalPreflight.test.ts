@@ -6,6 +6,9 @@ import {
   canonicalOracleGateFormalInputPayload,
   canonicalOracleGateFormalSpecPayload,
   canonicalSignedGoldDatasetPayload,
+  FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
+  FORMAL_ORACLE_USER_PROMPT_VERSION,
+  ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
   type GoldReviewDecisionRecord,
   type GoldReviewEvent,
   type OracleGateFormalInputManifest,
@@ -203,10 +206,10 @@ function spec(input: OracleGateFormalInputManifest): OracleGateFormalSpec {
     temperature: 0,
     seeds: [11, 23, 47],
     prompt: {
-      version: "oracle-gate-formal-prompt-v1",
+      version: FORMAL_ORACLE_USER_PROMPT_VERSION,
       system_sha256: "a".repeat(64),
-      user_template_sha256: "b".repeat(64),
-      output_schema_sha256: "c".repeat(64),
+      user_template_sha256: FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
+      output_schema_sha256: ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
     },
     budget: {
       max_input_tokens: 8192,

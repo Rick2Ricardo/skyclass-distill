@@ -7,16 +7,31 @@ import {
   parseFormalOraclePiRequestEnvelopeBytes,
   type FormalOraclePiRequestBuildInput,
 } from "./oracle-gate-request.js";
+import {
+  FORMAL_ORACLE_USER_PROMPT_TEMPLATE_BYTES,
+  FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
+  FORMAL_ORACLE_USER_PROMPT_VERSION,
+  renderFormalOracleUserPrompt,
+} from "./oracle-gate-user-prompt.js";
+import { ORACLE_GATE_RESPONSE_SCHEMA_SHA256 } from "./oracle-gate-response.js";
 
 const text = (value: string) => new TextEncoder().encode(value);
 
 function fixture(visual = true): FormalOraclePiRequestBuildInput {
-  const system = text("system\n"), user = text("user\n"), template = text("template {{case}}\n"), image = Uint8Array.from([1, 2, 3, 4]);
+  const system = text("system\n"), transcript = text("trusted transcript\n"), image = Uint8Array.from([1, 2, 3, 4]);
+  const user = renderFormalOracleUserPrompt({
+    prompt_version: FORMAL_ORACLE_USER_PROMPT_VERSION,
+    user_template_bytes: FORMAL_ORACLE_USER_PROMPT_TEMPLATE_BYTES,
+    expected_user_template_sha256: FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
+    selected_transcript_bytes: transcript, expected_selected_transcript_sha256: sha256Hex(transcript),
+    expected_selected_transcript_byte_length: transcript.byteLength, visual_input_available: visual,
+    output_schema_sha256: ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
+  });
   return {
     request_id: "FREQ-1", schedule_index: 0, case_id: "FCASE-1", arm: visual ? "static_final_board" : "transcript_only",
     model: "formal-model", system_prompt_bytes: system, expected_system_prompt_sha256: sha256Hex(system),
-    rendered_user_prompt_bytes: user, expected_rendered_user_prompt_sha256: sha256Hex(user),
-    user_template_bytes: template, expected_user_template_sha256: sha256Hex(template), output_schema_sha256: "a".repeat(64),
+    user_prompt: user, expected_rendered_user_prompt_sha256: user.prompt_sha256,
+    expected_user_template_sha256: FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256, output_schema_sha256: ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
     visuals: visual ? [{ label: "visual-1", mime_type: "image/jpeg", bytes: image, expected_sha256: sha256Hex(image), expected_byte_length: 4 }] : [],
     seed: 7, temperature: 0, max_input_tokens: 100, max_output_tokens: 50, timeout_ms: 1000, max_attempts: 2,
     transport: "pi", cache_retention: "none", tools_policy: "none",
@@ -67,6 +82,8 @@ describe("Formal Oracle Pi request envelope", () => {
   it("rejects prompt, fifth visual, base64, label, tools and retry drift", () => {
     const prompt = fixture(); prompt.expected_system_prompt_sha256 = "0".repeat(64);
     expect(() => buildFormalOraclePiRequestEnvelope(prompt)).toThrow("prompt/template");
+    const wrongBuilderSchema = fixture(); wrongBuilderSchema.output_schema_sha256 = "0".repeat(64);
+    expect(() => buildFormalOraclePiRequestEnvelope(wrongBuilderSchema)).toThrow("共享 response schema");
     const fifth = fixture(); fifth.visuals.push(...Array.from({ length: 4 }, () => fifth.visuals[0]));
     expect(() => buildFormalOraclePiRequestEnvelope(fifth)).toThrow("visual 数量");
     const source = new TextDecoder().decode(buildFormalOraclePiRequestEnvelope(fixture()).bytes);
@@ -75,6 +92,18 @@ describe("Formal Oracle Pi request envelope", () => {
     expect(() => parseFormalOraclePiRequestEnvelopeBytes(altered('"label":"visual-1"', '"label":"visual-2"'))).toThrow("metadata");
     expect(() => parseFormalOraclePiRequestEnvelopeBytes(altered('"tools":[]', '"tools":[{}]'))).toThrow("transport/cache/tools");
     expect(() => parseFormalOraclePiRequestEnvelopeBytes(altered('"inner_provider_retries":0', '"inner_provider_retries":1'))).toThrow("provider/retry");
+    expect(() => parseFormalOraclePiRequestEnvelopeBytes(altered(
+      `"output_schema_sha256":"${ORACLE_GATE_RESPONSE_SCHEMA_SHA256}"`,
+      `"output_schema_sha256":"${"0".repeat(64)}"`,
+    ))).toThrow("共享 response schema");
+    expect(() => parseFormalOraclePiRequestEnvelopeBytes(altered(
+      `"user_template_sha256":"${FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256}"`,
+      `"user_template_sha256":"${"f".repeat(64)}"`,
+    ))).toThrow("固定 template");
+    const contradictoryArm = source
+      .replace('"arm":"static_final_board"', '"arm":"transcript_only"')
+      .replace(/"visuals":\[\{[^}]+\}\]/, '"visuals":[]');
+    expect(() => parseFormalOraclePiRequestEnvelopeBytes(text(contradictoryArm))).toThrow("evidence availability");
     for (const [from, to] of [
       ['"model":"formal-model"', '"model":"other-model"'],
       ['"seed":7', '"seed":8'],

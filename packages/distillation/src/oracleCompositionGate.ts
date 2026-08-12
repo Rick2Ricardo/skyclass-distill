@@ -16,6 +16,11 @@ import {
   buildFormalOraclePiRequestEnvelope,
   type FormalOraclePiRequestArtifact,
 } from "../../contracts/src/oracle-gate-request.js";
+import {
+  FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
+  FORMAL_ORACLE_USER_PROMPT_VERSION,
+  renderFormalOracleUserPrompt,
+} from "../../contracts/src/oracle-gate-user-prompt.js";
 import { canonicalizeOracleGateCanvas } from "../../media/src/oracleGateCanvas.js";
 import type { OracleGateFrameDeriver } from "../../media/src/videoEvidence.js";
 import { FrozenOracleRegistryStore } from "../../store/src/frozenOracleRegistryStore.js";
@@ -37,7 +42,6 @@ import type { FormalRunContractV1, RunCheckpointV1 } from "../../contracts/src/o
 
 export interface FormalOracleExecutionArtifactV1 {
   request_id: string;
-  rendered_user_prompt_bytes: Uint8Array;
   visual_bytes: Uint8Array[];
 }
 
@@ -70,7 +74,7 @@ export interface FormalOracleCompositionCapability {
   readonly head_pin: Readonly<FormalOracleHeadPinV1>;
   readonly rights_registry_status: "pending_external_authoritative_head";
   readonly request_envelope_serialization_status: "completed";
-  readonly user_prompt_derivation_status: "pending_strict_template_renderer";
+  readonly user_prompt_derivation_status: "completed";
   readonly input_token_budget_status: "pending_model_specific_tokenizer";
   readonly provider_wire_binding_status: "pending_prepared_transport_adapter";
   readonly provider_account_endpoint_status: "pending_external_runtime_binding";
@@ -88,7 +92,7 @@ class CompositionCapability implements FormalOracleCompositionCapability {
   readonly stage = "composition_attested_only" as const;
   readonly rights_registry_status = "pending_external_authoritative_head" as const;
   readonly request_envelope_serialization_status = "completed" as const;
-  readonly user_prompt_derivation_status = "pending_strict_template_renderer" as const;
+  readonly user_prompt_derivation_status = "completed" as const;
   readonly input_token_budget_status = "pending_model_specific_tokenizer" as const;
   readonly provider_wire_binding_status = "pending_prepared_transport_adapter" as const;
   readonly provider_account_endpoint_status = "pending_external_runtime_binding" as const;
@@ -154,11 +158,18 @@ function cloneBytes(value: Uint8Array): Uint8Array {
 
 function cloneExecutionArtifacts(values: FormalOracleExecutionArtifactV1[]): FormalOracleExecutionArtifactV1[] {
   if (!Array.isArray(values) || Object.keys(values).length !== values.length) throw new Error("execution_artifacts 必须是稠密数组");
-  return values.map((item) => Object.freeze({
-    request_id: item.request_id,
-    rendered_user_prompt_bytes: cloneBytes(item.rendered_user_prompt_bytes),
-    visual_bytes: Object.freeze(item.visual_bytes.map(cloneBytes)),
-  })) as FormalOracleExecutionArtifactV1[];
+  return values.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)
+      || JSON.stringify(Object.keys(item).sort()) !== JSON.stringify(["request_id", "visual_bytes"])
+      || typeof item.request_id !== "string" || !item.request_id
+      || !Array.isArray(item.visual_bytes) || Object.keys(item.visual_bytes).length !== item.visual_bytes.length) {
+      throw new Error(`execution_artifacts[${index}] 必须使用 strict 字段集合与稠密 visual bytes`);
+    }
+    return Object.freeze({
+      request_id: item.request_id,
+      visual_bytes: Object.freeze(item.visual_bytes.map(cloneBytes)),
+    });
+  }) as FormalOracleExecutionArtifactV1[];
 }
 
 function snapshotTrustedKeys(input: ReadonlyMap<string, KeyLike>, label: string): ReadonlyMap<string, KeyLike> {
@@ -343,7 +354,6 @@ function assertExecutionArtifacts(input: {
   return input.plan.items.map((planItem, index) => {
     const artifact = input.artifacts[index];
     if (!artifact || artifact.request_id !== planItem.request_id
-      || digest(artifact.rendered_user_prompt_bytes) !== planItem.user_prompt_sha256
       || planItem.system_prompt_sha256 !== input.spec.prompt.system_sha256) {
       throw new Error(`Execution artifact bytes/hash/request ID 漂移：${planItem.request_id}`);
     }
@@ -367,11 +377,29 @@ function assertExecutionArtifacts(input: {
         throw new Error(`Execution visual bytes 未绑定 verified case/arm/canonical canvas：${planItem.request_id}`);
       }
     }
+    const verifiedCase = verifiedByCase.get(planItem.case_id);
+    if (!verifiedCase) throw new Error(`Execution plan case 不在 verified media 中：${planItem.case_id}`);
+    const transcriptBytes = Buffer.from(verifiedCase.speech.selected_transcript, "utf8");
+    const userPrompt = renderFormalOracleUserPrompt({
+      prompt_version: input.spec.prompt.version,
+      user_template_bytes: input.user_template_bytes,
+      expected_user_template_sha256: input.spec.prompt.user_template_sha256,
+      selected_transcript_bytes: transcriptBytes,
+      expected_selected_transcript_sha256: verifiedCase.speech.selected_transcript_sha256,
+      expected_selected_transcript_byte_length: verifiedCase.speech.selected_transcript_byte_length,
+      visual_input_available: planItem.arm !== "transcript_only",
+      output_schema_sha256: planItem.output_schema_sha256,
+    });
+    if (input.spec.prompt.version !== FORMAL_ORACLE_USER_PROMPT_VERSION
+      || input.spec.prompt.user_template_sha256 !== FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256
+      || userPrompt.prompt_sha256 !== planItem.user_prompt_sha256) {
+      throw new Error(`Rendered user prompt 未绑定 deterministic renderer/execution plan：${planItem.request_id}`);
+    }
     const built = buildFormalOraclePiRequestEnvelope({
       request_id: planItem.request_id, schedule_index: planItem.schedule_index, case_id: planItem.case_id, arm: planItem.arm,
       model: planItem.model, system_prompt_bytes: input.system_prompt_bytes, expected_system_prompt_sha256: planItem.system_prompt_sha256,
-      rendered_user_prompt_bytes: artifact.rendered_user_prompt_bytes, expected_rendered_user_prompt_sha256: planItem.user_prompt_sha256,
-      user_template_bytes: input.user_template_bytes, expected_user_template_sha256: input.spec.prompt.user_template_sha256,
+      user_prompt: userPrompt, expected_rendered_user_prompt_sha256: planItem.user_prompt_sha256,
+      expected_user_template_sha256: input.spec.prompt.user_template_sha256,
       output_schema_sha256: planItem.output_schema_sha256,
       visuals: planItem.visuals.map((visual, visualIndex) => ({
         label: visual.label, mime_type: visual.mime_type, bytes: artifact.visual_bytes[visualIndex],
@@ -393,9 +421,8 @@ function assertExecutionArtifacts(input: {
  * an execution token. The returned genesis pin still must be durably retained
  * by a separate monotonic/WORM authority before any future execution gate.
  * The execution plan binds a strict canonical future-adapter envelope covering
- * model/prompt/visual/seed/budget/retry policy. The rendered user prompt is
- * still an externally supplied frozen byte artifact: deterministic derivation
- * from a versioned template grammar and verified case bytes remains pending.
+ * model/prompt/visual/seed/budget/retry policy. The deterministic user prompt
+ * is derived here from the fixed grammar and byte-preflight transcript.
  * This envelope is not provider wire bytes; adapter/account/endpoint are pending.
  */
 export async function withComposedFormalOracleRunGenesis<T>(
@@ -493,7 +520,7 @@ export async function withComposedFormalOracleRunGenesis<T>(
         run_store_uri: input.run.run_store_uri,
         rights_registry_status: "pending_external_authoritative_head",
         request_envelope_serialization_status: "completed",
-        user_prompt_derivation_status: "pending_strict_template_renderer",
+        user_prompt_derivation_status: "completed",
         input_token_budget_status: "pending_model_specific_tokenizer",
         provider_wire_binding_status: "pending_prepared_transport_adapter",
         provider_account_endpoint_status: "pending_external_runtime_binding",

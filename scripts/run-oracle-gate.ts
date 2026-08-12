@@ -60,7 +60,7 @@ assert(client.configured, "LLM API 尚未配置");
 const config: OracleGateSmokeConfig = {
   schema_version: "oracle-gate-smoke-config-v1",
   prompt_version: spec.prompt_version,
-  output_schema_version: "oracle-gate-response-v1",
+  output_schema_version: "teacher-evidence-response-v1",
   seeds: [spec.generation_seed],
   temperature: 0,
   max_output_tokens: 2048,

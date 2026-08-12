@@ -14,7 +14,7 @@ import { validateOraclePilotPairing } from "./oraclePilot.js";
 export interface OracleGateSmokeConfig {
   schema_version: "oracle-gate-smoke-config-v1";
   prompt_version: string;
-  output_schema_version: "oracle-gate-response-v1";
+  output_schema_version: "teacher-evidence-response-v1";
   seeds: number[];
   temperature: number;
   max_output_tokens: number;
@@ -240,7 +240,7 @@ export async function runOracleGateSmoke(input: {
     || input.pilot.protocol.runtime_pixel_and_token_audit_required !== true) {
     throw new Error("Oracle Gate pilot protocol 未满足冻结的视觉与运行时审计契约");
   }
-  if (input.config.schema_version !== "oracle-gate-smoke-config-v1" || input.config.output_schema_version !== "oracle-gate-response-v1") {
+  if (input.config.schema_version !== "oracle-gate-smoke-config-v1" || input.config.output_schema_version !== "teacher-evidence-response-v1") {
     throw new Error("Oracle Gate smoke config schema 无效");
   }
   if (!input.config.prompt_version.trim() || input.config.prompt_version !== input.pilot.protocol.prompt_version) {

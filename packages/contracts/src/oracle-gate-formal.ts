@@ -6,6 +6,12 @@ export type OracleGateBoardMode =
   | "mixed"
   | "unknown";
 
+import { ORACLE_GATE_RESPONSE_SCHEMA_SHA256 } from "./oracle-gate-response.js";
+import {
+  FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
+  FORMAL_ORACLE_USER_PROMPT_VERSION,
+} from "./oracle-gate-user-prompt.js";
+
 export type OracleGateRightsStatus =
   | "authorized"
   | "open_license"
@@ -266,7 +272,12 @@ export function validateOracleGateFormalSpec(input: unknown): OracleGateFormalVa
   if (!isNonEmpty(input.model)) issue("model", "不能为空");
   if (input.transport !== "pi" || input.cache_retention !== "none" || input.tools_policy !== "none" || input.temperature !== 0) issue("protocol", "必须冻结为 Pi、无缓存、无工具、temperature=0");
   if (!Array.isArray(input.seeds) || input.seeds.length < 3 || !input.seeds.every((seed) => Number.isSafeInteger(seed) && Number(seed) >= 0 && Number(seed) <= 0xffff_ffff) || new Set(input.seeds).size !== input.seeds.length) issue("seeds", "至少需要三个唯一的 0..2^32-1 安全整数 seed");
-  if (!isRecord(input.prompt) || !isNonEmpty(input.prompt.version) || !isSha256(input.prompt.system_sha256) || !isSha256(input.prompt.user_template_sha256) || !isSha256(input.prompt.output_schema_sha256)) issue("prompt", "必须冻结完整 prompt 与 schema 哈希");
+  if (!isRecord(input.prompt) || input.prompt.version !== FORMAL_ORACLE_USER_PROMPT_VERSION
+    || !isSha256(input.prompt.system_sha256)
+    || input.prompt.user_template_sha256 !== FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256
+    || input.prompt.output_schema_sha256 !== ORACLE_GATE_RESPONSE_SCHEMA_SHA256) {
+    issue("prompt", "必须冻结 shared deterministic renderer/template/response schema");
+  }
   if (!isRecord(input.budget)) issue("budget", "必须是对象");
   else {
     for (const field of ["max_input_tokens", "max_output_tokens", "timeout_ms", "max_attempts"] as const) if (!Number.isSafeInteger(input.budget[field]) || Number(input.budget[field]) < 1) issue(`budget.${field}`, "必须是正安全整数");

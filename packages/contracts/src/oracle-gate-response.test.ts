@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ORACLE_GATE_RESPONSE_SCHEMA,
   ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
   ORACLE_GATE_RESPONSE_SEMANTIC_POLICY,
   ORACLE_GATE_RESPONSE_VALIDATOR_VERSION,
@@ -12,7 +13,7 @@ import {
 
 function response(): Record<string, unknown> {
   return {
-    schema_version: "oracle-gate-response-v1",
+    schema_version: "teacher-evidence-response-v1",
     observed_board_actions: [],
     generalized_teaching_capability: { name: "证据约束讲解", mechanism: "先观察再抽象", action_program: ["确认可见变化"] },
     evidence_claims: [],
@@ -21,6 +22,35 @@ function response(): Record<string, unknown> {
 }
 
 describe("shared Oracle Gate response contract", () => {
+  it("deep-freezes the runtime schema before deriving its canonical hash", () => {
+    const original = canonicalOracleGateJson(ORACLE_GATE_RESPONSE_SCHEMA);
+    const originalHash = ORACLE_GATE_RESPONSE_SCHEMA_SHA256;
+    const schema = ORACLE_GATE_RESPONSE_SCHEMA as unknown as {
+      schema_version: string;
+      observed_board_actions: Array<{ operation: string }>;
+      generalized_teaching_capability: { name: string; action_program: string[] };
+      evidence_claims: Array<{ claim: string }>;
+    };
+
+    expect(Object.isFrozen(schema)).toBe(true);
+    expect(Object.isFrozen(schema.observed_board_actions)).toBe(true);
+    expect(Object.isFrozen(schema.observed_board_actions[0])).toBe(true);
+    expect(Object.isFrozen(schema.generalized_teaching_capability)).toBe(true);
+    expect(Object.isFrozen(schema.generalized_teaching_capability.action_program)).toBe(true);
+    expect(Object.isFrozen(schema.evidence_claims)).toBe(true);
+    expect(Object.isFrozen(schema.evidence_claims[0])).toBe(true);
+
+    expect(() => { schema.generalized_teaching_capability.name = "mutated"; }).toThrow();
+    expect(() => { schema.generalized_teaching_capability.action_program[0] = "mutated"; }).toThrow();
+    expect(() => { schema.generalized_teaching_capability.action_program.push("mutated"); }).toThrow();
+    expect(() => { schema.observed_board_actions[0].operation = "mutated"; }).toThrow();
+    expect(() => { schema.evidence_claims.push({ claim: "mutated" }); }).toThrow();
+    expect(() => { schema.schema_version = "mutated"; }).toThrow();
+
+    expect(canonicalOracleGateJson(ORACLE_GATE_RESPONSE_SCHEMA)).toBe(original);
+    expect(ORACLE_GATE_RESPONSE_SCHEMA_SHA256).toBe(originalHash);
+  });
+
   it("strictly parses UTF-8 and produces deterministic canonical bytes", () => {
     const raw = new TextEncoder().encode(JSON.stringify(response(), null, 2));
     const parsed = parseOracleGateResponseBytes(raw);

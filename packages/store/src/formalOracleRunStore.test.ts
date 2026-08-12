@@ -16,6 +16,12 @@ import {
   buildFormalOraclePiRequestEnvelope,
   type FormalOraclePiRequestArtifact,
 } from "../../contracts/src/oracle-gate-request.js";
+import {
+  FORMAL_ORACLE_USER_PROMPT_TEMPLATE_BYTES,
+  FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
+  FORMAL_ORACLE_USER_PROMPT_VERSION,
+  renderFormalOracleUserPrompt,
+} from "../../contracts/src/oracle-gate-user-prompt.js";
 import type {
   CommittedRequestV1,
   FormalRunContractV1,
@@ -45,7 +51,8 @@ import { privateCanonicalJsonBytes, PrivateContentAddressedFs } from "./privateC
 const RUN_STORE_URI = "board2skill/formal-oracle/run-store";
 const created: string[] = [];
 const SYSTEM_PROMPT_BYTES = Buffer.from("frozen formal system prompt\n", "utf8");
-const USER_TEMPLATE_BYTES = Buffer.from("frozen formal user template {{case}}\n", "utf8");
+const USER_TEMPLATE_BYTES = Buffer.from(FORMAL_ORACLE_USER_PROMPT_TEMPLATE_BYTES);
+const SELECTED_TRANSCRIPT_BYTES = Buffer.from("[00:00:00.000 --> 00:00:00.750] 先观察板书\n", "utf8");
 
 afterEach(async () => {
   await Promise.all(created.splice(0).map((path) => rm(path, { recursive: true, force: true })));
@@ -73,9 +80,9 @@ function formalSpec(): OracleGateFormalSpec {
     temperature: 0,
     seeds: [17, 23, 41],
     prompt: {
-      version: "formal-prompt-v1",
+      version: FORMAL_ORACLE_USER_PROMPT_VERSION,
       system_sha256: sha(SYSTEM_PROMPT_BYTES),
-      user_template_sha256: sha(USER_TEMPLATE_BYTES),
+      user_template_sha256: FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
       output_schema_sha256: ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
     },
     budget: {
@@ -103,7 +110,17 @@ function formalSpec(): OracleGateFormalSpec {
 }
 
 function renderedUserPrompt(index: number): Buffer {
-  return Buffer.from(`rendered-user-prompt-${index}`, "utf8");
+  const arm = structuralSchedule(formalSpec())[index].arm;
+  return Buffer.from(renderFormalOracleUserPrompt({
+    prompt_version: FORMAL_ORACLE_USER_PROMPT_VERSION,
+    user_template_bytes: USER_TEMPLATE_BYTES,
+    expected_user_template_sha256: FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
+    selected_transcript_bytes: SELECTED_TRANSCRIPT_BYTES,
+    expected_selected_transcript_sha256: sha(SELECTED_TRANSCRIPT_BYTES),
+    expected_selected_transcript_byte_length: SELECTED_TRANSCRIPT_BYTES.byteLength,
+    visual_input_available: arm !== "transcript_only",
+    output_schema_sha256: ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
+  }).bytes);
 }
 
 function visualBytes(arm: string, seed: number): Buffer {
@@ -114,12 +131,22 @@ function requestPayload(index: number, drift: { model?: string; seed?: number; m
   const spec = formalSpec();
   const scheduled = structuralSchedule(spec)[index];
   const rendered = renderedUserPrompt(index);
+  const userPrompt = renderFormalOracleUserPrompt({
+    prompt_version: FORMAL_ORACLE_USER_PROMPT_VERSION,
+    user_template_bytes: USER_TEMPLATE_BYTES,
+    expected_user_template_sha256: FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
+    selected_transcript_bytes: SELECTED_TRANSCRIPT_BYTES,
+    expected_selected_transcript_sha256: sha(SELECTED_TRANSCRIPT_BYTES),
+    expected_selected_transcript_byte_length: SELECTED_TRANSCRIPT_BYTES.byteLength,
+    visual_input_available: scheduled.arm !== "transcript_only",
+    output_schema_sha256: ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
+  });
   const visual = scheduled.arm === "transcript_only" ? undefined : visualBytes(scheduled.arm, scheduled.seed);
   return buildFormalOraclePiRequestEnvelope({
     request_id: scheduled.request_id, schedule_index: index, case_id: scheduled.case_id, arm: scheduled.arm,
     model: drift.model ?? spec.model, system_prompt_bytes: SYSTEM_PROMPT_BYTES, expected_system_prompt_sha256: spec.prompt.system_sha256,
-    rendered_user_prompt_bytes: rendered, expected_rendered_user_prompt_sha256: sha(rendered),
-    user_template_bytes: USER_TEMPLATE_BYTES, expected_user_template_sha256: spec.prompt.user_template_sha256,
+    user_prompt: userPrompt, expected_rendered_user_prompt_sha256: sha(rendered),
+    expected_user_template_sha256: spec.prompt.user_template_sha256,
     output_schema_sha256: spec.prompt.output_schema_sha256,
     visuals: visual ? [{ label: "visual-1", mime_type: "image/jpeg", bytes: visual, expected_sha256: sha(visual), expected_byte_length: visual.byteLength }] : [],
     seed: drift.seed ?? scheduled.seed, temperature: spec.temperature, max_input_tokens: spec.budget.max_input_tokens,
@@ -393,7 +420,7 @@ function committedRequest(intent: RequestIntentV1, audit: RequestAttemptAuditV1,
 
 function oracleResponse(note?: string): Record<string, unknown> {
   return {
-    schema_version: "oracle-gate-response-v1",
+    schema_version: "teacher-evidence-response-v1",
     observed_board_actions: [],
     generalized_teaching_capability: {
       name: "证据约束讲解",
@@ -610,7 +637,7 @@ describe("FormalOracleRunStore", () => {
     wrongSchema.input.run.execution_plan_sha256 = wrongSchema.input.execution_plan.execution_plan_sha256;
     wrongSchema.input.run.run_sha256 = hashFormalRunContract(wrongSchema.input.run);
     wrongSchema.input.initial_checkpoint = initialCheckpoint(wrongSchema.input.run, wrongSchema.input.execution_plan);
-    await expect(wrongSchema.store.createSealedRun(wrongSchema.input)).rejects.toThrow("共享 Oracle Gate response schema");
+    await expect(wrongSchema.store.createSealedRun(wrongSchema.input)).rejects.toThrow(/response schema|shared deterministic renderer/);
   });
 
   it("persists raw and parsed response objects before structurally validating a successful request", async () => {
@@ -916,7 +943,7 @@ describe("FormalOracleRunStore", () => {
     }
 
     const semanticFailureSample = await prepareReceipt({
-      schema_version: "oracle-gate-response-v1",
+      schema_version: "teacher-evidence-response-v1",
       observed_board_actions: [{ sequence_index: 1, operation: "add", content: "小明拿到了满分", region: "学生区域" }],
       generalized_teaching_capability: { name: "Alice aced the test", mechanism: "学生题目全解对了", action_program: ["the class passed the exam"] },
       evidence_claims: [{ claim: "Alice passed the exam", evidence_slot: "transcript" }],

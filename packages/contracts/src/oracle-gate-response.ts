@@ -1,7 +1,7 @@
 import { sha256Hex } from "./sha256.js";
 import { containsFabricatedLearnerOutcome } from "./signed-gold.js";
 
-export const ORACLE_GATE_RESPONSE_SCHEMA_VERSION = "oracle-gate-response-v1" as const;
+export const ORACLE_GATE_RESPONSE_SCHEMA_VERSION = "teacher-evidence-response-v1" as const;
 export const ORACLE_GATE_RESPONSE_VALIDATOR_VERSION = "oracle-gate-response-structural-validator-v1" as const;
 
 export const ORACLE_GATE_RESPONSE_SEMANTIC_POLICY = {
@@ -38,8 +38,24 @@ export interface OracleGateResponseV1 {
   uncertainties: string[];
 }
 
-/** Frozen prompt-facing descriptor; its canonical hash is the formal spec schema anchor. */
-export const ORACLE_GATE_RESPONSE_SCHEMA = {
+type DeepReadonly<T> = T extends (...args: never[]) => unknown ? T
+  : T extends readonly unknown[] ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+    : T extends object ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+      : T;
+
+function deepFreeze<T>(value: T): DeepReadonly<T> {
+  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const nested of Object.values(value)) deepFreeze(nested);
+    Object.freeze(value);
+  }
+  return value as DeepReadonly<T>;
+}
+
+/**
+ * Runtime-immutable prompt-facing descriptor. The nested arrays/objects are
+ * frozen before canonical bytes and the formal-spec schema anchor are derived.
+ */
+export const ORACLE_GATE_RESPONSE_SCHEMA = deepFreeze({
   schema_version: ORACLE_GATE_RESPONSE_SCHEMA_VERSION,
   observed_board_actions: [{
     sequence_index: 1,
@@ -54,7 +70,7 @@ export const ORACLE_GATE_RESPONSE_SCHEMA = {
   },
   evidence_claims: [{ claim: "string", evidence_slot: "transcript|visual-1|uncertain" }],
   uncertainties: ["string"],
-} as const;
+} as const);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);

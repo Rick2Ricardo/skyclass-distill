@@ -45,7 +45,7 @@ export interface FormalOracleCompositionAttestationV1 {
   run_store_uri: string;
   rights_registry_status: "pending_external_authoritative_head";
   request_envelope_serialization_status: "completed";
-  user_prompt_derivation_status: "pending_strict_template_renderer";
+  user_prompt_derivation_status: "completed";
   input_token_budget_status: "pending_model_specific_tokenizer";
   provider_wire_binding_status: "pending_prepared_transport_adapter";
   provider_account_endpoint_status: "pending_external_runtime_binding";
@@ -172,7 +172,7 @@ export function validateFormalOracleCompositionAttestation(
   if (!isSafeUri(input.run_store_uri)) issue("run_store_uri", "必须是受控相对路径");
   if (input.rights_registry_status !== "pending_external_authoritative_head") issue("rights_registry_status", "只绑定 declared resource root；authoritative rights/withdrawal head 仍必须 pending");
   if (input.request_envelope_serialization_status !== "completed") issue("request_envelope_serialization_status", "canonical future-adapter request envelope 必须完成序列化并闭合 execution plan");
-  if (input.user_prompt_derivation_status !== "pending_strict_template_renderer") issue("user_prompt_derivation_status", "rendered user prompt 尚未由冻结 template grammar 与 verified case bytes 确定性派生");
+  if (input.user_prompt_derivation_status !== "completed") issue("user_prompt_derivation_status", "rendered user prompt 必须由冻结 template grammar 与 verified case transcript 确定性派生");
   if (input.input_token_budget_status !== "pending_model_specific_tokenizer") issue("input_token_budget_status", "max_input_tokens 只是冻结预算，尚未由 model-specific tokenizer/image accounting 证明");
   if (input.provider_wire_binding_status !== "pending_prepared_transport_adapter") issue("provider_wire_binding_status", "envelope 尚未绑定 provider SDK/wire adapter");
   if (input.provider_account_endpoint_status !== "pending_external_runtime_binding") issue("provider_account_endpoint_status", "provider account/endpoint 必须保持外部运行时待绑定");
