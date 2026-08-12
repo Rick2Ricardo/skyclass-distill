@@ -68,7 +68,7 @@ function formalRun(): FormalRunContractV1 {
 
 function intent(run = formalRun()): RequestIntentV1 {
   const value: RequestIntentV1 = {
-    schema_version: "oracle-gate-request-intent-v1",
+    schema_version: "oracle-gate-request-intent-v2",
     intent_sha256: HASH,
     run_sha256: run.run_sha256,
     request_id: "FREQ-fixture-001",
@@ -80,8 +80,14 @@ function intent(run = formalRun()): RequestIntentV1 {
     arm: "transcript_only",
     seed: 17,
     model: "vision-fixture",
-    request_payload_sha256: "e".repeat(64),
-    request_object_uri: "objects/requests/request-001.json",
+    request_envelope_sha256: "e".repeat(64),
+    request_envelope_object_uri: "objects/requests/request-001.json",
+    provider_body_sha256: "9".repeat(64),
+    provider_body_object_uri: "objects/provider-bodies/request-001.json",
+    provider_body_profile: "openai-chat-completions-direct-serialization-v1",
+    provider_body_dispatch_status: "not_dispatchable_transport_mismatch",
+    prepared_adapter_version: "formal-oracle-prepared-provider-adapter-v1",
+    provider_token_field: "max_completion_tokens",
     system_prompt_sha256: "f".repeat(64),
     user_prompt_sha256: "1".repeat(64),
     output_schema_sha256: "2".repeat(64),
@@ -113,8 +119,8 @@ function attempt(request = intent()): RequestAttemptAuditV1 {
     latency_ms: 1000,
     provider_id: "fixture-provider",
     provider_request_id: "provider-request-1",
-    request_sha256: request.request_payload_sha256,
-    request_object_uri: request.request_object_uri,
+    request_sha256: request.provider_body_sha256,
+    request_object_uri: request.provider_body_object_uri,
     response_object_uri: "objects/responses/response-001.json",
     response_bytes_sha256: "3".repeat(64),
     parsed_response_object_uri: "objects/parsed-responses/response-001.json",
@@ -280,7 +286,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     expect(validatePrivateAnswerKeyAgainstPublicPackage(key, published)).toEqual({ valid: true, issues: [] });
 
     const changedDomain = structuredClone(request);
-    changedDomain.request_payload_sha256 = "9".repeat(64);
+    changedDomain.request_envelope_sha256 = "9".repeat(64);
     expect(hashRequestIntent(changedDomain)).not.toBe(request.intent_sha256);
   });
 
@@ -324,9 +330,9 @@ describe("Formal Oracle content-addressed run contracts", () => {
     expect(validateFormalRunContract(run).issues.map((item) => item.path)).toEqual(expect.arrayContaining(["$", "api_execution_allowed", "run_sha256"]));
 
     const request = structuredClone(intent()) as RequestIntentV1;
-    request.request_object_uri = "%252e%252e/private/request.json";
+    request.request_envelope_object_uri = "%252e%252e/private/request.json";
     request.seed = Number.POSITIVE_INFINITY;
-    expect(validateRequestIntent(request).issues.map((item) => item.path)).toEqual(expect.arrayContaining(["request_object_uri", "seed", "intent_sha256"]));
+    expect(validateRequestIntent(request).issues.map((item) => item.path)).toEqual(expect.arrayContaining(["request_objects", "seed", "intent_sha256"]));
   });
 
   it("keeps dispatch intent, receipt, and schema-validated commit as distinct durable states", () => {

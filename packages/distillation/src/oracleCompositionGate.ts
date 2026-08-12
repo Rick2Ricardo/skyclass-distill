@@ -16,6 +16,7 @@ import {
   buildFormalOraclePiRequestEnvelope,
   type FormalOraclePiRequestArtifact,
 } from "../../contracts/src/oracle-gate-request.js";
+import { buildFormalOraclePreparedProviderRequest } from "../../contracts/src/oracle-gate-provider-request.js";
 import {
   FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
   FORMAL_ORACLE_USER_PROMPT_VERSION,
@@ -74,10 +75,13 @@ export interface FormalOracleCompositionCapability {
   readonly head_pin: Readonly<FormalOracleHeadPinV1>;
   readonly rights_registry_status: "pending_external_authoritative_head";
   readonly request_envelope_serialization_status: "completed";
+  readonly provider_body_serialization_status: "completed_direct_fetch_boundary_prepared";
+  readonly provider_body_transport_compatibility_status: "pending_pi_or_direct_profile_selection";
   readonly user_prompt_derivation_status: "completed";
   readonly input_token_budget_status: "pending_model_specific_tokenizer";
-  readonly provider_wire_binding_status: "pending_prepared_transport_adapter";
+  readonly provider_wire_binding_status: "pending_external_endpoint_account_validation";
   readonly provider_account_endpoint_status: "pending_external_runtime_binding";
+  readonly provider_response_capture_status: "pending_strict_sse_capture_contract";
   readonly toolchain_capsule_status: "pending_external_immutable_capsule";
   readonly composition_record_authenticity_status: "pending_external_trusted_signature_or_worm";
   readonly external_head_pin_status: "pending_external_monotonic_worm";
@@ -92,10 +96,13 @@ class CompositionCapability implements FormalOracleCompositionCapability {
   readonly stage = "composition_attested_only" as const;
   readonly rights_registry_status = "pending_external_authoritative_head" as const;
   readonly request_envelope_serialization_status = "completed" as const;
+  readonly provider_body_serialization_status = "completed_direct_fetch_boundary_prepared" as const;
+  readonly provider_body_transport_compatibility_status = "pending_pi_or_direct_profile_selection" as const;
   readonly user_prompt_derivation_status = "completed" as const;
   readonly input_token_budget_status = "pending_model_specific_tokenizer" as const;
-  readonly provider_wire_binding_status = "pending_prepared_transport_adapter" as const;
+  readonly provider_wire_binding_status = "pending_external_endpoint_account_validation" as const;
   readonly provider_account_endpoint_status = "pending_external_runtime_binding" as const;
+  readonly provider_response_capture_status = "pending_strict_sse_capture_contract" as const;
   readonly toolchain_capsule_status = "pending_external_immutable_capsule" as const;
   readonly composition_record_authenticity_status = "pending_external_trusted_signature_or_worm" as const;
   readonly external_head_pin_status = "pending_external_monotonic_worm" as const;
@@ -409,7 +416,15 @@ function assertExecutionArtifacts(input: {
       max_output_tokens: planItem.max_output_tokens, timeout_ms: planItem.timeout_ms, max_attempts: planItem.max_attempts,
       transport: planItem.transport, cache_retention: planItem.cache_retention, tools_policy: planItem.tools_policy,
     });
-    if (built.payload_sha256 !== planItem.request_payload_sha256) throw new Error(`Built request envelope hash 未绑定 execution plan：${planItem.request_id}`);
+    const prepared = buildFormalOraclePreparedProviderRequest(built);
+    if (built.payload_sha256 !== planItem.request_envelope_sha256
+      || prepared.provider_body_sha256 !== planItem.provider_body_sha256
+      || prepared.provider_body_profile !== planItem.provider_body_profile
+      || prepared.provider_body_dispatch_status !== planItem.provider_body_dispatch_status
+      || prepared.adapter_version !== planItem.prepared_adapter_version
+      || prepared.token_field !== planItem.provider_token_field) {
+      throw new Error(`Built request envelope/provider body 双 hash 未绑定 execution plan：${planItem.request_id}`);
+    }
     return built;
   });
 }
@@ -520,10 +535,13 @@ export async function withComposedFormalOracleRunGenesis<T>(
         run_store_uri: input.run.run_store_uri,
         rights_registry_status: "pending_external_authoritative_head",
         request_envelope_serialization_status: "completed",
+        provider_body_serialization_status: "completed_direct_fetch_boundary_prepared",
+        provider_body_transport_compatibility_status: "pending_pi_or_direct_profile_selection",
         user_prompt_derivation_status: "completed",
         input_token_budget_status: "pending_model_specific_tokenizer",
-        provider_wire_binding_status: "pending_prepared_transport_adapter",
+        provider_wire_binding_status: "pending_external_endpoint_account_validation",
         provider_account_endpoint_status: "pending_external_runtime_binding",
+        provider_response_capture_status: "pending_strict_sse_capture_contract",
         toolchain_capsule_status: "pending_external_immutable_capsule",
         composition_record_authenticity_status: "pending_external_trusted_signature_or_worm",
         external_head_pin_status: "pending_external_monotonic_worm",

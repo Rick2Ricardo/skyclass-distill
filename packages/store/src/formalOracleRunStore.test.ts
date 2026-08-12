@@ -17,6 +17,13 @@ import {
   type FormalOraclePiRequestArtifact,
 } from "../../contracts/src/oracle-gate-request.js";
 import {
+  FORMAL_ORACLE_PREPARED_ADAPTER_VERSION,
+  FORMAL_ORACLE_PROVIDER_BODY_PROFILE,
+  FORMAL_ORACLE_PROVIDER_TOKEN_FIELD,
+  buildFormalOraclePreparedProviderRequest,
+  type FormalOraclePreparedProviderRequestArtifactV1,
+} from "../../contracts/src/oracle-gate-provider-request.js";
+import {
   FORMAL_ORACLE_USER_PROMPT_TEMPLATE_BYTES,
   FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
   FORMAL_ORACLE_USER_PROMPT_VERSION,
@@ -156,6 +163,10 @@ function requestPayload(index: number, drift: { model?: string; seed?: number; m
   });
 }
 
+function preparedPayload(payload: FormalOraclePiRequestArtifact): FormalOraclePreparedProviderRequestArtifactV1 {
+  return buildFormalOraclePreparedProviderRequest(payload);
+}
+
 function structuralSchedule(spec: OracleGateFormalSpec): FormalOracleStructuralScheduleV1 {
   const arms = ["transcript_only", "static_final_board", "uniform_frame", "oracle_delta"] as const;
   return spec.seeds.flatMap((seed) => arms.map((arm, armIndex) => {
@@ -175,7 +186,7 @@ function structuralSchedule(spec: OracleGateFormalSpec): FormalOracleStructuralS
 
 function executionPlan(spec: OracleGateFormalSpec, schedule: FormalOracleStructuralScheduleV1): FormalOracleExecutionPlanV1 {
   const plan: FormalOracleExecutionPlanV1 = {
-    schema_version: "formal-oracle-execution-plan-v1",
+    schema_version: "formal-oracle-execution-plan-v2",
     execution_plan_sha256: "0".repeat(64),
     items: schedule.map((item, index) => ({
       request_id: item.request_id,
@@ -185,7 +196,12 @@ function executionPlan(spec: OracleGateFormalSpec, schedule: FormalOracleStructu
       arm: item.arm,
       seed: item.seed,
       model: spec.model,
-      request_payload_sha256: requestPayload(index).payload_sha256,
+      request_envelope_sha256: requestPayload(index).payload_sha256,
+      provider_body_sha256: preparedPayload(requestPayload(index)).provider_body_sha256,
+      provider_body_profile: FORMAL_ORACLE_PROVIDER_BODY_PROFILE,
+      provider_body_dispatch_status: "not_dispatchable_transport_mismatch",
+      prepared_adapter_version: FORMAL_ORACLE_PREPARED_ADAPTER_VERSION,
+      provider_token_field: FORMAL_ORACLE_PROVIDER_TOKEN_FIELD,
       system_prompt_sha256: spec.prompt.system_sha256,
       // Rendered request prompt is intentionally different from the template hash.
       user_prompt_sha256: sha(renderedUserPrompt(index)),
@@ -301,8 +317,9 @@ function requestIntent(
   preparedAt = "2026-08-12T00:00:01.000Z",
 ): RequestIntentV1 {
   const expected = input.execution_plan.items[index];
+  const prepared = preparedPayload(payload);
   const request: RequestIntentV1 = {
-    schema_version: "oracle-gate-request-intent-v1",
+    schema_version: "oracle-gate-request-intent-v2",
     intent_sha256: "0".repeat(64),
     run_sha256: input.run.run_sha256,
     request_id: expected.request_id,
@@ -314,8 +331,14 @@ function requestIntent(
     arm: expected.arm,
     seed: expected.seed,
     model: expected.model,
-    request_payload_sha256: payload.payload_sha256,
-    request_object_uri: store.requestObjectUri(input.run.run_sha256, payload.payload_sha256),
+    request_envelope_sha256: payload.payload_sha256,
+    request_envelope_object_uri: store.requestObjectUri(input.run.run_sha256, payload.payload_sha256),
+    provider_body_sha256: prepared.provider_body_sha256,
+    provider_body_object_uri: store.providerBodyObjectUri(input.run.run_sha256, prepared.provider_body_sha256),
+    provider_body_profile: FORMAL_ORACLE_PROVIDER_BODY_PROFILE,
+    provider_body_dispatch_status: "not_dispatchable_transport_mismatch",
+    prepared_adapter_version: FORMAL_ORACLE_PREPARED_ADAPTER_VERSION,
+    provider_token_field: FORMAL_ORACLE_PROVIDER_TOKEN_FIELD,
     system_prompt_sha256: expected.system_prompt_sha256,
     user_prompt_sha256: expected.user_prompt_sha256,
     output_schema_sha256: expected.output_schema_sha256,
@@ -365,8 +388,8 @@ function attemptAudit(
     latency_ms: Date.parse(finishedAt) - Date.parse(startedAt),
     provider_id: "fixture-provider",
     provider_request_id: outcome === "not_sent" ? null : `provider-${intent.attempt_ordinal}`,
-    request_sha256: intent.request_payload_sha256,
-    request_object_uri: intent.request_object_uri,
+    request_sha256: intent.provider_body_sha256,
+    request_object_uri: intent.provider_body_object_uri,
     response_object_uri: result ? store.responseObjectUri(intent.run_sha256, sha(responseBytes!)) : null,
     response_bytes_sha256: result ? sha(responseBytes!) : null,
     parsed_response_object_uri: result ? store.parsedResponseObjectUri(intent.run_sha256, hashPublicBlindResponse(parsedResponse!)) : null,
@@ -482,7 +505,7 @@ describe("FormalOracleRunStore", () => {
       expected_head: sealed.head_pin,
       expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256,
       intent,
-      request_payload: payload,
+      request_envelope: payload, prepared_provider_request: preparedPayload(payload),
       created_at: "2026-08-12T00:00:02.000Z",
     });
     const currentHeadBytes = await readFile(headPath);
@@ -493,7 +516,7 @@ describe("FormalOracleRunStore", () => {
       expected_head: committed.head_pin,
       expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256,
       intent,
-      request_payload: payload,
+      request_envelope: payload, prepared_provider_request: preparedPayload(payload),
       created_at: "2026-08-12T00:00:03.000Z",
     })).rejects.toThrow("expected_head 与 expected_checkpoint");
     await expect(store.createSealedRun(input)).rejects.toThrow("create-once");
@@ -541,30 +564,60 @@ describe("FormalOracleRunStore", () => {
         expected_head: sealed.head_pin,
         expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256,
         intent,
-        request_payload: payload,
+        request_envelope: payload, prepared_provider_request: preparedPayload(payload),
         created_at: "2026-08-12T00:00:02.000Z",
       })).rejects.toThrow(/execution plan|绑定当前 run|不在 sealed checkpoint|Request intent 无效/);
     }
+    for (const mutate of [
+      (intent: RequestIntentV1) => { intent.request_envelope_sha256 = "2".repeat(64); },
+      (intent: RequestIntentV1) => { intent.provider_body_sha256 = "2".repeat(64); },
+      (intent: RequestIntentV1) => { intent.provider_body_profile = "drift" as typeof intent.provider_body_profile; },
+      (intent: RequestIntentV1) => { intent.provider_token_field = "max_tokens" as typeof intent.provider_token_field; },
+    ]) {
+      const intent = structuredClone(base);
+      mutate(intent);
+      intent.intent_sha256 = hashRequestIntent(intent);
+      await expect(store.commitDispatchIntent({
+        run_sha256: input.run.run_sha256, expected_head: sealed.head_pin,
+        expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256, intent,
+        request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(2),
+      })).rejects.toThrow();
+    }
+    const wrongBody = preparedPayload(requestPayload(0));
+    await expect(store.commitDispatchIntent({
+      run_sha256: input.run.run_sha256, expected_head: sealed.head_pin,
+      expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256, intent: base,
+      request_envelope: payload, prepared_provider_request: wrongBody, created_at: time(2),
+    })).rejects.toThrow(/provider body|绑定/);
+    const mutatedBody = preparedPayload(payload);
+    mutatedBody.body_bytes[0] ^= 1;
+    await expect(store.commitDispatchIntent({
+      run_sha256: input.run.run_sha256, expected_head: sealed.head_pin,
+      expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256, intent: base,
+      request_envelope: payload, prepared_provider_request: mutatedBody, created_at: time(2),
+    })).rejects.toThrow();
     await expect(store.commitDispatchIntent({
       run_sha256: input.run.run_sha256,
       expected_head: sealed.head_pin,
       expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256,
       intent: base,
-      request_payload: {
+      request_envelope: {
         envelope: payload.envelope,
         bytes: Buffer.from("wrong bytes", "utf8"),
         payload_sha256: sha("wrong bytes"),
       } as FormalOraclePiRequestArtifact,
+      prepared_provider_request: preparedPayload(payload),
       created_at: "2026-08-12T00:00:02.000Z",
     })).rejects.toThrow("伪造");
     const mutatedBrandedPayload = requestPayload(1);
+    const preparedBeforeMutation = preparedPayload(mutatedBrandedPayload);
     mutatedBrandedPayload.bytes[0] ^= 1;
     await expect(store.commitDispatchIntent({
       run_sha256: input.run.run_sha256,
       expected_head: sealed.head_pin,
       expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256,
       intent: base,
-      request_payload: mutatedBrandedPayload,
+      request_envelope: mutatedBrandedPayload, prepared_provider_request: preparedBeforeMutation,
       created_at: "2026-08-12T00:00:02.000Z",
     })).rejects.toThrow();
     const selfConsistentWrongPayload = requestPayload(0);
@@ -573,7 +626,7 @@ describe("FormalOracleRunStore", () => {
       expected_head: sealed.head_pin,
       expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256,
       intent: requestIntent(input, selfConsistentWrongPayload, store),
-      request_payload: selfConsistentWrongPayload,
+      request_envelope: selfConsistentWrongPayload, prepared_provider_request: preparedPayload(selfConsistentWrongPayload),
       created_at: "2026-08-12T00:00:02.000Z",
     })).rejects.toThrow(/execution plan|envelope/);
     for (const envelopeDrift of [
@@ -586,7 +639,7 @@ describe("FormalOracleRunStore", () => {
         expected_head: sealed.head_pin,
         expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256,
         intent: base,
-        request_payload: envelopeDrift,
+        request_envelope: envelopeDrift, prepared_provider_request: preparedPayload(envelopeDrift),
         created_at: "2026-08-12T00:00:02.000Z",
       })).rejects.toThrow(/execution plan|envelope/);
     }
@@ -595,7 +648,7 @@ describe("FormalOracleRunStore", () => {
       expected_head: sealed.head_pin,
       expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256,
       intent: base,
-      request_payload: payload,
+      request_envelope: payload, prepared_provider_request: preparedPayload(payload),
       created_at: "2026-08-12T00:00:02.000Z",
     });
     expect(committed.checkpoint.entries[1]).toMatchObject({ state: "DISPATCH_INTENT_COMMITTED", resume_action: "block_ambiguous" });
@@ -604,7 +657,7 @@ describe("FormalOracleRunStore", () => {
       expected_head: committed.head_pin,
       expected_checkpoint_sha256: committed.head_pin.checkpoint_sha256,
       intent: base,
-      request_payload: payload,
+      request_envelope: payload, prepared_provider_request: preparedPayload(payload),
       created_at: "2026-08-12T00:00:03.000Z",
     })).rejects.toThrow("不得自动 retry");
   });
@@ -648,7 +701,7 @@ describe("FormalOracleRunStore", () => {
     snapshot = await store.commitDispatchIntent({
       run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
       expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
-      intent, request_payload: payload, created_at: time(2),
+      intent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(2),
     });
     const receipt = attemptAudit(intent, store, "result_received", { started_at: time(3), finished_at: time(4) });
     snapshot = await store.commitAttemptAudit({
@@ -684,7 +737,7 @@ describe("FormalOracleRunStore", () => {
     snapshot = await store.commitDispatchIntent({
       run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
       expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
-      intent: firstIntent, request_payload: payload, created_at: time(2),
+      intent: firstIntent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(2),
     });
     const noSend = attemptAudit(firstIntent, store, "not_sent", { started_at: time(3), finished_at: time(4) });
     snapshot = await store.commitAttemptAudit({
@@ -704,7 +757,7 @@ describe("FormalOracleRunStore", () => {
     snapshot = await store.commitDispatchIntent({
       run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
       expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
-      intent: secondIntent, request_payload: payload, created_at: time(8),
+      intent: secondIntent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(8),
     });
     expect(snapshot.checkpoint.entries[1]).toMatchObject({
       state: "DISPATCH_INTENT_COMMITTED",
@@ -735,7 +788,7 @@ describe("FormalOracleRunStore", () => {
     safe = await confirmed.store.commitDispatchIntent({
       run_sha256: confirmed.input.run.run_sha256, expected_head: safe.head_pin,
       expected_checkpoint_sha256: safe.head_pin.checkpoint_sha256,
-      intent: safeIntent, request_payload: safePayload, created_at: time(2),
+      intent: safeIntent, request_envelope: safePayload, prepared_provider_request: preparedPayload(safePayload), created_at: time(2),
     });
     const noResult = attemptAudit(safeIntent, confirmed.store, "no_result_confirmed", { started_at: time(3), finished_at: time(4) });
     safe = await confirmed.store.commitAttemptAudit({
@@ -757,7 +810,7 @@ describe("FormalOracleRunStore", () => {
     blocked = await ambiguous.store.commitDispatchIntent({
       run_sha256: ambiguous.input.run.run_sha256, expected_head: blocked.head_pin,
       expected_checkpoint_sha256: blocked.head_pin.checkpoint_sha256,
-      intent: ambiguousIntent, request_payload: ambiguousPayload, created_at: time(2),
+      intent: ambiguousIntent, request_envelope: ambiguousPayload, prepared_provider_request: preparedPayload(ambiguousPayload), created_at: time(2),
     });
     const unknown = attemptAudit(ambiguousIntent, ambiguous.store, "unknown", { started_at: time(3), finished_at: time(4) });
     blocked = await ambiguous.store.commitAttemptAudit({
@@ -784,7 +837,7 @@ describe("FormalOracleRunStore", () => {
       snapshot = await current.store.commitDispatchIntent({
         run_sha256: current.input.run.run_sha256, expected_head: snapshot.head_pin,
         expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
-        intent, request_payload: payload, created_at: time(2),
+        intent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(2),
       });
       const receipt = attemptAudit(intent, current.store, "result_received", {
         started_at: time(3), finished_at: time(4), stop_reason: stopReason,
@@ -816,7 +869,7 @@ describe("FormalOracleRunStore", () => {
     snapshot = await exhausted.store.commitDispatchIntent({
       run_sha256: exhausted.input.run.run_sha256, expected_head: snapshot.head_pin,
       expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
-      intent: firstIntent, request_payload: payload, created_at: time(2),
+      intent: firstIntent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(2),
     });
     const firstAudit = attemptAudit(firstIntent, exhausted.store, "not_sent", { started_at: time(3), finished_at: time(4) });
     snapshot = await exhausted.store.commitAttemptAudit({
@@ -831,7 +884,7 @@ describe("FormalOracleRunStore", () => {
     snapshot = await exhausted.store.commitDispatchIntent({
       run_sha256: exhausted.input.run.run_sha256, expected_head: snapshot.head_pin,
       expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
-      intent: secondIntent, request_payload: payload, created_at: time(8),
+      intent: secondIntent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(8),
     });
     const finalAudit = attemptAudit(secondIntent, exhausted.store, "no_result_confirmed", { started_at: time(9), finished_at: time(10) });
     snapshot = await exhausted.store.commitAttemptAudit({
@@ -854,7 +907,7 @@ describe("FormalOracleRunStore", () => {
     snapshot = await store.commitDispatchIntent({
       run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
       expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
-      intent, request_payload: payload, created_at: time(2),
+      intent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(2),
     });
     const base = attemptAudit(intent, store, "result_received", { started_at: time(3), finished_at: time(4) });
     await expect(store.commitAttemptAudit({
@@ -912,7 +965,7 @@ describe("FormalOracleRunStore", () => {
       snapshot = await current.store.commitDispatchIntent({
         run_sha256: current.input.run.run_sha256, expected_head: snapshot.head_pin,
         expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
-        intent, request_payload: payload, created_at: time(2),
+        intent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(2),
       });
       const receipt = attemptAudit(intent, current.store, "result_received", {
         started_at: time(3), finished_at: time(4), parsed_response: response,
@@ -992,7 +1045,7 @@ describe("FormalOracleRunStore", () => {
     snapshot = await store.commitDispatchIntent({
       run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
       expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
-      intent, request_payload: payload, created_at: time(2),
+      intent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(2),
     });
     const audit = attemptAudit(intent, store, "not_sent", { started_at: time(3), finished_at: time(4) });
     const common = {
@@ -1041,8 +1094,8 @@ describe("FormalOracleRunStore", () => {
     const payload = requestPayload(1);
     const intent = requestIntent(input, payload, store, 1, 1, time(1));
     await store.privateFs.publishImmutableObject(
-      `runs/${input.run.run_sha256}/objects/request-payloads/${intent.request_payload_sha256}`,
-      "request.bin",
+      `runs/${input.run.run_sha256}/objects/request-envelopes/${intent.request_envelope_sha256}`,
+      "request-envelope.json",
       payload.bytes,
     );
     await store.privateFs.publishImmutableObject(
@@ -1095,7 +1148,7 @@ describe("FormalOracleRunStore", () => {
       snapshot = await store.commitDispatchIntent({
         run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
         expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
-        intent, request_payload: payload, created_at: time(second + 1),
+        intent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(second + 1),
       });
       const receipt = attemptAudit(intent, store, "result_received", {
         started_at: time(second + 2), finished_at: time(second + 3),

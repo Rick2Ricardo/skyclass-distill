@@ -29,6 +29,14 @@ import {
   type FormalOraclePiRequestEnvelopeV1,
 } from "../../contracts/src/oracle-gate-request.js";
 import {
+  FORMAL_ORACLE_PREPARED_ADAPTER_VERSION,
+  FORMAL_ORACLE_PROVIDER_BODY_PROFILE,
+  FORMAL_ORACLE_PROVIDER_TOKEN_FIELD,
+  assertFormalOraclePreparedProviderRequestArtifact,
+  parseFormalOraclePreparedProviderRequestBytes,
+  type FormalOraclePreparedProviderRequestArtifactV1,
+} from "../../contracts/src/oracle-gate-provider-request.js";
+import {
   FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
   FORMAL_ORACLE_USER_PROMPT_VERSION,
   parseFormalOracleUserPromptBytes,
@@ -93,7 +101,12 @@ export interface FormalOracleExecutionPlanItemV1 {
   arm: OracleGateRunArm;
   seed: number;
   model: string;
-  request_payload_sha256: string;
+  request_envelope_sha256: string;
+  provider_body_sha256: string;
+  provider_body_profile: typeof FORMAL_ORACLE_PROVIDER_BODY_PROFILE;
+  provider_body_dispatch_status: "not_dispatchable_transport_mismatch";
+  prepared_adapter_version: typeof FORMAL_ORACLE_PREPARED_ADAPTER_VERSION;
+  provider_token_field: typeof FORMAL_ORACLE_PROVIDER_TOKEN_FIELD;
   system_prompt_sha256: string;
   user_prompt_sha256: string;
   output_schema_sha256: string;
@@ -109,7 +122,7 @@ export interface FormalOracleExecutionPlanItemV1 {
 }
 
 export interface FormalOracleExecutionPlanV1 {
-  schema_version: "formal-oracle-execution-plan-v1";
+  schema_version: "formal-oracle-execution-plan-v2";
   execution_plan_sha256: string;
   items: FormalOracleExecutionPlanItemV1[];
 }
@@ -131,7 +144,8 @@ export interface CommitDispatchIntentInput {
   expected_head: FormalOracleHeadPinV1;
   expected_checkpoint_sha256: string;
   intent: RequestIntentV1;
-  request_payload: FormalOraclePiRequestArtifact;
+  request_envelope: FormalOraclePiRequestArtifact;
+  prepared_provider_request: FormalOraclePreparedProviderRequestArtifactV1;
   created_at: string;
 }
 
@@ -222,7 +236,7 @@ export interface FormalOracleResumePlan {
   api_execution_allowed: false;
 }
 
-const EXECUTION_PLAN_DOMAIN = "skyclass/formal-oracle/execution-plan/v1\0";
+const EXECUTION_PLAN_DOMAIN = "skyclass/formal-oracle/execution-plan/v2\0";
 const TERMINAL_REASON_DOMAIN = "skyclass/formal-oracle/terminal-reason/v1\0";
 const ARMS = new Set<OracleGateRunArm>(["transcript_only", "static_final_board", "uniform_frame", "oracle_delta"]);
 
@@ -429,7 +443,7 @@ function assertExecutionPlan(
 ): void {
   if (!plan || typeof plan !== "object" || Array.isArray(plan)
     || !exactKeys(plan as unknown as Record<string, unknown>, ["schema_version", "execution_plan_sha256", "items"])
-    || plan.schema_version !== "formal-oracle-execution-plan-v1" || !/^[a-f0-9]{64}$/.test(plan.execution_plan_sha256)
+    || plan.schema_version !== "formal-oracle-execution-plan-v2" || !/^[a-f0-9]{64}$/.test(plan.execution_plan_sha256)
     || !isDenseArray(plan.items) || plan.items.length !== schedule.length) {
     throw new Error("Execution plan schema/count 无效");
   }
@@ -438,11 +452,16 @@ function assertExecutionPlan(
     if (!raw || typeof raw !== "object" || Array.isArray(raw)
       || !exactKeys(raw as unknown as Record<string, unknown>, [
         "request_id", "idempotency_key", "schedule_index", "case_id", "arm", "seed", "model", "system_prompt_sha256",
-        "request_payload_sha256", "user_prompt_sha256", "output_schema_sha256", "visuals", "transport", "temperature", "max_input_tokens",
+        "request_envelope_sha256", "provider_body_sha256", "provider_body_profile", "provider_body_dispatch_status", "prepared_adapter_version", "provider_token_field",
+        "user_prompt_sha256", "output_schema_sha256", "visuals", "transport", "temperature", "max_input_tokens",
         "max_output_tokens", "timeout_ms", "max_attempts", "cache_retention", "tools_policy",
       ]) || raw.request_id !== scheduled.request_id || raw.idempotency_key !== scheduled.idempotency_key
       || raw.schedule_index !== index || raw.case_id !== scheduled.case_id || raw.arm !== scheduled.arm || raw.seed !== scheduled.seed
-      || raw.model !== spec.model || !/^[a-f0-9]{64}$/.test(raw.request_payload_sha256)
+      || raw.model !== spec.model || !/^[a-f0-9]{64}$/.test(raw.request_envelope_sha256) || !/^[a-f0-9]{64}$/.test(raw.provider_body_sha256)
+      || raw.provider_body_profile !== FORMAL_ORACLE_PROVIDER_BODY_PROFILE
+      || raw.provider_body_dispatch_status !== "not_dispatchable_transport_mismatch"
+      || raw.prepared_adapter_version !== FORMAL_ORACLE_PREPARED_ADAPTER_VERSION
+      || raw.provider_token_field !== FORMAL_ORACLE_PROVIDER_TOKEN_FIELD
       || raw.system_prompt_sha256 !== spec.prompt.system_sha256
       || !/^[a-f0-9]{64}$/.test(raw.user_prompt_sha256) || raw.output_schema_sha256 !== spec.prompt.output_schema_sha256
       || raw.transport !== spec.transport || raw.temperature !== spec.temperature
@@ -501,7 +520,12 @@ function assertIntentMatchesExecutionPlan(intent: RequestIntentV1, expected: For
   if (intent.request_id !== expected.request_id || intent.idempotency_key !== expected.idempotency_key
     || intent.schedule_index !== expected.schedule_index || intent.case_id !== expected.case_id || intent.arm !== expected.arm
     || intent.seed !== expected.seed || intent.model !== expected.model
-    || intent.request_payload_sha256 !== expected.request_payload_sha256
+    || intent.request_envelope_sha256 !== expected.request_envelope_sha256
+    || intent.provider_body_sha256 !== expected.provider_body_sha256
+    || intent.provider_body_profile !== expected.provider_body_profile
+    || intent.provider_body_dispatch_status !== expected.provider_body_dispatch_status
+    || intent.prepared_adapter_version !== expected.prepared_adapter_version
+    || intent.provider_token_field !== expected.provider_token_field
     || intent.system_prompt_sha256 !== expected.system_prompt_sha256 || intent.user_prompt_sha256 !== expected.user_prompt_sha256
     || intent.output_schema_sha256 !== expected.output_schema_sha256
     || !privateCanonicalJsonBytes(intent.visuals).equals(privateCanonicalJsonBytes(expected.visuals))
@@ -609,10 +633,16 @@ export class FormalOracleRunStore {
     this.privateFs = new PrivateContentAddressedFs(dataDir, this.runStoreUri, options);
   }
 
-  requestObjectUri(runSha256: string, requestPayloadSha256: string): string {
+  requestObjectUri(runSha256: string, requestEnvelopeSha256: string): string {
     assertPrivateSha256(runSha256, "run_sha256");
-    assertPrivateSha256(requestPayloadSha256, "request_payload_sha256");
-    return `runs/${runSha256}/objects/request-payloads/${requestPayloadSha256}/request.bin`;
+    assertPrivateSha256(requestEnvelopeSha256, "request_envelope_sha256");
+    return `runs/${runSha256}/objects/request-envelopes/${requestEnvelopeSha256}/request-envelope.json`;
+  }
+
+  providerBodyObjectUri(runSha256: string, providerBodySha256: string): string {
+    assertPrivateSha256(runSha256, "run_sha256");
+    assertPrivateSha256(providerBodySha256, "provider_body_sha256");
+    return `runs/${runSha256}/objects/provider-bodies/${providerBodySha256}/provider-body.json`;
   }
 
   responseObjectUri(runSha256: string, responseBytesSha256: string): string {
@@ -786,23 +816,40 @@ export class FormalOracleRunStore {
         || Date.parse(snapshot.checkpoint.created_at) > Date.parse(input.created_at)) {
         throw new Error("Dispatch checkpoint 时间不得早于 intent 或上一 checkpoint");
       }
-      assertFormalOraclePiRequestArtifact(input.request_payload);
-      const parsedPayload = parseFormalOraclePiRequestEnvelopeBytes(input.request_payload.bytes);
-      if (parsedPayload.payload_sha256 !== input.request_payload.payload_sha256) throw new Error("Formal request branded artifact hash 漂移");
-      assertEnvelopeMatchesExecutionPlan(parsedPayload.envelope, snapshot.execution_plan.items[entryIndex], snapshot.formal_spec);
-      const payload = Buffer.from(parsedPayload.bytes);
-      const payloadSha256 = digest(payload);
-      if (payloadSha256 !== snapshot.execution_plan.items[entryIndex].request_payload_sha256
-        || payloadSha256 !== input.intent.request_payload_sha256) {
-        throw new Error("request payload bytes/intent/execution plan SHA-256 三方不匹配");
+      assertFormalOraclePiRequestArtifact(input.request_envelope);
+      assertFormalOraclePreparedProviderRequestArtifact(input.prepared_provider_request);
+      const parsedEnvelope = parseFormalOraclePiRequestEnvelopeBytes(input.request_envelope.bytes);
+      if (parsedEnvelope.payload_sha256 !== input.request_envelope.payload_sha256) throw new Error("Formal request envelope branded artifact hash 漂移");
+      assertEnvelopeMatchesExecutionPlan(parsedEnvelope.envelope, snapshot.execution_plan.items[entryIndex], snapshot.formal_spec);
+      const prepared = parseFormalOraclePreparedProviderRequestBytes({
+        request_envelope: parsedEnvelope,
+        provider_body_bytes: input.prepared_provider_request.body_bytes,
+      });
+      const envelopeBytes = Buffer.from(parsedEnvelope.bytes);
+      const bodyBytes = Buffer.from(prepared.body_bytes);
+      const envelopeSha256 = digest(envelopeBytes);
+      const bodySha256 = digest(bodyBytes);
+      if (envelopeSha256 !== snapshot.execution_plan.items[entryIndex].request_envelope_sha256
+        || envelopeSha256 !== input.intent.request_envelope_sha256
+        || bodySha256 !== snapshot.execution_plan.items[entryIndex].provider_body_sha256
+        || bodySha256 !== input.intent.provider_body_sha256) {
+        throw new Error("request envelope/provider body bytes 与 intent/execution plan 双 SHA-256 不匹配");
       }
-      const expectedUri = this.requestObjectUri(input.run_sha256, input.intent.request_payload_sha256);
-      if (input.intent.request_object_uri !== expectedUri) throw new Error("request_object_uri 不属于当前私有内容地址 run");
+      const expectedEnvelopeUri = this.requestObjectUri(input.run_sha256, input.intent.request_envelope_sha256);
+      const expectedBodyUri = this.providerBodyObjectUri(input.run_sha256, input.intent.provider_body_sha256);
+      if (input.intent.request_envelope_object_uri !== expectedEnvelopeUri || input.intent.provider_body_object_uri !== expectedBodyUri) {
+        throw new Error("request envelope/provider body URI 不属于当前私有内容地址 run");
+      }
 
       await this.privateFs.publishImmutableObject(
-        this.requestPayloadDirectory(input.run_sha256, input.intent.request_payload_sha256),
-        "request.bin",
-        payload,
+        this.requestPayloadDirectory(input.run_sha256, input.intent.request_envelope_sha256),
+        "request-envelope.json",
+        envelopeBytes,
+      );
+      await this.privateFs.publishImmutableObject(
+        this.providerBodyDirectory(input.run_sha256, input.intent.provider_body_sha256),
+        "provider-body.json",
+        bodyBytes,
       );
       await this.privateFs.publishImmutableObject(
         this.intentDirectory(input.run_sha256, input.intent.intent_sha256),
@@ -873,9 +920,9 @@ export class FormalOracleRunStore {
         || Date.parse(snapshot.checkpoint.created_at) > Date.parse(input.created_at)) {
         throw new Error("Attempt audit ordinal/time 未闭合 durable dispatch checkpoint");
       }
-      const durableRequest = await this.privateFs.readFile(intent.request_object_uri);
-      if (digest(durableRequest) !== intent.request_payload_sha256 || input.audit.request_sha256 !== digest(durableRequest)) {
-        throw new Error("Attempt audit 未绑定 durable request bytes");
+      const durableRequest = await this.privateFs.readFile(intent.provider_body_object_uri);
+      if (digest(durableRequest) !== intent.provider_body_sha256 || input.audit.request_sha256 !== digest(durableRequest)) {
+        throw new Error("Attempt audit 未绑定 durable provider body bytes");
       }
 
       if (input.audit.outcome === "result_received") {
@@ -1153,11 +1200,16 @@ export class FormalOracleRunStore {
       throw new Error("Request intent 内容地址或 run/schedule binding 无效");
     }
     assertIntentMatchesExecutionPlan(intent, executionPlan.items[entryIndex]);
-    const request = await this.privateFs.readFile(intent.request_object_uri);
-    if (intent.request_object_uri !== this.requestObjectUri(run.run_sha256, intent.request_payload_sha256)
-      || digest(request) !== intent.request_payload_sha256) throw new Error("Request intent 未绑定 durable request bytes");
+    const request = await this.privateFs.readFile(intent.request_envelope_object_uri);
+    const providerBody = await this.privateFs.readFile(intent.provider_body_object_uri);
+    if (intent.request_envelope_object_uri !== this.requestObjectUri(run.run_sha256, intent.request_envelope_sha256)
+      || digest(request) !== intent.request_envelope_sha256
+      || intent.provider_body_object_uri !== this.providerBodyObjectUri(run.run_sha256, intent.provider_body_sha256)
+      || digest(providerBody) !== intent.provider_body_sha256) throw new Error("Request intent 未绑定 durable envelope/provider body bytes");
     const parsed = parseFormalOraclePiRequestEnvelopeBytes(request);
-    if (parsed.payload_sha256 !== intent.request_payload_sha256) throw new Error("Durable request envelope content address 无效");
+    if (parsed.payload_sha256 !== intent.request_envelope_sha256) throw new Error("Durable request envelope content address 无效");
+    const prepared = parseFormalOraclePreparedProviderRequestBytes({ request_envelope: parsed, provider_body_bytes: providerBody });
+    if (prepared.provider_body_sha256 !== intent.provider_body_sha256) throw new Error("Durable provider body content address 无效");
     assertEnvelopeMatchesExecutionPlan(parsed.envelope, executionPlan.items[entryIndex], formalSpec);
     return intent;
   }
@@ -1497,6 +1549,9 @@ export class FormalOracleRunStore {
     return `${this.terminalReasonDirectory(runSha256, reasonSha256)}/terminal-reason.json`;
   }
   private requestPayloadDirectory(runSha256: string, payloadSha256: string): string {
-    return `${this.runPath(runSha256)}/objects/request-payloads/${payloadSha256}`;
+    return `${this.runPath(runSha256)}/objects/request-envelopes/${payloadSha256}`;
+  }
+  private providerBodyDirectory(runSha256: string, providerBodySha256: string): string {
+    return `${this.runPath(runSha256)}/objects/provider-bodies/${providerBodySha256}`;
   }
 }

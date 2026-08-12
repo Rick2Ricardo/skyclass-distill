@@ -62,7 +62,7 @@ export interface FormalRunContractV1 {
 }
 
 export interface RequestIntentV1 {
-  schema_version: "oracle-gate-request-intent-v1";
+  schema_version: "oracle-gate-request-intent-v2";
   intent_sha256: string;
   run_sha256: string;
   request_id: string;
@@ -74,8 +74,14 @@ export interface RequestIntentV1 {
   arm: OracleGateRunArm;
   seed: number;
   model: string;
-  request_payload_sha256: string;
-  request_object_uri: string;
+  request_envelope_sha256: string;
+  request_envelope_object_uri: string;
+  provider_body_sha256: string;
+  provider_body_object_uri: string;
+  provider_body_profile: "openai-chat-completions-direct-serialization-v1";
+  provider_body_dispatch_status: "not_dispatchable_transport_mismatch";
+  prepared_adapter_version: "formal-oracle-prepared-provider-adapter-v1";
+  provider_token_field: "max_completion_tokens";
   system_prompt_sha256: string;
   user_prompt_sha256: string;
   output_schema_sha256: string;
@@ -518,17 +524,21 @@ export function validateRequestIntent(input: unknown): OracleGateRunValidationRe
   const issues: OracleGateRunValidationIssue[] = [];
   const issue = (path: string, message: string): void => { issues.push({ path, message }); };
   if (!isRecord(input)) return report([{ path: "$", message: "必须是对象" }]);
-  const keys = ["schema_version", "intent_sha256", "run_sha256", "request_id", "idempotency_key", "schedule_index", "attempt_ordinal", "prepared_at", "case_id", "arm", "seed", "model", "request_payload_sha256", "request_object_uri", "system_prompt_sha256", "user_prompt_sha256", "output_schema_sha256", "visuals", "transport", "temperature", "max_input_tokens", "max_output_tokens", "timeout_ms", "max_attempts", "cache_retention", "tools_policy"];
+  const keys = ["schema_version", "intent_sha256", "run_sha256", "request_id", "idempotency_key", "schedule_index", "attempt_ordinal", "prepared_at", "case_id", "arm", "seed", "model", "request_envelope_sha256", "request_envelope_object_uri", "provider_body_sha256", "provider_body_object_uri", "provider_body_profile", "provider_body_dispatch_status", "prepared_adapter_version", "provider_token_field", "system_prompt_sha256", "user_prompt_sha256", "output_schema_sha256", "visuals", "transport", "temperature", "max_input_tokens", "max_output_tokens", "timeout_ms", "max_attempts", "cache_retention", "tools_policy"];
   if (!exactKeys(input, keys)) issue("$", "字段集合无效");
-  if (input.schema_version !== "oracle-gate-request-intent-v1") issue("schema_version", "版本无效");
-  for (const field of ["intent_sha256", "run_sha256", "idempotency_key", "request_payload_sha256", "system_prompt_sha256", "user_prompt_sha256", "output_schema_sha256"] as const) if (!isSha(input[field])) issue(field, "必须是 SHA-256");
+  if (input.schema_version !== "oracle-gate-request-intent-v2") issue("schema_version", "版本无效");
+  for (const field of ["intent_sha256", "run_sha256", "idempotency_key", "request_envelope_sha256", "provider_body_sha256", "system_prompt_sha256", "user_prompt_sha256", "output_schema_sha256"] as const) if (!isSha(input[field])) issue(field, "必须是 SHA-256");
   if (!isId(input.request_id) || !isId(input.case_id) || !isNonEmpty(input.model)) issue("identity", "request_id/case_id/model 格式无效");
   if (!isNonNegativeSafeInteger(input.schedule_index)) issue("schedule_index", "必须是非负安全整数");
   if (!isPositiveSafeInteger(input.attempt_ordinal)) issue("attempt_ordinal", "必须是正安全整数");
   if (!isCanonicalTime(input.prepared_at)) issue("prepared_at", "必须是 canonical ISO 时间");
   if (!ARMS.has(input.arm as OracleGateRunArm)) issue("arm", "值无效");
   if (!isUint32(input.seed)) issue("seed", "必须是 0..2^32-1 安全整数");
-  if (!isSafeUri(input.request_object_uri)) issue("request_object_uri", "必须是受控相对路径");
+  if (!isSafeUri(input.request_envelope_object_uri) || !isSafeUri(input.provider_body_object_uri)) issue("request_objects", "envelope/body 必须是受控相对路径");
+  if (input.provider_body_profile !== "openai-chat-completions-direct-serialization-v1"
+    || input.provider_body_dispatch_status !== "not_dispatchable_transport_mismatch"
+    || input.prepared_adapter_version !== "formal-oracle-prepared-provider-adapter-v1"
+    || input.provider_token_field !== "max_completion_tokens") issue("prepared_profile", "必须冻结 direct provider profile/adapter/token field");
   if (!isDenseArray(input.visuals)) issue("visuals", "必须是稠密数组且不得有额外属性");
   else {
     input.visuals.forEach((visual, index) => validateVisual(visual, `visuals[${index}]`, issues));
@@ -870,7 +880,7 @@ export function validateRequestAttemptAgainstIntent(intent: unknown, audit: unkn
   const actual = audit as RequestAttemptAuditV1;
   const equalFields: Array<keyof RequestIntentV1 & keyof RequestAttemptAuditV1> = ["run_sha256", "request_id", "idempotency_key", "attempt_ordinal", "model", "transport", "temperature", "max_input_tokens", "max_output_tokens", "timeout_ms", "seed", "cache_retention", "tools_policy"];
   for (const field of equalFields) if (expected[field] !== actual[field]) issues.push({ path: `audit.${field}`, message: "与 request intent 不一致" });
-  if (actual.intent_sha256 !== expected.intent_sha256 || actual.request_sha256 !== expected.request_payload_sha256 || actual.request_object_uri !== expected.request_object_uri) issues.push({ path: "audit.request", message: "intent/request 内容绑定不一致" });
+  if (actual.intent_sha256 !== expected.intent_sha256 || actual.request_sha256 !== expected.provider_body_sha256 || actual.request_object_uri !== expected.provider_body_object_uri) issues.push({ path: "audit.request", message: "intent/provider body 内容绑定不一致" });
   if (stableJson(actual.submitted_visuals) !== stableJson(expected.visuals)) issues.push({ path: "audit.submitted_visuals", message: "与 request intent 不一致" });
   if (isRecord(actual.usage) && (Number(actual.usage.input_tokens) > expected.max_input_tokens || Number(actual.usage.output_tokens) > expected.max_output_tokens)) issues.push({ path: "audit.usage", message: "token usage 超过 request intent 冻结预算" });
   if ((actual.outcome === "not_sent" || actual.outcome === "no_result_confirmed")
@@ -1086,7 +1096,14 @@ export function validateCompletedFormalRunArtifactChain(input: {
       arm: item.arm,
       seed: item.seed,
       model: item.model,
-      request_payload_sha256: item.request_payload_sha256,
+      request_envelope_sha256: item.request_envelope_sha256,
+      request_envelope_object_uri: item.request_envelope_object_uri,
+      provider_body_sha256: item.provider_body_sha256,
+      provider_body_object_uri: item.provider_body_object_uri,
+      provider_body_profile: item.provider_body_profile,
+      provider_body_dispatch_status: item.provider_body_dispatch_status,
+      prepared_adapter_version: item.prepared_adapter_version,
+      provider_token_field: item.provider_token_field,
       system_prompt_sha256: item.system_prompt_sha256,
       user_prompt_sha256: item.user_prompt_sha256,
       output_schema_sha256: item.output_schema_sha256,

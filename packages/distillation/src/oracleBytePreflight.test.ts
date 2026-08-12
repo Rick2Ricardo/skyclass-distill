@@ -19,6 +19,10 @@ import {
   FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
   FORMAL_ORACLE_USER_PROMPT_VERSION,
   buildFormalOraclePiRequestEnvelope,
+  buildFormalOraclePreparedProviderRequest,
+  FORMAL_ORACLE_PREPARED_ADAPTER_VERSION,
+  FORMAL_ORACLE_PROVIDER_BODY_PROFILE,
+  FORMAL_ORACLE_PROVIDER_TOKEN_FIELD,
   renderFormalOracleUserPrompt,
   parseFormalOracleUserPromptBytes,
   type GoldReviewDecisionRecord,
@@ -559,7 +563,7 @@ async function buildCompositionFixture(): Promise<ComposeFormalOracleRunGenesisI
     return { request_id: item.request_id, visual_bytes: visual };
   }));
   const executionPlan: FormalOracleExecutionPlanV1 = {
-    schema_version: "formal-oracle-execution-plan-v1",
+    schema_version: "formal-oracle-execution-plan-v2",
     execution_plan_sha256: "0".repeat(64),
     items: structural.schedule.map((item, index) => {
       const visualBytes = artifacts[index].visual_bytes[0];
@@ -583,7 +587,12 @@ async function buildCompositionFixture(): Promise<ComposeFormalOracleRunGenesisI
         arm: item.arm,
         seed: item.seed,
         model: fixture.spec.model,
-        request_payload_sha256: "0".repeat(64),
+        request_envelope_sha256: "0".repeat(64),
+        provider_body_sha256: "0".repeat(64),
+        provider_body_profile: FORMAL_ORACLE_PROVIDER_BODY_PROFILE,
+        provider_body_dispatch_status: "not_dispatchable_transport_mismatch" as const,
+        prepared_adapter_version: FORMAL_ORACLE_PREPARED_ADAPTER_VERSION,
+        provider_token_field: FORMAL_ORACLE_PROVIDER_TOKEN_FIELD,
         system_prompt_sha256: fixture.spec.prompt.system_sha256,
         user_prompt_sha256: userPrompt.prompt_sha256,
         output_schema_sha256: fixture.spec.prompt.output_schema_sha256,
@@ -605,7 +614,7 @@ async function buildCompositionFixture(): Promise<ComposeFormalOracleRunGenesisI
         cache_retention: fixture.spec.cache_retention,
         tools_policy: fixture.spec.tools_policy,
       };
-      planItem.request_payload_sha256 = buildFormalOraclePiRequestEnvelope({
+      const requestEnvelope = buildFormalOraclePiRequestEnvelope({
         request_id: planItem.request_id, schedule_index: planItem.schedule_index, case_id: planItem.case_id, arm: planItem.arm,
         model: planItem.model, system_prompt_bytes: systemPromptBytes, expected_system_prompt_sha256: planItem.system_prompt_sha256,
         user_prompt: userPrompt, expected_rendered_user_prompt_sha256: planItem.user_prompt_sha256,
@@ -618,7 +627,9 @@ async function buildCompositionFixture(): Promise<ComposeFormalOracleRunGenesisI
         seed: planItem.seed, temperature: planItem.temperature, max_input_tokens: planItem.max_input_tokens,
         max_output_tokens: planItem.max_output_tokens, timeout_ms: planItem.timeout_ms, max_attempts: planItem.max_attempts,
         transport: planItem.transport, cache_retention: planItem.cache_retention, tools_policy: planItem.tools_policy,
-      }).payload_sha256;
+      });
+      planItem.request_envelope_sha256 = requestEnvelope.payload_sha256;
+      planItem.provider_body_sha256 = buildFormalOraclePreparedProviderRequest(requestEnvelope).provider_body_sha256;
       return planItem;
     }),
   };
@@ -760,10 +771,13 @@ describe("Formal Oracle externally-pinned composition gate", () => {
           stage: "composition_attested_only",
           rights_registry_status: "pending_external_authoritative_head",
           request_envelope_serialization_status: "completed",
+          provider_body_serialization_status: "completed_direct_fetch_boundary_prepared",
+          provider_body_transport_compatibility_status: "pending_pi_or_direct_profile_selection",
           user_prompt_derivation_status: "completed",
           input_token_budget_status: "pending_model_specific_tokenizer",
-          provider_wire_binding_status: "pending_prepared_transport_adapter",
+          provider_wire_binding_status: "pending_external_endpoint_account_validation",
           provider_account_endpoint_status: "pending_external_runtime_binding",
+          provider_response_capture_status: "pending_strict_sse_capture_contract",
           toolchain_capsule_status: "pending_external_immutable_capsule",
           composition_record_authenticity_status: "pending_external_trusted_signature_or_worm",
           external_head_pin_status: "pending_external_monotonic_worm",
