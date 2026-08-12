@@ -6,9 +6,25 @@ import {
   type FormalOraclePiRequestEnvelopeV1,
 } from "./oracle-gate-request.js";
 
-export const FORMAL_ORACLE_PROVIDER_BODY_PROFILE = "openai-chat-completions-direct-serialization-v1" as const;
+export const FORMAL_ORACLE_PROVIDER_BODY_PROFILE = "pi-openai-completions-fetch-boundary-v1" as const;
 export const FORMAL_ORACLE_PROVIDER_TOKEN_FIELD = "max_completion_tokens" as const;
-export const FORMAL_ORACLE_PREPARED_ADAPTER_VERSION = "formal-oracle-prepared-provider-adapter-v1" as const;
+export const FORMAL_ORACLE_PREPARED_ADAPTER_VERSION = "formal-oracle-pi-fetch-boundary-adapter-v1" as const;
+export const FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES = Object.freeze({
+  schema_version: "formal-oracle-pi-observed-local-dependency-hashes-v1",
+  pi_ai_version: "0.84.1",
+  pi_openai_completions_source_sha256: "727d744f20985f667151e8ecee3ad30af388d9d66d91a92d0fb9ad3261da4363",
+  pi_package_json_sha256: "c69acef56f6b9510ef0b3db2d35fb1f22c240bd0b11fd588c3e860042ed98b04",
+  openai_sdk_version: "6.26.0",
+  openai_client_source_sha256: "94004bb03478cc9b9c3e8c5a5f1493f8850e73c6ba018d46b01c0c3bb122857d",
+  openai_request_encoder_source_sha256: "f531d2038dfc1aec9a0637fedaa9524920fbf94f353955034cd9c11165a2969b",
+  openai_chat_completions_source_sha256: "e132e527ddda22e76c41340b92c3c00883bf1fe0b44d418fede2197ade7af34c",
+  openai_package_json_sha256: "24889958f2fc85ccd36ab0af48725cddd10a08faa74f72747f9711a3eeda1b31",
+  observed_node_version: "v22.13.0",
+  required_node_engine: ">=22.19.0",
+  node_engine_status: "pending_incompatible_node_engine",
+  external_toolchain_authenticity_status: "pending_external_immutable_capsule",
+  api_execution_allowed: false,
+} as const);
 
 export interface FormalOracleOpenAICompatibleBodyV1 {
   model: string;
@@ -25,12 +41,11 @@ export interface FormalOracleOpenAICompatibleBodyV1 {
   temperature: 0;
   seed: number;
   store: false;
-  tools: [];
 }
 
 export interface FormalOraclePreparedProviderRequestArtifactV1 {
   readonly provider_body_profile: typeof FORMAL_ORACLE_PROVIDER_BODY_PROFILE;
-  readonly provider_body_dispatch_status: "not_dispatchable_transport_mismatch";
+  readonly provider_body_dispatch_status: "pending_local_pi_fetch_boundary_proof_non_executable";
   readonly adapter_version: typeof FORMAL_ORACLE_PREPARED_ADAPTER_VERSION;
   readonly token_field: typeof FORMAL_ORACLE_PROVIDER_TOKEN_FIELD;
   readonly request_envelope_sha256: string;
@@ -38,14 +53,15 @@ export interface FormalOraclePreparedProviderRequestArtifactV1 {
   readonly timeout_ms: number;
   readonly http_method: "POST";
   readonly content_type: "application/json";
-  readonly redirect_policy: "error";
+  readonly redirect_policy_status: "not_bound_by_pi_sdk_fetch_boundary";
   readonly hidden_provider_retries: 0;
   readonly body: Readonly<FormalOracleOpenAICompatibleBodyV1>;
   readonly body_bytes: Uint8Array;
-  readonly pi_sdk_wire_equivalence_status: "pending_not_used_by_direct_profile";
+  readonly pi_sdk_fetch_boundary_equivalence_status: "pending_local_fake_fetch_proof";
   readonly provider_endpoint_account_status: "pending_external_runtime_binding";
-  readonly formal_transport_compatibility_status: "pending_pi_or_direct_profile_selection";
-  readonly runtime_toolchain_status: "pending_external_immutable_capsule";
+  readonly formal_transport_compatibility_status: "pending_local_fake_fetch_proof";
+  readonly observed_local_dependency_hashes: typeof FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES;
+  readonly runtime_toolchain_status: "pending_incompatible_node_engine_and_external_immutable_capsule";
   readonly provider_response_capture_status: "pending_strict_sse_capture_contract";
   readonly api_execution_allowed: false;
 }
@@ -175,16 +191,15 @@ function bodyFromEnvelope(envelope: FormalOraclePiRequestEnvelopeV1): FormalOrac
     messages: [{ role: "system", content: envelope.system_prompt }, { role: "user", content }],
     stream: true,
     stream_options: { include_usage: true },
+    store: false,
     max_completion_tokens: envelope.max_output_tokens,
     temperature: envelope.temperature,
     seed: envelope.seed,
-    store: false,
-    tools: [],
   };
 }
 function validateBody(value: unknown, envelope: FormalOraclePiRequestEnvelopeV1): asserts value is FormalOracleOpenAICompatibleBodyV1 {
   if (!isRecord(value)) throw new Error("Prepared provider body 顶层必须是对象");
-  exactKeys(value, ["model", "messages", "stream", "stream_options", "max_completion_tokens", "temperature", "seed", "store", "tools"], "Prepared provider body");
+  exactKeys(value, ["model", "messages", "stream", "stream_options", "max_completion_tokens", "temperature", "seed", "store"], "Prepared provider body");
   if (value.model !== envelope.model || value.stream !== true || value.store !== false
     || value.max_completion_tokens !== envelope.max_output_tokens || value.temperature !== 0 || value.seed !== envelope.seed) {
     throw new Error("Prepared provider body model/stream/store/token/temperature/seed 未绑定 envelope");
@@ -192,15 +207,15 @@ function validateBody(value: unknown, envelope: FormalOraclePiRequestEnvelopeV1)
   if (!isRecord(value.stream_options)) throw new Error("Prepared provider body stream usage 无效");
   exactKeys(value.stream_options, ["include_usage"], "Prepared provider body stream_options");
   if (value.stream_options.include_usage !== true) throw new Error("Prepared provider body stream usage 无效");
-  if (!dense(value.tools) || value.tools.length !== 0 || !dense(value.messages) || value.messages.length !== 2) throw new Error("Prepared provider body tools/messages 无效");
+  if (!dense(value.messages) || value.messages.length !== 2) throw new Error("Prepared provider body messages 无效");
   const expected = bodyFromEnvelope(envelope);
-  if (canonical(value) !== canonical(expected)) throw new Error("Prepared provider body 未逐字段绑定 request envelope");
+  if (JSON.stringify(value) !== JSON.stringify(expected)) throw new Error("Prepared provider body 未按 Pi fetch-boundary 字段顺序绑定 request envelope");
 }
 
 function createArtifact(envelope: FormalOraclePiRequestArtifact, body: FormalOracleOpenAICompatibleBodyV1, bytes: Uint8Array): FormalOraclePreparedProviderRequestArtifactV1 {
   const value = Object.freeze({
     provider_body_profile: FORMAL_ORACLE_PROVIDER_BODY_PROFILE,
-    provider_body_dispatch_status: "not_dispatchable_transport_mismatch" as const,
+    provider_body_dispatch_status: "pending_local_pi_fetch_boundary_proof_non_executable" as const,
     adapter_version: FORMAL_ORACLE_PREPARED_ADAPTER_VERSION,
     token_field: FORMAL_ORACLE_PROVIDER_TOKEN_FIELD,
     request_envelope_sha256: envelope.payload_sha256,
@@ -208,14 +223,15 @@ function createArtifact(envelope: FormalOraclePiRequestArtifact, body: FormalOra
     timeout_ms: envelope.envelope.timeout_ms,
     http_method: "POST" as const,
     content_type: "application/json" as const,
-    redirect_policy: "error" as const,
+    redirect_policy_status: "not_bound_by_pi_sdk_fetch_boundary" as const,
     hidden_provider_retries: 0 as const,
     body: freeze(body),
     body_bytes: Uint8Array.from(bytes),
-    pi_sdk_wire_equivalence_status: "pending_not_used_by_direct_profile" as const,
+    pi_sdk_fetch_boundary_equivalence_status: "pending_local_fake_fetch_proof" as const,
     provider_endpoint_account_status: "pending_external_runtime_binding" as const,
-    formal_transport_compatibility_status: "pending_pi_or_direct_profile_selection" as const,
-    runtime_toolchain_status: "pending_external_immutable_capsule" as const,
+    formal_transport_compatibility_status: "pending_local_fake_fetch_proof" as const,
+    observed_local_dependency_hashes: FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES,
+    runtime_toolchain_status: "pending_incompatible_node_engine_and_external_immutable_capsule" as const,
     provider_response_capture_status: "pending_strict_sse_capture_contract" as const,
     api_execution_allowed: false as const,
   });
@@ -231,7 +247,7 @@ export function buildFormalOraclePreparedProviderRequest(
   const reparsed = parseFormalOraclePiRequestEnvelopeBytes(requestEnvelope.bytes);
   if (reparsed.payload_sha256 !== requestEnvelope.payload_sha256) throw new Error("Prepared provider request envelope bytes/hash 漂移");
   const body = bodyFromEnvelope(reparsed.envelope);
-  const bytes = new TextEncoder().encode(canonical(body));
+  const bytes = new TextEncoder().encode(JSON.stringify(body));
   return createArtifact(reparsed, body, bytes);
 }
 
@@ -245,7 +261,7 @@ export function parseFormalOraclePreparedProviderRequestBytes(input: {
   new Scanner(source).scan();
   const value = JSON.parse(source) as unknown;
   validateBody(value, envelope.envelope);
-  const canonicalBytes = new TextEncoder().encode(canonical(value));
+  const canonicalBytes = new TextEncoder().encode(JSON.stringify(bodyFromEnvelope(envelope.envelope)));
   if (canonicalBytes.byteLength !== input.provider_body_bytes.byteLength
     || !canonicalBytes.every((byte, index) => byte === input.provider_body_bytes[index])) {
     throw new Error("Prepared provider body 必须是 strict canonical JSON");
@@ -268,22 +284,24 @@ export function revalidateFormalOraclePreparedProviderRequestArtifact(
   const envelope = preparedEnvelopes.get(value as object);
   if (!envelope) throw new Error("Prepared provider request 缺少进程内 envelope provenance");
   if (value.provider_body_profile !== FORMAL_ORACLE_PROVIDER_BODY_PROFILE
-    || value.provider_body_dispatch_status !== "not_dispatchable_transport_mismatch"
+    || value.provider_body_dispatch_status !== "pending_local_pi_fetch_boundary_proof_non_executable"
     || value.adapter_version !== FORMAL_ORACLE_PREPARED_ADAPTER_VERSION
     || value.token_field !== FORMAL_ORACLE_PROVIDER_TOKEN_FIELD || value.request_envelope_sha256 !== envelope.payload_sha256
-    || value.http_method !== "POST" || value.content_type !== "application/json" || value.redirect_policy !== "error"
+    || value.http_method !== "POST" || value.content_type !== "application/json"
+    || value.redirect_policy_status !== "not_bound_by_pi_sdk_fetch_boundary"
     || value.hidden_provider_retries !== 0
-    || value.pi_sdk_wire_equivalence_status !== "pending_not_used_by_direct_profile"
+    || value.pi_sdk_fetch_boundary_equivalence_status !== "pending_local_fake_fetch_proof"
     || value.provider_endpoint_account_status !== "pending_external_runtime_binding" || value.api_execution_allowed !== false) {
     throw new Error("Prepared provider request profile/provenance/status 漂移");
   }
-  if (value.runtime_toolchain_status !== "pending_external_immutable_capsule"
+  if (value.runtime_toolchain_status !== "pending_incompatible_node_engine_and_external_immutable_capsule"
     || value.provider_response_capture_status !== "pending_strict_sse_capture_contract"
-    || value.formal_transport_compatibility_status !== "pending_pi_or_direct_profile_selection") {
+    || value.formal_transport_compatibility_status !== "pending_local_fake_fetch_proof"
+    || value.observed_local_dependency_hashes !== FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES) {
     throw new Error("Prepared provider request runtime/response capture 尚未闭合");
   }
   const reparsed = parseFormalOraclePreparedProviderRequestBytes({ request_envelope: envelope, provider_body_bytes: value.body_bytes });
-  if (reparsed.provider_body_sha256 !== value.provider_body_sha256 || canonical(reparsed.body) !== canonical(value.body)) {
+  if (reparsed.provider_body_sha256 !== value.provider_body_sha256 || JSON.stringify(reparsed.body) !== JSON.stringify(value.body)) {
     throw new Error("Prepared provider request body bytes/hash/object 漂移");
   }
   return reparsed;

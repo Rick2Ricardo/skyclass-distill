@@ -104,7 +104,7 @@ export interface FormalOracleExecutionPlanItemV1 {
   request_envelope_sha256: string;
   provider_body_sha256: string;
   provider_body_profile: typeof FORMAL_ORACLE_PROVIDER_BODY_PROFILE;
-  provider_body_dispatch_status: "not_dispatchable_transport_mismatch";
+  provider_body_dispatch_status: "pending_local_pi_fetch_boundary_proof_non_executable";
   prepared_adapter_version: typeof FORMAL_ORACLE_PREPARED_ADAPTER_VERSION;
   provider_token_field: typeof FORMAL_ORACLE_PROVIDER_TOKEN_FIELD;
   system_prompt_sha256: string;
@@ -459,7 +459,7 @@ function assertExecutionPlan(
       || raw.schedule_index !== index || raw.case_id !== scheduled.case_id || raw.arm !== scheduled.arm || raw.seed !== scheduled.seed
       || raw.model !== spec.model || !/^[a-f0-9]{64}$/.test(raw.request_envelope_sha256) || !/^[a-f0-9]{64}$/.test(raw.provider_body_sha256)
       || raw.provider_body_profile !== FORMAL_ORACLE_PROVIDER_BODY_PROFILE
-      || raw.provider_body_dispatch_status !== "not_dispatchable_transport_mismatch"
+      || raw.provider_body_dispatch_status !== "pending_local_pi_fetch_boundary_proof_non_executable"
       || raw.prepared_adapter_version !== FORMAL_ORACLE_PREPARED_ADAPTER_VERSION
       || raw.provider_token_field !== FORMAL_ORACLE_PROVIDER_TOKEN_FIELD
       || raw.system_prompt_sha256 !== spec.prompt.system_sha256

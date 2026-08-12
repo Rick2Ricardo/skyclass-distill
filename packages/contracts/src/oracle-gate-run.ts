@@ -78,9 +78,9 @@ export interface RequestIntentV1 {
   request_envelope_object_uri: string;
   provider_body_sha256: string;
   provider_body_object_uri: string;
-  provider_body_profile: "openai-chat-completions-direct-serialization-v1";
-  provider_body_dispatch_status: "not_dispatchable_transport_mismatch";
-  prepared_adapter_version: "formal-oracle-prepared-provider-adapter-v1";
+  provider_body_profile: "pi-openai-completions-fetch-boundary-v1";
+  provider_body_dispatch_status: "pending_local_pi_fetch_boundary_proof_non_executable";
+  prepared_adapter_version: "formal-oracle-pi-fetch-boundary-adapter-v1";
   provider_token_field: "max_completion_tokens";
   system_prompt_sha256: string;
   user_prompt_sha256: string;
@@ -535,10 +535,10 @@ export function validateRequestIntent(input: unknown): OracleGateRunValidationRe
   if (!ARMS.has(input.arm as OracleGateRunArm)) issue("arm", "值无效");
   if (!isUint32(input.seed)) issue("seed", "必须是 0..2^32-1 安全整数");
   if (!isSafeUri(input.request_envelope_object_uri) || !isSafeUri(input.provider_body_object_uri)) issue("request_objects", "envelope/body 必须是受控相对路径");
-  if (input.provider_body_profile !== "openai-chat-completions-direct-serialization-v1"
-    || input.provider_body_dispatch_status !== "not_dispatchable_transport_mismatch"
-    || input.prepared_adapter_version !== "formal-oracle-prepared-provider-adapter-v1"
-    || input.provider_token_field !== "max_completion_tokens") issue("prepared_profile", "必须冻结 direct provider profile/adapter/token field");
+  if (input.provider_body_profile !== "pi-openai-completions-fetch-boundary-v1"
+    || input.provider_body_dispatch_status !== "pending_local_pi_fetch_boundary_proof_non_executable"
+    || input.prepared_adapter_version !== "formal-oracle-pi-fetch-boundary-adapter-v1"
+    || input.provider_token_field !== "max_completion_tokens") issue("prepared_profile", "必须冻结 Pi fetch-boundary profile/adapter/token field，且仍不可执行");
   if (!isDenseArray(input.visuals)) issue("visuals", "必须是稠密数组且不得有额外属性");
   else {
     input.visuals.forEach((visual, index) => validateVisual(visual, `visuals[${index}]`, issues));

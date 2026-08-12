@@ -45,13 +45,14 @@ export interface FormalOracleCompositionAttestationV1 {
   run_store_uri: string;
   rights_registry_status: "pending_external_authoritative_head";
   request_envelope_serialization_status: "completed";
-  provider_body_serialization_status: "completed_direct_fetch_boundary_prepared";
-  provider_body_transport_compatibility_status: "pending_pi_or_direct_profile_selection";
+  provider_body_serialization_status: "completed_pi_body_serialization_candidate";
+  provider_body_transport_compatibility_status: "pending_per_request_local_fake_fetch_proof";
   user_prompt_derivation_status: "completed";
   input_token_budget_status: "pending_model_specific_tokenizer";
   provider_wire_binding_status: "pending_external_endpoint_account_validation";
   provider_account_endpoint_status: "pending_external_runtime_binding";
   provider_response_capture_status: "pending_strict_sse_capture_contract";
+  provider_runtime_engine_status: "pending_incompatible_node_engine";
   toolchain_capsule_status: "pending_external_immutable_capsule";
   composition_record_authenticity_status: "pending_external_trusted_signature_or_worm";
   external_head_pin_status: "pending_external_monotonic_worm";
@@ -145,7 +146,7 @@ export function validateFormalOracleCompositionAttestation(
     "speech_attestation_sha256", "run_sha256", "execution_plan_sha256", "genesis_checkpoint_sha256",
     "genesis_generation", "head_pin", "run_store_uri", "rights_registry_status", "request_envelope_serialization_status", "provider_body_serialization_status", "provider_body_transport_compatibility_status",
     "user_prompt_derivation_status", "input_token_budget_status",
-    "provider_wire_binding_status", "provider_account_endpoint_status", "provider_response_capture_status",
+    "provider_wire_binding_status", "provider_account_endpoint_status", "provider_response_capture_status", "provider_runtime_engine_status",
     "toolchain_capsule_status", "composition_record_authenticity_status", "external_head_pin_status", "blind_package_status", "statistics_status",
     "api_execution_allowed",
   ] as const;
@@ -175,13 +176,14 @@ export function validateFormalOracleCompositionAttestation(
   if (!isSafeUri(input.run_store_uri)) issue("run_store_uri", "必须是受控相对路径");
   if (input.rights_registry_status !== "pending_external_authoritative_head") issue("rights_registry_status", "只绑定 declared resource root；authoritative rights/withdrawal head 仍必须 pending");
   if (input.request_envelope_serialization_status !== "completed") issue("request_envelope_serialization_status", "canonical future-adapter request envelope 必须完成序列化并闭合 execution plan");
-  if (input.provider_body_serialization_status !== "completed_direct_fetch_boundary_prepared") issue("provider_body_serialization_status", "direct profile provider body 必须确定序列化并闭合 execution plan");
-  if (input.provider_body_transport_compatibility_status !== "pending_pi_or_direct_profile_selection") issue("provider_body_transport_compatibility_status", "当前 formal transport=pi 与 direct serialization candidate 尚未选定可执行合同");
+  if (input.provider_body_serialization_status !== "completed_pi_body_serialization_candidate") issue("provider_body_serialization_status", "Pi-shaped body serialization candidate 必须与 execution plan 闭合，但不冒充 fetch proof");
+  if (input.provider_body_transport_compatibility_status !== "pending_per_request_local_fake_fetch_proof") issue("provider_body_transport_compatibility_status", "composition 未逐请求运行 Pi fake-fetch proof，必须保持 pending");
   if (input.user_prompt_derivation_status !== "completed") issue("user_prompt_derivation_status", "rendered user prompt 必须由冻结 template grammar 与 verified case transcript 确定性派生");
   if (input.input_token_budget_status !== "pending_model_specific_tokenizer") issue("input_token_budget_status", "max_input_tokens 只是冻结预算，尚未由 model-specific tokenizer/image accounting 证明");
   if (input.provider_wire_binding_status !== "pending_external_endpoint_account_validation") issue("provider_wire_binding_status", "真实 provider endpoint/account 与 Pi SDK equivalence 仍待外部门验证");
   if (input.provider_account_endpoint_status !== "pending_external_runtime_binding") issue("provider_account_endpoint_status", "provider account/endpoint 必须保持外部运行时待绑定");
   if (input.provider_response_capture_status !== "pending_strict_sse_capture_contract") issue("provider_response_capture_status", "stream response bytes/SSE usage/stop capture 尚未闭合");
+  if (input.provider_runtime_engine_status !== "pending_incompatible_node_engine") issue("provider_runtime_engine_status", "当前 Node 22.13.0 低于声明的 >=22.19.0，必须保持 pending");
   if (input.toolchain_capsule_status !== "pending_external_immutable_capsule") issue("toolchain_capsule_status", "工具动态依赖/不可变 capsule 仍必须 pending");
   if (input.composition_record_authenticity_status !== "pending_external_trusted_signature_or_worm") issue("composition_record_authenticity_status", "自哈希记录仍需外部可信签名或 WORM");
   if (input.external_head_pin_status !== "pending_external_monotonic_worm") issue("external_head_pin_status", "外部单调/WORM HEAD 仍必须 pending");

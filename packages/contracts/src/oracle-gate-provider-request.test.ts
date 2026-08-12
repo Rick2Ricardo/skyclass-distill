@@ -47,24 +47,25 @@ function envelope(visual = true) {
   return buildFormalOraclePiRequestEnvelope(input);
 }
 
-describe("Formal Oracle direct prepared provider body", () => {
-  it("builds an exact canonical OpenAI-compatible direct profile body without local provenance", () => {
+describe("Formal Oracle Pi fetch-boundary provider body candidate", () => {
+  it("builds the exact Pi-shaped JSON serialization candidate without local provenance", () => {
     const source = envelope();
     const built = buildFormalOraclePreparedProviderRequest(source);
     assertFormalOraclePreparedProviderRequestArtifact(built);
     expect(built).toMatchObject({
       provider_body_profile: FORMAL_ORACLE_PROVIDER_BODY_PROFILE,
-      provider_body_dispatch_status: "not_dispatchable_transport_mismatch",
+      provider_body_dispatch_status: "pending_local_pi_fetch_boundary_proof_non_executable",
       adapter_version: FORMAL_ORACLE_PREPARED_ADAPTER_VERSION,
       token_field: FORMAL_ORACLE_PROVIDER_TOKEN_FIELD,
       request_envelope_sha256: source.payload_sha256,
-      http_method: "POST", content_type: "application/json", redirect_policy: "error", hidden_provider_retries: 0,
+      http_method: "POST", content_type: "application/json", redirect_policy_status: "not_bound_by_pi_sdk_fetch_boundary", hidden_provider_retries: 0,
+      pi_sdk_fetch_boundary_equivalence_status: "pending_local_fake_fetch_proof",
       api_execution_allowed: false,
     });
     expect(built.provider_body_sha256).toBe(sha256Hex(built.body_bytes));
     expect(built.body).toMatchObject({
       model: "model-v1", stream: true, stream_options: { include_usage: true },
-      max_completion_tokens: 50, temperature: 0, seed: 7, store: false, tools: [],
+      max_completion_tokens: 50, temperature: 0, seed: 7, store: false,
     });
     expect(built.body.messages[0]).toEqual({ role: "system", content: "system\n" });
     expect(built.body.messages[1].content.slice(1)).toEqual([
@@ -72,6 +73,7 @@ describe("Formal Oracle direct prepared provider body", () => {
       { type: "image_url", image_url: { url: "data:image/jpeg;base64,AQIDBA==" } },
     ]);
     expect(new TextDecoder().decode(built.body_bytes)).not.toMatch(/request_id|case_id|arm|timeout|max_attempts|cache_retention|provider_binding/);
+    expect(new TextDecoder().decode(built.body_bytes)).toBe(JSON.stringify(built.body));
     expect(parseFormalOraclePreparedProviderRequestBytes({ request_envelope: source, provider_body_bytes: built.body_bytes }).provider_body_sha256).toBe(built.provider_body_sha256);
   });
 
@@ -82,6 +84,7 @@ describe("Formal Oracle direct prepared provider body", () => {
     expect(() => attempt(body.replace('"model":', '"model":"x","model":'))).toThrow("duplicate");
     expect(() => parseFormalOraclePreparedProviderRequestBytes({ request_envelope: source, provider_body_bytes: Uint8Array.from([0xff]) })).toThrow("UTF-8");
     expect(() => attempt(` ${body}`)).toThrow("canonical");
+    expect(() => attempt(body.replace(/^(\{"model"[^,]+),("messages"[^]*?)(,"stream":true)/, "{$2,$1$3"))).toThrow();
     expect(() => attempt(body.replace("{", '{"unknown":true,'))).toThrow("字段集合");
     expect(() => attempt(body.replace('"max_completion_tokens":50', '"max_tokens":50'))).toThrow("字段集合");
     for (const [from, to] of [
@@ -90,7 +93,7 @@ describe("Formal Oracle direct prepared provider body", () => {
       ['"seed":7', '"seed":8'],
       ['"store":false', '"store":true'],
       ['"include_usage":true', '"include_usage":false'],
-      ['"tools":[]', '"tools":[{}]'],
+      ['"stream":true', '"tools":[],"stream":true'],
       ['[VISUAL visual-1 sha256=', '[VISUAL visual-2 sha256='],
       ['data:image/jpeg;base64,AQIDBA==', 'data:image/jpeg;base64,AQIDBB=='],
     ] as const) expect(() => attempt(body.replace(from, to))).toThrow();

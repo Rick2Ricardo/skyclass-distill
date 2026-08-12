@@ -75,13 +75,14 @@ export interface FormalOracleCompositionCapability {
   readonly head_pin: Readonly<FormalOracleHeadPinV1>;
   readonly rights_registry_status: "pending_external_authoritative_head";
   readonly request_envelope_serialization_status: "completed";
-  readonly provider_body_serialization_status: "completed_direct_fetch_boundary_prepared";
-  readonly provider_body_transport_compatibility_status: "pending_pi_or_direct_profile_selection";
+  readonly provider_body_serialization_status: "completed_pi_body_serialization_candidate";
+  readonly provider_body_transport_compatibility_status: "pending_per_request_local_fake_fetch_proof";
   readonly user_prompt_derivation_status: "completed";
   readonly input_token_budget_status: "pending_model_specific_tokenizer";
   readonly provider_wire_binding_status: "pending_external_endpoint_account_validation";
   readonly provider_account_endpoint_status: "pending_external_runtime_binding";
   readonly provider_response_capture_status: "pending_strict_sse_capture_contract";
+  readonly provider_runtime_engine_status: "pending_incompatible_node_engine";
   readonly toolchain_capsule_status: "pending_external_immutable_capsule";
   readonly composition_record_authenticity_status: "pending_external_trusted_signature_or_worm";
   readonly external_head_pin_status: "pending_external_monotonic_worm";
@@ -96,13 +97,14 @@ class CompositionCapability implements FormalOracleCompositionCapability {
   readonly stage = "composition_attested_only" as const;
   readonly rights_registry_status = "pending_external_authoritative_head" as const;
   readonly request_envelope_serialization_status = "completed" as const;
-  readonly provider_body_serialization_status = "completed_direct_fetch_boundary_prepared" as const;
-  readonly provider_body_transport_compatibility_status = "pending_pi_or_direct_profile_selection" as const;
+  readonly provider_body_serialization_status = "completed_pi_body_serialization_candidate" as const;
+  readonly provider_body_transport_compatibility_status = "pending_per_request_local_fake_fetch_proof" as const;
   readonly user_prompt_derivation_status = "completed" as const;
   readonly input_token_budget_status = "pending_model_specific_tokenizer" as const;
   readonly provider_wire_binding_status = "pending_external_endpoint_account_validation" as const;
   readonly provider_account_endpoint_status = "pending_external_runtime_binding" as const;
   readonly provider_response_capture_status = "pending_strict_sse_capture_contract" as const;
+  readonly provider_runtime_engine_status = "pending_incompatible_node_engine" as const;
   readonly toolchain_capsule_status = "pending_external_immutable_capsule" as const;
   readonly composition_record_authenticity_status = "pending_external_trusted_signature_or_worm" as const;
   readonly external_head_pin_status = "pending_external_monotonic_worm" as const;
@@ -535,13 +537,14 @@ export async function withComposedFormalOracleRunGenesis<T>(
         run_store_uri: input.run.run_store_uri,
         rights_registry_status: "pending_external_authoritative_head",
         request_envelope_serialization_status: "completed",
-        provider_body_serialization_status: "completed_direct_fetch_boundary_prepared",
-        provider_body_transport_compatibility_status: "pending_pi_or_direct_profile_selection",
+        provider_body_serialization_status: "completed_pi_body_serialization_candidate",
+        provider_body_transport_compatibility_status: "pending_per_request_local_fake_fetch_proof",
         user_prompt_derivation_status: "completed",
         input_token_budget_status: "pending_model_specific_tokenizer",
         provider_wire_binding_status: "pending_external_endpoint_account_validation",
         provider_account_endpoint_status: "pending_external_runtime_binding",
         provider_response_capture_status: "pending_strict_sse_capture_contract",
+        provider_runtime_engine_status: "pending_incompatible_node_engine",
         toolchain_capsule_status: "pending_external_immutable_capsule",
         composition_record_authenticity_status: "pending_external_trusted_signature_or_worm",
         external_head_pin_status: "pending_external_monotonic_worm",
