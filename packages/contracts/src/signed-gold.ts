@@ -150,9 +150,50 @@ function exactStringSet(left: unknown, right: string[]): boolean {
     && JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
 }
 
-function containsFabricatedLearnerOutcome(value: string): boolean {
-  return /(?:听懂|理解|明白|掌握|熟悉|学会|会做|作答|答对|进步|提高|提升|改善|下降|不再犯错|正确率|错误率|成绩|学习效果|学习增益|教学效果)/i.test(value)
-    || /(?:understand|understood|master(?:ed|y)?|learned|familiar|improv|performed\s+better|fewer\s+errors|reduced\s+errors|accuracy|scores?|learning\s+(?:outcome|gain)|teaching\s+effect)/i.test(value);
+const CHINESE_LEARNER_SUBJECT = /(?:学生|学员|同学|孩子|儿童|班级|全班|大家)/g;
+const CHINESE_LEARNER_OUTCOME = /(?:听懂|理解|明白|掌握|熟悉|学会|会做|作答|答对|做对|解出|解答|算出|独立完成|正确完成|顺利完成|不再犯错|进步|提高|提升|改善|下降|正确率|错误率|成绩|学习效果|学习增益|教学效果|(?:均|都|已经|已|现在|目前)*\s*(?:能|会|能够|可以)(?:\s*(?:了|独立|正确|顺利|完成|解出|解答|做对|答对))*)/i;
+const CHINESE_HYPOTHETICAL_PREFIX = /(?:引导|指导|帮助|协助|使|让|鼓励|支持|训练|要求|提示|请|询问|安排|邀请|以便|为了|旨在|希望|期望|预期|若|如果|假如)\s*$/;
+const CHINESE_HYPOTHETICAL_MODAL = /(?:将|应该|应当|可能|或许|预计|预期|需要|需|尝试|练习)/;
+const CHINESE_NAMED_LEARNER_OUTCOME = /(?:^|[，。；：,:;\s])(?!(?:老师|教师|教员))\p{Script=Han}{2,4}(?:已经|已|正在|独立|正确|顺利)*\s*(?:作答|答对|做对)/u;
+const ENGLISH_LEARNER_SUBJECT = /\b(?:students?|learners?|pupils?|the\s+class|class)\b/gi;
+const ENGLISH_LEARNER_OUTCOME = /\b(?:understand|understood|master(?:ed|y)?|learned|familiar|improv\w*|performed\s+better|solv(?:e|es|ed|ing)|can\s+(?:now\s+)?solve|(?:is|are|was|were)\s+able\s+to|complet(?:e|es|ed|ing)|answer(?:ed)?\s+correctly|responded\s+correctly|got\s+(?:it|the\s+(?:answer|problem))\s+right|fewer\s+errors|reduced\s+errors|accuracy|scores?|learning\s+(?:outcome|gain)|teaching\s+effect)\b/i;
+const ENGLISH_HYPOTHETICAL_PREFIX = /\b(?:help|enable|allow|guide|encourage|support|teach|ask|prompt|train|require|instruct|invite|have|expect|hope|if|when|unless|let)\s+(?:the\s+)?$/i;
+const ENGLISH_HYPOTHETICAL_MODAL = /\b(?:should|would|could|may|might|will|expected|asked|need|needs|practice)\b/i;
+const CHINESE_CLAUSE_BOUNDARY = /(?:[，,；;。.!?！？]|但是|然而|随后|后来|最后|最终|但|却)/;
+const ENGLISH_CLAUSE_BOUNDARY = /(?:[,;.!?]|\b(?:but|however|then|later|afterwards|eventually)\b)/i;
+
+function outcomeClausePrefix(textBeforeOutcome: string, boundary: RegExp): string {
+  return textBeforeOutcome.split(boundary).at(-1) ?? "";
+}
+
+/**
+ * Shared semantic guard: asserted learner/class outcomes are not observable
+ * board facts. Teacher-intended or explicitly hypothetical frames are excluded.
+ */
+export function containsFabricatedLearnerOutcome(value: string): boolean {
+  CHINESE_LEARNER_SUBJECT.lastIndex = 0;
+  for (let subject = CHINESE_LEARNER_SUBJECT.exec(value); subject; subject = CHINESE_LEARNER_SUBJECT.exec(value)) {
+    const prefix = value.slice(Math.max(0, subject.index - 16), subject.index);
+    const suffix = value.slice(subject.index + subject[0].length, subject.index + subject[0].length + 48);
+    const outcome = CHINESE_LEARNER_OUTCOME.exec(suffix);
+    const beforeOutcome = outcome ? suffix.slice(0, outcome.index) : "";
+    const sameClauseAsSubject = !CHINESE_CLAUSE_BOUNDARY.test(beforeOutcome);
+    if (outcome && !(sameClauseAsSubject && CHINESE_HYPOTHETICAL_PREFIX.test(prefix))
+      && !CHINESE_HYPOTHETICAL_MODAL.test(outcomeClausePrefix(suffix.slice(0, outcome.index), CHINESE_CLAUSE_BOUNDARY))) return true;
+  }
+  if (CHINESE_NAMED_LEARNER_OUTCOME.test(value) && !CHINESE_HYPOTHETICAL_PREFIX.test(value.slice(0, 16))) return true;
+
+  ENGLISH_LEARNER_SUBJECT.lastIndex = 0;
+  for (let subject = ENGLISH_LEARNER_SUBJECT.exec(value); subject; subject = ENGLISH_LEARNER_SUBJECT.exec(value)) {
+    const prefix = value.slice(Math.max(0, subject.index - 32), subject.index);
+    const suffix = value.slice(subject.index + subject[0].length, subject.index + subject[0].length + 80);
+    const outcome = ENGLISH_LEARNER_OUTCOME.exec(suffix);
+    const beforeOutcome = outcome ? suffix.slice(0, outcome.index) : "";
+    const sameClauseAsSubject = !ENGLISH_CLAUSE_BOUNDARY.test(beforeOutcome);
+    if (outcome && !(sameClauseAsSubject && ENGLISH_HYPOTHETICAL_PREFIX.test(prefix))
+      && !ENGLISH_HYPOTHETICAL_MODAL.test(outcomeClausePrefix(suffix.slice(0, outcome.index), ENGLISH_CLAUSE_BOUNDARY))) return true;
+  }
+  return false;
 }
 
 function validComparisonKind(value: unknown): boolean {

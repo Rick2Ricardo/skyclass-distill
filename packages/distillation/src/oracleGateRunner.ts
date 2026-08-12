@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 import { dirname } from "node:path";
+import {
+  ORACLE_GATE_RESPONSE_SCHEMA,
+  ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
+  validateOracleGateResponse,
+} from "../../contracts/src/oracle-gate-response.js";
 import type { AuditedJsonResponse, ImageInput, LlmCallControl, LlmClient, LlmRequestAudit } from "../../llm/src/client.js";
 import { canonicalizeOracleGateCanvas } from "../../media/src/oracleGateCanvas.js";
 import { verifyImageEvidence } from "../../media/src/imageEvidence.js";
@@ -86,14 +91,6 @@ export interface OracleGateClient {
 
 const ARM_ORDER: OraclePilotArm[] = ["transcript_only", "static_final_board", "uniform_frame", "oracle_delta"];
 
-const OUTPUT_SCHEMA = {
-  schema_version: "oracle-gate-response-v1",
-  observed_board_actions: [{ sequence_index: 1, operation: "add|erase|modify|connect|unknown", content: "string|null", region: "string|null" }],
-  generalized_teaching_capability: { name: "string", mechanism: "string", action_program: ["renderer-neutral teacher action"] },
-  evidence_claims: [{ claim: "string", evidence_slot: "transcript|visual-1|uncertain" }],
-  uncertainties: ["string"],
-};
-
 const SYSTEM = `你是严格的板书教学能力蒸馏器。只使用本次请求提供的语音和视觉证据。先记录可见板书动作，再抽象可迁移的教学能力；不得把原题常数固化为通用规则，不得补写课堂中不存在的学生反应、学习增益或教学效果。输出动作必须与 HTML、SVG、Canvas、Ink 等渲染器解耦。证据不足时使用 unknown/null 和 uncertainties，不得猜测。只输出符合给定结构的 JSON。`;
 
 function digest(value: unknown): string {
@@ -104,64 +101,7 @@ function assertFiniteInteger(value: number, label: string): void {
   if (!Number.isSafeInteger(value)) throw new Error(`${label} 必须是安全整数`);
 }
 
-function assertExactKeys(value: Record<string, unknown>, allowed: string[], label: string): void {
-  const allowedSet = new Set(allowed);
-  const unexpected = Object.keys(value).filter((key) => !allowedSet.has(key));
-  if (unexpected.length) throw new Error(`${label} 包含未注册字段：${unexpected.join(", ")}`);
-}
-
-export function validateOracleGateResponse(value: Record<string, unknown>, allowedEvidenceSlots: ReadonlySet<string>): void {
-  const allowedTopLevel = new Set([
-    "schema_version",
-    "observed_board_actions",
-    "generalized_teaching_capability",
-    "evidence_claims",
-    "uncertainties",
-  ]);
-  const unexpected = Object.keys(value).filter((key) => !allowedTopLevel.has(key));
-  if (unexpected.length) throw new Error(`Oracle Gate 响应包含未注册字段：${unexpected.join(", ")}`);
-  if (value.schema_version !== "oracle-gate-response-v1") throw new Error("Oracle Gate 响应 schema_version 无效");
-  if (!Array.isArray(value.observed_board_actions)) throw new Error("Oracle Gate 响应缺少 observed_board_actions");
-  if (!value.generalized_teaching_capability || typeof value.generalized_teaching_capability !== "object" || Array.isArray(value.generalized_teaching_capability)) {
-    throw new Error("Oracle Gate 响应缺少 generalized_teaching_capability");
-  }
-  if (!Array.isArray(value.evidence_claims) || !Array.isArray(value.uncertainties)) throw new Error("Oracle Gate 响应证据或不确定性字段无效");
-  const operations = new Set(["add", "erase", "modify", "connect", "unknown"]);
-  let previousSequence = 0;
-  for (const [index, raw] of value.observed_board_actions.entries()) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(`observed_board_actions[${index}] 必须是对象`);
-    const action = raw as Record<string, unknown>;
-    assertExactKeys(action, ["sequence_index", "operation", "content", "region"], `observed_board_actions[${index}]`);
-    if (!Number.isSafeInteger(action.sequence_index) || Number(action.sequence_index) <= previousSequence) {
-      throw new Error(`observed_board_actions[${index}].sequence_index 必须严格递增`);
-    }
-    previousSequence = Number(action.sequence_index);
-    if (typeof action.operation !== "string" || !operations.has(action.operation)) throw new Error(`observed_board_actions[${index}].operation 无效`);
-    if (action.content !== null && typeof action.content !== "string") throw new Error(`observed_board_actions[${index}].content 无效`);
-    if (action.region !== null && typeof action.region !== "string") throw new Error(`observed_board_actions[${index}].region 无效`);
-  }
-  const capability = value.generalized_teaching_capability as Record<string, unknown>;
-  assertExactKeys(capability, ["name", "mechanism", "action_program"], "generalized_teaching_capability");
-  if (typeof capability.name !== "string" || !capability.name.trim()
-    || typeof capability.mechanism !== "string" || !capability.mechanism.trim()
-    || !Array.isArray(capability.action_program) || !capability.action_program.length
-    || capability.action_program.some((item) => typeof item !== "string" || !item.trim())) {
-    throw new Error("generalized_teaching_capability 必须包含非空 name、mechanism 和 action_program");
-  }
-  for (const [index, raw] of value.evidence_claims.entries()) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(`evidence_claims[${index}] 必须是对象`);
-    const claim = raw as Record<string, unknown>;
-    assertExactKeys(claim, ["claim", "evidence_slot"], `evidence_claims[${index}]`);
-    if (typeof claim.claim !== "string" || !claim.claim.trim() || typeof claim.evidence_slot !== "string" || !allowedEvidenceSlots.has(claim.evidence_slot)) {
-      throw new Error(`evidence_claims[${index}] 的 claim 或 evidence_slot 无效`);
-    }
-  }
-  if (value.uncertainties.some((item) => typeof item !== "string" || !item.trim())) throw new Error("uncertainties 必须是非空字符串数组");
-  const serialized = JSON.stringify(value);
-  if (/(?:学生|学员|同学).*?(?:已经|已|都).{0,8}(?:掌握|听懂|明白|学会)|students? (?:have|had) (?:understood|learned|mastered)/i.test(serialized)) {
-    throw new Error("Oracle Gate 响应把学生学习结果伪装成课堂事实");
-  }
-}
+export { validateOracleGateResponse } from "../../contracts/src/oracle-gate-response.js";
 
 function expectedRequestSha(input: {
   model: string;
@@ -238,7 +178,7 @@ function userPrompt(sample: OraclePilotArmInput): string {
 ${sample.transcript}
 
 输出结构：
-${JSON.stringify(OUTPUT_SCHEMA)}
+${JSON.stringify(ORACLE_GATE_RESPONSE_SCHEMA)}
 
 规则：observed_board_actions 按可恢复的时间顺序排列；看不到板书变化时允许 operation=unknown。generalized_teaching_capability 必须参数化、可迁移且渲染器中立。evidence_slot 只能写 transcript、visual-1 或 uncertain。`;
 }
@@ -319,7 +259,7 @@ export async function runOracleGateSmoke(input: {
   }
 
   const promptSha = digest({ version: input.config.prompt_version, system: SYSTEM });
-  const outputSchemaSha = digest(OUTPUT_SCHEMA);
+  const outputSchemaSha = ORACLE_GATE_RESPONSE_SCHEMA_SHA256;
   const protocolFingerprint = digest({
     model: input.client.options.model,
     prompt_sha256: promptSha,
@@ -356,10 +296,7 @@ export async function runOracleGateSmoke(input: {
       };
       const prompt = userPrompt(sample);
       const result = await input.client.chatJsonAudited(SYSTEM, prompt, visual.input, input.config.temperature, control);
-      validateOracleGateResponse(
-        result.value,
-        sample.arm === "transcript_only" ? new Set(["transcript", "uncertain"]) : new Set(["transcript", "visual-1", "uncertain"]),
-      );
+      validateOracleGateResponse(result.value, sample.arm);
       assertProviderAudit({
         audit: result.audit,
         model: input.client.options.model,

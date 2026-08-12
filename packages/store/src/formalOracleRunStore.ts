@@ -4,20 +4,34 @@ import {
   canonicalOracleGateFormalSpecPayload,
   validateOracleGateFormalSpec,
 } from "../../contracts/src/oracle-gate-formal.js";
+import {
+  ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
+  ORACLE_GATE_RESPONSE_VALIDATOR_VERSION,
+  canonicalOracleGateResponseBytes,
+  parseOracleGateResponseBytes,
+  validateOracleGateResponse,
+} from "../../contracts/src/oracle-gate-response.js";
 import type {
   FormalRunContractV1,
+  CommittedRequestV1,
   OracleGateCheckpointCountsV1,
   OracleGateCheckpointEntryV1,
   OracleGateRunArm,
   OracleGateRunVisualV1,
+  RequestAttemptAuditV1,
   RequestIntentV1,
   RunCheckpointV1,
 } from "../../contracts/src/oracle-gate-run.js";
 import {
   hashFormalRunContract,
+  hashCommittedRequest,
+  hashPublicBlindResponse,
+  hashRequestAttemptAudit,
   hashRequestIntent,
   hashRunCheckpoint,
   validateFormalRunContract,
+  validateCommittedRequestAgainstAttempt,
+  validateRequestAttemptAgainstIntent,
   validateRequestIntent,
   validateRunCheckpoint,
   validateRunCheckpointTransition,
@@ -110,6 +124,65 @@ export interface CommitDispatchIntentInput {
   created_at: string;
 }
 
+export interface CommitAttemptAuditInput {
+  run_sha256: string;
+  expected_head: FormalOracleHeadPinV1;
+  expected_checkpoint_sha256: string;
+  audit: RequestAttemptAuditV1;
+  response_bytes?: Uint8Array;
+  parsed_response?: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface MarkRetryReadyInput {
+  run_sha256: string;
+  expected_head: FormalOracleHeadPinV1;
+  expected_checkpoint_sha256: string;
+  request_id: string;
+  created_at: string;
+}
+
+export interface CommitSchemaValidatedRequestInput {
+  run_sha256: string;
+  expected_head: FormalOracleHeadPinV1;
+  expected_checkpoint_sha256: string;
+  committed_request: CommittedRequestV1;
+  created_at: string;
+}
+
+export interface FailRunRequestInput {
+  run_sha256: string;
+  expected_head: FormalOracleHeadPinV1;
+  expected_checkpoint_sha256: string;
+  request_id: string;
+  created_at: string;
+}
+
+export interface CompleteRunInput {
+  run_sha256: string;
+  expected_head: FormalOracleHeadPinV1;
+  expected_checkpoint_sha256: string;
+  created_at: string;
+}
+
+export type FormalOracleTerminalReasonCode =
+  | "ambiguous_unknown_attempt"
+  | "provider_length"
+  | "provider_error"
+  | "attempt_budget_exhausted";
+
+export interface FormalOracleTerminalReasonV1 {
+  schema_version: "formal-oracle-terminal-reason-v1";
+  terminal_reason_sha256: string;
+  run_sha256: string;
+  request_id: string;
+  reason_code: FormalOracleTerminalReasonCode;
+  source_attempt_sha256: string;
+  detail_sha256: string;
+  created_at: string;
+  api_execution_allowed: false;
+}
+
 export interface FormalOracleRunSnapshot {
   run: FormalRunContractV1;
   formal_spec: OracleGateFormalSpec;
@@ -139,6 +212,7 @@ export interface FormalOracleResumePlan {
 }
 
 const EXECUTION_PLAN_DOMAIN = "skyclass/formal-oracle/execution-plan/v1\0";
+const TERMINAL_REASON_DOMAIN = "skyclass/formal-oracle/terminal-reason/v1\0";
 const ARMS = new Set<OracleGateRunArm>(["transcript_only", "static_final_board", "uniform_frame", "oracle_delta"]);
 
 /**
@@ -170,6 +244,15 @@ export function hashFormalOracleExecutionPlan(plan: FormalOracleExecutionPlanV1)
   return createHash("sha256").update(EXECUTION_PLAN_DOMAIN).update(canonicalFormalOracleExecutionPlanPayload(plan)).digest("hex");
 }
 
+export function canonicalFormalOracleTerminalReasonPayload(reason: FormalOracleTerminalReasonV1): string {
+  const { terminal_reason_sha256: _hash, ...payload } = reason;
+  return privateCanonicalJsonBytes(payload).toString("utf8").slice(0, -1);
+}
+
+export function hashFormalOracleTerminalReason(reason: FormalOracleTerminalReasonV1): string {
+  return createHash("sha256").update(TERMINAL_REASON_DOMAIN).update(canonicalFormalOracleTerminalReasonPayload(reason)).digest("hex");
+}
+
 function validationError(label: string, report: { valid: boolean; issues: Array<{ path: string; message: string }> }): void {
   if (!report.valid) throw new Error(`${label} 无效：${report.issues[0]?.path} ${report.issues[0]?.message}`);
 }
@@ -199,7 +282,7 @@ function checkpointCounts(entries: OracleGateCheckpointEntryV1[]): OracleGateChe
     retry_ready: entries.filter((item) => item.state === "RETRY_READY").length,
     dispatch_intent_committed: entries.filter((item) => item.state === "DISPATCH_INTENT_COMMITTED").length,
     receipt_committed: entries.filter((item) => item.state === "RECEIPT_COMMITTED").length,
-    verified_committed: entries.filter((item) => item.state === "VERIFIED_COMMITTED").length,
+    schema_validated_committed: entries.filter((item) => item.state === "SCHEMA_VALIDATED_COMMITTED").length,
     blocked_ambiguous: entries.filter((item) => item.state === "BLOCKED_AMBIGUOUS").length,
     failed_closed: entries.filter((item) => item.state === "FAILED_CLOSED").length,
   };
@@ -256,6 +339,9 @@ function assertStrictFormalSpec(spec: OracleGateFormalSpec, run: FormalRunContra
     || spec.signed_gold_dataset_sha256 !== run.signed_gold_dataset_sha256
     || spec.code_revision !== run.code_revision) {
     throw new Error("Formal spec 未绑定 run 的 input/gold/code revision");
+  }
+  if (spec.prompt.output_schema_sha256 !== ORACLE_GATE_RESPONSE_SCHEMA_SHA256) {
+    throw new Error("Formal spec output_schema_sha256 未绑定共享 Oracle Gate response schema");
   }
 }
 
@@ -412,12 +498,63 @@ function assertIntentMatchesExecutionPlan(intent: RequestIntentV1, expected: For
   }
 }
 
+function terminalDetailHash(audit: RequestAttemptAuditV1): string {
+  return digest(Buffer.from(privateCanonicalJsonBytes({
+    attempt_sha256: audit.attempt_sha256,
+    error_code: audit.error_code,
+    error_message: audit.error_message,
+    outcome: audit.outcome,
+    stop_reason: audit.stop_reason,
+  })));
+}
+
+function terminalReason(
+  runSha256: string,
+  requestId: string,
+  audit: RequestAttemptAuditV1,
+  reasonCode: FormalOracleTerminalReasonCode,
+  createdAt: string,
+): FormalOracleTerminalReasonV1 {
+  const reason: FormalOracleTerminalReasonV1 = {
+    schema_version: "formal-oracle-terminal-reason-v1",
+    terminal_reason_sha256: "0".repeat(64),
+    run_sha256: runSha256,
+    request_id: requestId,
+    reason_code: reasonCode,
+    source_attempt_sha256: audit.attempt_sha256,
+    detail_sha256: terminalDetailHash(audit),
+    created_at: createdAt,
+    api_execution_allowed: false,
+  };
+  reason.terminal_reason_sha256 = hashFormalOracleTerminalReason(reason);
+  return reason;
+}
+
+function assertTerminalReason(reason: FormalOracleTerminalReasonV1, runSha256: string): void {
+  if (!reason || typeof reason !== "object" || Array.isArray(reason)
+    || !exactKeys(reason as unknown as Record<string, unknown>, [
+      "schema_version", "terminal_reason_sha256", "run_sha256", "request_id", "reason_code",
+      "source_attempt_sha256", "detail_sha256", "created_at", "api_execution_allowed",
+    ]) || reason.schema_version !== "formal-oracle-terminal-reason-v1" || reason.run_sha256 !== runSha256
+    || !isId(reason.request_id) || !["ambiguous_unknown_attempt", "provider_length", "provider_error", "attempt_budget_exhausted"].includes(reason.reason_code)
+    || !/^[a-f0-9]{64}$/.test(reason.terminal_reason_sha256) || !/^[a-f0-9]{64}$/.test(reason.source_attempt_sha256)
+    || !/^[a-f0-9]{64}$/.test(reason.detail_sha256) || reason.api_execution_allowed !== false) {
+    throw new Error("Terminal reason schema 或根绑定无效");
+  }
+  canonicalTime(reason.created_at, "terminal reason created_at");
+  if (hashFormalOracleTerminalReason(reason) !== reason.terminal_reason_sha256) throw new Error("Terminal reason 内容地址不匹配");
+}
+
 /**
  * This store proves private-byte integrity, the complete case × arm × seed
  * schedule matrix, and execution-plan/checkpoint bindings only. It does not
  * independently prove Gold event counts, teacher diversity, or operation
  * coverage; those remain mandatory in the later pinned-ledger-registry
  * composition gate. No method in this class authorizes API execution.
+ * SCHEMA_VALIDATED_COMMITTED proves only durable transport bytes, deterministic
+ * raw-to-parsed equivalence, and the frozen structural schema/arm rules.
+ * EXECUTION_COMPLETE means the entire frozen request matrix reached that state;
+ * neither state asserts teaching correctness or teacher-only semantic quality.
  */
 export class FormalOracleRunStore {
   readonly runStoreUri: string;
@@ -432,6 +569,18 @@ export class FormalOracleRunStore {
     assertPrivateSha256(runSha256, "run_sha256");
     assertPrivateSha256(requestPayloadSha256, "request_payload_sha256");
     return `runs/${runSha256}/objects/request-payloads/${requestPayloadSha256}/request.bin`;
+  }
+
+  responseObjectUri(runSha256: string, responseBytesSha256: string): string {
+    assertPrivateSha256(runSha256, "run_sha256");
+    assertPrivateSha256(responseBytesSha256, "response_bytes_sha256");
+    return `runs/${runSha256}/objects/responses/${responseBytesSha256}/response.json`;
+  }
+
+  parsedResponseObjectUri(runSha256: string, parsedResponseSha256: string): string {
+    assertPrivateSha256(runSha256, "run_sha256");
+    assertPrivateSha256(parsedResponseSha256, "parsed_response_sha256");
+    return `runs/${runSha256}/objects/parsed-responses/${parsedResponseSha256}/parsed-response.json`;
   }
 
   async createSealedRun(input: CreateSealedRunInput): Promise<FormalOracleRunSnapshot> {
@@ -533,8 +682,9 @@ export class FormalOracleRunStore {
       if (previousEntry.state === "DISPATCH_INTENT_COMMITTED" || previousEntry.resume_action === "block_ambiguous") {
         throw new Error("Request 已 durable dispatch；结果不明时不得自动 retry");
       }
-      if (previousEntry.state !== "PENDING" || previousEntry.resume_action !== "dispatch_new_attempt") {
-        throw new Error("本薄片只允许从干净 PENDING commit dispatch intent");
+      if ((previousEntry.state !== "PENDING" && previousEntry.state !== "RETRY_READY")
+        || previousEntry.resume_action !== "dispatch_new_attempt" || previousEntry.attempts_used >= previousEntry.max_attempts) {
+        throw new Error("只允许从 PENDING/RETRY_READY 且仍有预算时 commit dispatch intent");
       }
       if (input.intent.run_sha256 !== snapshot.run.run_sha256
         || input.intent.idempotency_key !== previousEntry.idempotency_key
@@ -544,7 +694,8 @@ export class FormalOracleRunStore {
         throw new Error("Request intent 未绑定当前 run/request/attempt ordinal");
       }
       assertIntentMatchesExecutionPlan(input.intent, snapshot.execution_plan.items[entryIndex]);
-      if (Date.parse(input.intent.prepared_at) > Date.parse(input.created_at)
+      if (Date.parse(input.intent.prepared_at) < Date.parse(snapshot.checkpoint.created_at)
+        || Date.parse(input.intent.prepared_at) > Date.parse(input.created_at)
         || Date.parse(snapshot.checkpoint.created_at) > Date.parse(input.created_at)) {
         throw new Error("Dispatch checkpoint 时间不得早于 intent 或上一 checkpoint");
       }
@@ -609,6 +760,390 @@ export class FormalOracleRunStore {
     });
   }
 
+  async commitAttemptAudit(input: CommitAttemptAuditInput): Promise<FormalOracleRunSnapshot> {
+    assertPrivateSha256(input.run_sha256, "run_sha256");
+    assertPrivateSha256(input.expected_checkpoint_sha256, "expected_checkpoint_sha256");
+    canonicalTime(input.created_at, "created_at");
+    return this.withRunLock(input.run_sha256, async () => {
+      const snapshot = await this.loadRunUnlocked(input.run_sha256, input.expected_head);
+      this.assertExpectedCheckpoint(snapshot, input.expected_head, input.expected_checkpoint_sha256);
+      const entryIndex = snapshot.checkpoint.entries.findIndex((entry) => entry.request_id === input.audit.request_id);
+      if (entryIndex < 0) throw new Error("Attempt audit request 不在 frozen schedule");
+      const entry = snapshot.checkpoint.entries[entryIndex];
+      if (entry.state !== "DISPATCH_INTENT_COMMITTED" || !entry.active_intent_sha256) {
+        throw new Error("Attempt audit 只能从 durable DISPATCH_INTENT_COMMITTED 提交");
+      }
+      const intent = await this.loadIntentUnlocked(snapshot.run, snapshot.execution_plan, entryIndex, entry.active_intent_sha256);
+      validationError("Attempt audit against intent", validateRequestAttemptAgainstIntent(intent, input.audit));
+      if (input.audit.attempt_sha256 !== hashRequestAttemptAudit(input.audit)
+        || input.audit.attempt_ordinal !== entry.attempts_used + 1
+        || Date.parse(input.audit.started_at) < Date.parse(snapshot.checkpoint.created_at)
+        || Date.parse(input.audit.finished_at) > Date.parse(input.created_at)
+        || Date.parse(snapshot.checkpoint.created_at) > Date.parse(input.created_at)) {
+        throw new Error("Attempt audit ordinal/time 未闭合 durable dispatch checkpoint");
+      }
+      const durableRequest = await this.privateFs.readFile(intent.request_object_uri);
+      if (digest(durableRequest) !== intent.request_payload_sha256 || input.audit.request_sha256 !== digest(durableRequest)) {
+        throw new Error("Attempt audit 未绑定 durable request bytes");
+      }
+
+      if (input.audit.outcome === "result_received") {
+        if (input.response_bytes === undefined || input.parsed_response === undefined
+          || !input.parsed_response || typeof input.parsed_response !== "object" || Array.isArray(input.parsed_response)
+          || input.audit.response_object_uri !== this.responseObjectUri(input.run_sha256, String(input.audit.response_bytes_sha256))
+          || input.audit.parsed_response_object_uri !== this.parsedResponseObjectUri(input.run_sha256, String(input.audit.parsed_response_sha256))) {
+          throw new Error("result_received 必须携带 deterministic raw/parsed response objects");
+        }
+        const responseBytes = Buffer.from(input.response_bytes);
+        if (digest(responseBytes) !== input.audit.response_bytes_sha256) throw new Error("Raw response bytes SHA-256 不匹配 audit");
+        const parsedFromRaw = parseOracleGateResponseBytes(responseBytes);
+        const parsedBytes = Buffer.from(canonicalOracleGateResponseBytes(parsedFromRaw));
+        if (!parsedBytes.equals(Buffer.from(canonicalOracleGateResponseBytes(input.parsed_response)))) {
+          throw new Error("Parsed response 与 provider raw JSON 不一致");
+        }
+        if (hashPublicBlindResponse(parsedFromRaw) !== input.audit.parsed_response_sha256) {
+          throw new Error("Parsed response canonical hash 不匹配 audit");
+        }
+        await this.privateFs.publishImmutableObject(
+          this.responseDirectory(input.run_sha256, input.audit.response_bytes_sha256),
+          "response.json",
+          responseBytes,
+        );
+        await this.privateFs.publishImmutableObject(
+          this.parsedResponseDirectory(input.run_sha256, input.audit.parsed_response_sha256),
+          "parsed-response.json",
+          parsedBytes,
+        );
+      } else if (input.response_bytes !== undefined || input.parsed_response !== undefined) {
+        throw new Error("非 result_received attempt 不得携带 response objects");
+      }
+
+      await this.privateFs.publishImmutableObject(
+        this.attemptDirectory(input.run_sha256, input.audit.attempt_sha256),
+        "attempt-audit.json",
+        privateCanonicalJsonBytes(input.audit),
+      );
+      const unknown = input.audit.outcome === "unknown";
+      const reason = unknown
+        ? terminalReason(input.run_sha256, input.audit.request_id, input.audit, "ambiguous_unknown_attempt", input.created_at)
+        : null;
+      if (reason) await this.persistTerminalReason(input.run_sha256, reason);
+      const entries = snapshot.checkpoint.entries.map((prior, index): OracleGateCheckpointEntryV1 => index === entryIndex ? {
+        ...prior,
+        state: unknown ? "BLOCKED_AMBIGUOUS" : "RECEIPT_COMMITTED",
+        resume_action: unknown ? "block_ambiguous" : "verify_receipt",
+        attempts_used: prior.attempts_used + 1,
+        latest_attempt_audit_sha256: input.audit.attempt_sha256,
+      } : { ...prior });
+      const next = this.nextCheckpoint(
+        snapshot,
+        entries,
+        input.created_at,
+        unknown ? "BLOCKED_AMBIGUOUS" : "RUNNING",
+        reason?.terminal_reason_sha256 ?? null,
+      );
+      return this.commitCheckpointUnlocked(snapshot, next);
+    });
+  }
+
+  async markRetryReady(input: MarkRetryReadyInput): Promise<FormalOracleRunSnapshot> {
+    assertPrivateSha256(input.run_sha256, "run_sha256");
+    assertPrivateSha256(input.expected_checkpoint_sha256, "expected_checkpoint_sha256");
+    canonicalTime(input.created_at, "created_at");
+    return this.withRunLock(input.run_sha256, async () => {
+      const snapshot = await this.loadRunUnlocked(input.run_sha256, input.expected_head);
+      this.assertExpectedCheckpoint(snapshot, input.expected_head, input.expected_checkpoint_sha256);
+      const entryIndex = snapshot.checkpoint.entries.findIndex((entry) => entry.request_id === input.request_id);
+      if (entryIndex < 0) throw new Error("Retry request 不在 frozen schedule");
+      const entry = snapshot.checkpoint.entries[entryIndex];
+      if (entry.state !== "RECEIPT_COMMITTED" || !entry.latest_attempt_audit_sha256) {
+        throw new Error("markRetryReady 只允许 RECEIPT_COMMITTED");
+      }
+      const audit = await this.loadAttemptUnlocked(snapshot.run, snapshot.execution_plan, entryIndex, entry.latest_attempt_audit_sha256);
+      if (audit.outcome !== "not_sent" && audit.outcome !== "no_result_confirmed") {
+        throw new Error("只有明确 not_sent/no_result_confirmed 才能评估 retry");
+      }
+      if (Date.parse(audit.finished_at) > Date.parse(input.created_at)
+        || Date.parse(snapshot.checkpoint.created_at) > Date.parse(input.created_at)) throw new Error("Retry checkpoint 时间回退");
+      const exhausted = entry.attempts_used >= entry.max_attempts;
+      if (!exhausted && audit.automatic_retry_allowed !== true) throw new Error("Retry 必须由 cross-validated audit 明确允许");
+      const reason = exhausted
+        ? terminalReason(input.run_sha256, input.request_id, audit, "attempt_budget_exhausted", input.created_at)
+        : null;
+      if (reason) await this.persistTerminalReason(input.run_sha256, reason);
+      const entries = snapshot.checkpoint.entries.map((prior, index): OracleGateCheckpointEntryV1 => index === entryIndex ? {
+        ...prior,
+        state: exhausted ? "FAILED_CLOSED" : "RETRY_READY",
+        resume_action: exhausted ? "block_failed" : "dispatch_new_attempt",
+      } : { ...prior });
+      const next = this.nextCheckpoint(
+        snapshot,
+        entries,
+        input.created_at,
+        exhausted ? "FAILED_CLOSED" : "RUNNING",
+        reason?.terminal_reason_sha256 ?? null,
+      );
+      return this.commitCheckpointUnlocked(snapshot, next);
+    });
+  }
+
+  async commitSchemaValidatedRequest(input: CommitSchemaValidatedRequestInput): Promise<FormalOracleRunSnapshot> {
+    assertPrivateSha256(input.run_sha256, "run_sha256");
+    assertPrivateSha256(input.expected_checkpoint_sha256, "expected_checkpoint_sha256");
+    canonicalTime(input.created_at, "created_at");
+    return this.withRunLock(input.run_sha256, async () => {
+      const snapshot = await this.loadRunUnlocked(input.run_sha256, input.expected_head);
+      this.assertExpectedCheckpoint(snapshot, input.expected_head, input.expected_checkpoint_sha256);
+      const entryIndex = snapshot.checkpoint.entries.findIndex((entry) => entry.request_id === input.committed_request.request_id);
+      if (entryIndex < 0) throw new Error("Committed request 不在 frozen schedule");
+      const entry = snapshot.checkpoint.entries[entryIndex];
+      if (entry.state !== "RECEIPT_COMMITTED" || !entry.active_intent_sha256 || !entry.latest_attempt_audit_sha256) {
+        throw new Error("commitSchemaValidatedRequest 只允许 RECEIPT_COMMITTED");
+      }
+      const intent = await this.loadIntentUnlocked(snapshot.run, snapshot.execution_plan, entryIndex, entry.active_intent_sha256);
+      const audit = await this.loadAttemptUnlocked(snapshot.run, snapshot.execution_plan, entryIndex, entry.latest_attempt_audit_sha256);
+      validationError("Committed request against attempt", validateCommittedRequestAgainstAttempt(intent, audit, input.committed_request));
+      if (input.committed_request.committed_request_sha256 !== hashCommittedRequest(input.committed_request)
+        || Date.parse(input.committed_request.transport_and_schema_verified_at) > Date.parse(input.created_at)
+        || Date.parse(snapshot.checkpoint.created_at) > Date.parse(input.created_at)) {
+        throw new Error("Committed request hash/time 未闭合 receipt checkpoint");
+      }
+      const parsed = await this.verifyResponseObjects(snapshot.run.run_sha256, audit);
+      if (snapshot.formal_spec.prompt.output_schema_sha256 !== ORACLE_GATE_RESPONSE_SCHEMA_SHA256
+        || snapshot.execution_plan.items[entryIndex].output_schema_sha256 !== ORACLE_GATE_RESPONSE_SCHEMA_SHA256
+        || input.committed_request.validator_version !== ORACLE_GATE_RESPONSE_VALIDATOR_VERSION) {
+        throw new Error("Committed request 未绑定 frozen shared response schema/validator");
+      }
+      validateOracleGateResponse(parsed, snapshot.execution_plan.items[entryIndex].arm);
+      await this.privateFs.publishImmutableObject(
+        this.committedRequestDirectory(input.run_sha256, input.committed_request.committed_request_sha256),
+        "committed-request.json",
+        privateCanonicalJsonBytes(input.committed_request),
+      );
+      const entries = snapshot.checkpoint.entries.map((prior, index): OracleGateCheckpointEntryV1 => index === entryIndex ? {
+        ...prior,
+        state: "SCHEMA_VALIDATED_COMMITTED",
+        resume_action: "skip_schema_validated",
+        committed_request_sha256: input.committed_request.committed_request_sha256,
+      } : { ...prior });
+      const next = this.nextCheckpoint(snapshot, entries, input.created_at, "RUNNING", null);
+      return this.commitCheckpointUnlocked(snapshot, next);
+    });
+  }
+
+  async failRunRequest(input: FailRunRequestInput): Promise<FormalOracleRunSnapshot> {
+    assertPrivateSha256(input.run_sha256, "run_sha256");
+    assertPrivateSha256(input.expected_checkpoint_sha256, "expected_checkpoint_sha256");
+    canonicalTime(input.created_at, "created_at");
+    return this.withRunLock(input.run_sha256, async () => {
+      const snapshot = await this.loadRunUnlocked(input.run_sha256, input.expected_head);
+      this.assertExpectedCheckpoint(snapshot, input.expected_head, input.expected_checkpoint_sha256);
+      const entryIndex = snapshot.checkpoint.entries.findIndex((entry) => entry.request_id === input.request_id);
+      if (entryIndex < 0) throw new Error("Fail request 不在 frozen schedule");
+      const entry = snapshot.checkpoint.entries[entryIndex];
+      if (entry.state !== "RECEIPT_COMMITTED" || !entry.latest_attempt_audit_sha256) {
+        throw new Error("failRunRequest 只允许具有 durable receipt 的 request");
+      }
+      const audit = await this.loadAttemptUnlocked(snapshot.run, snapshot.execution_plan, entryIndex, entry.latest_attempt_audit_sha256);
+      let reasonCode: FormalOracleTerminalReasonCode;
+      if (audit.outcome === "result_received" && audit.stop_reason === "length") reasonCode = "provider_length";
+      else if (audit.outcome === "result_received" && audit.stop_reason === "error") reasonCode = "provider_error";
+      else if ((audit.outcome === "not_sent" || audit.outcome === "no_result_confirmed")
+        && entry.attempts_used >= entry.max_attempts) reasonCode = "attempt_budget_exhausted";
+      else throw new Error("只有 length/error 或 attempt 预算耗尽可以显式 FAILED_CLOSED");
+      if (Date.parse(audit.finished_at) > Date.parse(input.created_at)
+        || Date.parse(snapshot.checkpoint.created_at) > Date.parse(input.created_at)) throw new Error("Failed checkpoint 时间回退");
+      const reason = terminalReason(input.run_sha256, input.request_id, audit, reasonCode, input.created_at);
+      await this.persistTerminalReason(input.run_sha256, reason);
+      const entries = snapshot.checkpoint.entries.map((prior, index): OracleGateCheckpointEntryV1 => index === entryIndex ? {
+        ...prior,
+        state: "FAILED_CLOSED",
+        resume_action: "block_failed",
+      } : { ...prior });
+      const next = this.nextCheckpoint(snapshot, entries, input.created_at, "FAILED_CLOSED", reason.terminal_reason_sha256);
+      return this.commitCheckpointUnlocked(snapshot, next);
+    });
+  }
+
+  async completeRun(input: CompleteRunInput): Promise<FormalOracleRunSnapshot> {
+    assertPrivateSha256(input.run_sha256, "run_sha256");
+    assertPrivateSha256(input.expected_checkpoint_sha256, "expected_checkpoint_sha256");
+    canonicalTime(input.created_at, "created_at");
+    return this.withRunLock(input.run_sha256, async () => {
+      const snapshot = await this.loadRunUnlocked(input.run_sha256, input.expected_head);
+      this.assertExpectedCheckpoint(snapshot, input.expected_head, input.expected_checkpoint_sha256);
+      if (snapshot.checkpoint.run_state === "EXECUTION_COMPLETE") {
+        throw new Error("EXECUTION_COMPLETE 是 create-once 终态，不得重复追加 checkpoint");
+      }
+      if (snapshot.checkpoint.entries.some((entry) => entry.state !== "SCHEMA_VALIDATED_COMMITTED")) {
+        throw new Error("只有全部 requests SCHEMA_VALIDATED_COMMITTED 才能 complete run；此终态不代表语义 review 通过");
+      }
+      if (Date.parse(snapshot.checkpoint.created_at) > Date.parse(input.created_at)) throw new Error("Complete checkpoint 时间回退");
+      const next = this.nextCheckpoint(
+        snapshot,
+        snapshot.checkpoint.entries.map((entry) => ({ ...entry })),
+        input.created_at,
+        "EXECUTION_COMPLETE",
+        null,
+      );
+      return this.commitCheckpointUnlocked(snapshot, next);
+    });
+  }
+
+  private assertExpectedCheckpoint(
+    snapshot: FormalOracleRunSnapshot,
+    expectedHead: FormalOracleHeadPinV1,
+    expectedCheckpointSha256: string,
+  ): void {
+    if (expectedHead.checkpoint_sha256 !== expectedCheckpointSha256
+      || snapshot.head.checkpoint_sha256 !== expectedCheckpointSha256) {
+      throw new Error("expected_head/expected_checkpoint/HEAD CAS 不一致");
+    }
+  }
+
+  private nextCheckpoint(
+    snapshot: FormalOracleRunSnapshot,
+    entries: OracleGateCheckpointEntryV1[],
+    createdAt: string,
+    runState: RunCheckpointV1["run_state"],
+    terminalReasonSha256: string | null,
+  ): RunCheckpointV1 {
+    const checkpoint: RunCheckpointV1 = {
+      schema_version: "oracle-gate-run-checkpoint-v1",
+      checkpoint_sha256: "0".repeat(64),
+      run_sha256: snapshot.run.run_sha256,
+      schedule_sha256: snapshot.run.schedule_sha256,
+      generation: snapshot.checkpoint.generation + 1,
+      previous_checkpoint_sha256: snapshot.checkpoint.checkpoint_sha256,
+      created_at: createdAt,
+      run_state: runState,
+      terminal_reason_sha256: terminalReasonSha256,
+      request_count: snapshot.run.request_count,
+      counts: checkpointCounts(entries),
+      entries,
+    };
+    checkpoint.checkpoint_sha256 = hashRunCheckpoint(checkpoint);
+    validationError("Next checkpoint", validateRunCheckpoint(checkpoint));
+    validationError("Next checkpoint transition", validateRunCheckpointTransition(snapshot.checkpoint, checkpoint));
+    return checkpoint;
+  }
+
+  private async commitCheckpointUnlocked(
+    snapshot: FormalOracleRunSnapshot,
+    next: RunCheckpointV1,
+  ): Promise<FormalOracleRunSnapshot> {
+    await this.privateFs.publishImmutableObject(
+      this.checkpointDirectory(snapshot.run.run_sha256, next.checkpoint_sha256),
+      "checkpoint.json",
+      privateCanonicalJsonBytes(next),
+    );
+    const currentHead = await this.loadHead(snapshot.run.run_sha256);
+    if (currentHead.checkpoint_sha256 !== snapshot.head.checkpoint_sha256
+      || currentHead.generation !== snapshot.head.generation) {
+      throw new Error("HEAD CAS 失败：immutable objects 保留为 orphan，拒绝自动采用");
+    }
+    const nextHead = this.makeHead(next);
+    await this.privateFs.replaceFileAtomic(this.headPath(snapshot.run.run_sha256), privateCanonicalJsonBytes(nextHead));
+    return this.loadRunUnlocked(snapshot.run.run_sha256, this.pinFromHead(nextHead));
+  }
+
+  private async loadIntentUnlocked(
+    run: FormalRunContractV1,
+    executionPlan: FormalOracleExecutionPlanV1,
+    entryIndex: number,
+    intentSha256: string,
+  ): Promise<RequestIntentV1> {
+    const bytes = await this.privateFs.readFile(this.intentPath(run.run_sha256, intentSha256));
+    const intent = parseCanonicalDocument<RequestIntentV1>(bytes, "Request intent");
+    validationError("Request intent", validateRequestIntent(intent));
+    if (intent.intent_sha256 !== intentSha256 || hashRequestIntent(intent) !== intentSha256
+      || intent.run_sha256 !== run.run_sha256 || intent.schedule_index !== entryIndex) {
+      throw new Error("Request intent 内容地址或 run/schedule binding 无效");
+    }
+    assertIntentMatchesExecutionPlan(intent, executionPlan.items[entryIndex]);
+    const request = await this.privateFs.readFile(intent.request_object_uri);
+    if (intent.request_object_uri !== this.requestObjectUri(run.run_sha256, intent.request_payload_sha256)
+      || digest(request) !== intent.request_payload_sha256) throw new Error("Request intent 未绑定 durable request bytes");
+    return intent;
+  }
+
+  private async loadAttemptUnlocked(
+    run: FormalRunContractV1,
+    executionPlan: FormalOracleExecutionPlanV1,
+    entryIndex: number,
+    attemptSha256: string,
+  ): Promise<RequestAttemptAuditV1> {
+    const bytes = await this.privateFs.readFile(this.attemptPath(run.run_sha256, attemptSha256));
+    const audit = parseCanonicalDocument<RequestAttemptAuditV1>(bytes, "Attempt audit");
+    if (audit.attempt_sha256 !== attemptSha256 || hashRequestAttemptAudit(audit) !== attemptSha256) {
+      throw new Error("Attempt audit 内容地址无效");
+    }
+    const intent = await this.loadIntentUnlocked(run, executionPlan, entryIndex, audit.intent_sha256);
+    validationError("Attempt audit against intent", validateRequestAttemptAgainstIntent(intent, audit));
+    if (audit.outcome === "result_received") await this.verifyResponseObjects(run.run_sha256, audit);
+    return audit;
+  }
+
+  private async loadCommittedRequestUnlocked(
+    run: FormalRunContractV1,
+    executionPlan: FormalOracleExecutionPlanV1,
+    entryIndex: number,
+    committedSha256: string,
+  ): Promise<CommittedRequestV1> {
+    const bytes = await this.privateFs.readFile(this.committedRequestPath(run.run_sha256, committedSha256));
+    const committed = parseCanonicalDocument<CommittedRequestV1>(bytes, "Committed request");
+    if (committed.committed_request_sha256 !== committedSha256 || hashCommittedRequest(committed) !== committedSha256) {
+      throw new Error("Committed request 内容地址无效");
+    }
+    const intent = await this.loadIntentUnlocked(run, executionPlan, entryIndex, committed.intent_sha256);
+    const audit = await this.loadAttemptUnlocked(run, executionPlan, entryIndex, committed.attempt_sha256);
+    validationError("Committed request against attempt", validateCommittedRequestAgainstAttempt(intent, audit, committed));
+    if (executionPlan.items[entryIndex].output_schema_sha256 !== ORACLE_GATE_RESPONSE_SCHEMA_SHA256
+      || committed.validator_version !== ORACLE_GATE_RESPONSE_VALIDATOR_VERSION) {
+      throw new Error("Durable committed request 未绑定 frozen shared response schema/validator");
+    }
+    const parsed = await this.verifyResponseObjects(run.run_sha256, audit);
+    validateOracleGateResponse(parsed, executionPlan.items[entryIndex].arm);
+    return committed;
+  }
+
+  private async verifyResponseObjects(runSha256: string, audit: RequestAttemptAuditV1): Promise<Record<string, unknown>> {
+    if (audit.outcome !== "result_received" || !audit.response_bytes_sha256 || !audit.parsed_response_sha256
+      || audit.response_object_uri !== this.responseObjectUri(runSha256, audit.response_bytes_sha256)
+      || audit.parsed_response_object_uri !== this.parsedResponseObjectUri(runSha256, audit.parsed_response_sha256)) {
+      throw new Error("Result audit response refs 无效");
+    }
+    const raw = await this.privateFs.readFile(audit.response_object_uri);
+    if (digest(raw) !== audit.response_bytes_sha256) throw new Error("Durable raw response hash 无效");
+    const parsedFromRaw = parseOracleGateResponseBytes(raw);
+    const parsedBytes = await this.privateFs.readFile(audit.parsed_response_object_uri);
+    const parsed = parseOracleGateResponseBytes(parsedBytes);
+    const canonicalFromRaw = Buffer.from(canonicalOracleGateResponseBytes(parsedFromRaw));
+    if (!canonicalFromRaw.equals(parsedBytes)
+      || !canonicalFromRaw.equals(Buffer.from(canonicalOracleGateResponseBytes(parsed)))
+      || hashPublicBlindResponse(parsed) !== audit.parsed_response_sha256) {
+      throw new Error("Durable parsed response hash 无效");
+    }
+    return parsed;
+  }
+
+  private async persistTerminalReason(runSha256: string, reason: FormalOracleTerminalReasonV1): Promise<void> {
+    assertTerminalReason(reason, runSha256);
+    await this.privateFs.publishImmutableObject(
+      this.terminalReasonDirectory(runSha256, reason.terminal_reason_sha256),
+      "terminal-reason.json",
+      privateCanonicalJsonBytes(reason),
+    );
+  }
+
+  private async loadTerminalReason(runSha256: string, reasonSha256: string): Promise<FormalOracleTerminalReasonV1> {
+    const bytes = await this.privateFs.readFile(this.terminalReasonPath(runSha256, reasonSha256));
+    const reason = parseCanonicalDocument<FormalOracleTerminalReasonV1>(bytes, "Terminal reason");
+    assertTerminalReason(reason, runSha256);
+    if (reason.terminal_reason_sha256 !== reasonSha256) throw new Error("Terminal reason path hash 不匹配");
+    return reason;
+  }
+
   private async loadRunUnlocked(runSha256: string, expectedHead: FormalOracleHeadPinV1): Promise<FormalOracleRunSnapshot> {
     const head = await this.loadHead(runSha256);
     assertHeadPin(runSha256, expectedHead, head);
@@ -657,7 +1192,9 @@ export class FormalOracleRunStore {
       validationError("Checkpoint history", validateRunCheckpointTransition(checkpoints[index - 1], checkpoints[index]));
     }
     assertGenesisMatchesPlans(checkpoints[0], structuralSchedule, executionPlan);
-    for (const checkpoint of checkpoints) await this.validateDispatchReferences(run, executionPlan, checkpoint);
+    for (const [index, checkpoint] of checkpoints.entries()) {
+      await this.validateCheckpointReferences(run, executionPlan, checkpoint, index > 0 ? checkpoints[index - 1] : null);
+    }
     return {
       run,
       formal_spec: formalSpec,
@@ -671,32 +1208,91 @@ export class FormalOracleRunStore {
     };
   }
 
-  private async validateDispatchReferences(
+  private async validateCheckpointReferences(
     run: FormalRunContractV1,
     executionPlan: FormalOracleExecutionPlanV1,
     checkpoint: RunCheckpointV1,
+    previous: RunCheckpointV1 | null,
   ): Promise<void> {
     for (const [entryIndex, entry] of checkpoint.entries.entries()) {
-      if (!entry.active_intent_sha256) continue;
-      const bytes = await this.privateFs.readFile(this.intentPath(run.run_sha256, entry.active_intent_sha256));
-      const intent = parseCanonicalDocument<RequestIntentV1>(bytes, "Request intent");
-      validationError("Request intent", validateRequestIntent(intent));
-      if (intent.intent_sha256 !== entry.active_intent_sha256 || hashRequestIntent(intent) !== entry.active_intent_sha256
-        || intent.run_sha256 !== run.run_sha256 || intent.request_id !== entry.request_id
-        || intent.idempotency_key !== entry.idempotency_key || intent.max_attempts !== entry.max_attempts
-        || intent.schedule_index !== entryIndex) {
-        throw new Error("Checkpoint active intent 引用未绑定真实 request object");
+      const activeIntent = entry.active_intent_sha256
+        ? await this.loadIntentUnlocked(run, executionPlan, entryIndex, entry.active_intent_sha256)
+        : null;
+      if (activeIntent && (activeIntent.request_id !== entry.request_id || activeIntent.idempotency_key !== entry.idempotency_key
+        || activeIntent.max_attempts !== entry.max_attempts || Date.parse(activeIntent.prepared_at) > Date.parse(checkpoint.created_at))) {
+        throw new Error("Checkpoint active intent 未绑定 request/idempotency/time");
       }
-      assertIntentMatchesExecutionPlan(intent, executionPlan.items[entryIndex]);
+      const audit = entry.latest_attempt_audit_sha256
+        ? await this.loadAttemptUnlocked(run, executionPlan, entryIndex, entry.latest_attempt_audit_sha256)
+        : null;
+      if (audit && (audit.request_id !== entry.request_id || audit.idempotency_key !== entry.idempotency_key
+        || audit.attempt_ordinal !== entry.attempts_used || Date.parse(audit.finished_at) > Date.parse(checkpoint.created_at))) {
+        throw new Error("Checkpoint latest audit 未绑定 request/ordinal/time");
+      }
       if (entry.state === "DISPATCH_INTENT_COMMITTED"
-        && (intent.attempt_ordinal !== entry.attempts_used + 1
-          || Date.parse(intent.prepared_at) > Date.parse(checkpoint.created_at))) {
+        && (!activeIntent || activeIntent.attempt_ordinal !== entry.attempts_used + 1)) {
         throw new Error("Dispatch checkpoint 未绑定下一 attempt ordinal 的 durable intent");
       }
-      const expectedUri = this.requestObjectUri(run.run_sha256, intent.request_payload_sha256);
-      if (intent.request_object_uri !== expectedUri) throw new Error("Intent request_object_uri 不属于当前 run");
-      const payload = await this.privateFs.readFile(expectedUri);
-      if (digest(payload) !== intent.request_payload_sha256) throw new Error("Durable request payload 内容地址不匹配");
+      const previousEntry = previous?.entries.find((item) => item.request_id === entry.request_id);
+      if (entry.state === "DISPATCH_INTENT_COMMITTED" && previousEntry
+        && Date.parse(activeIntent!.prepared_at) < Date.parse(previous!.created_at)) {
+        throw new Error("Dispatch intent prepared_at 不得早于其前驱 checkpoint");
+      }
+      if (["RECEIPT_COMMITTED", "RETRY_READY", "BLOCKED_AMBIGUOUS", "SCHEMA_VALIDATED_COMMITTED"].includes(entry.state)
+        && (!activeIntent || !audit || activeIntent.intent_sha256 !== audit.intent_sha256
+          || activeIntent.attempt_ordinal !== entry.attempts_used)) {
+        throw new Error("Receipt-derived checkpoint 未绑定同序号 intent/audit");
+      }
+      if (entry.state === "RECEIPT_COMMITTED" && audit?.outcome === "unknown") {
+        throw new Error("unknown audit 不得进入 RECEIPT_COMMITTED");
+      }
+      if ((entry.state === "RECEIPT_COMMITTED" || entry.state === "BLOCKED_AMBIGUOUS")
+        && previousEntry?.state === "DISPATCH_INTENT_COMMITTED" && audit
+        && Date.parse(audit.started_at) < Date.parse(previous!.created_at)) {
+        throw new Error("Provider attempt 不得早于 durable dispatch checkpoint");
+      }
+      if (entry.state === "RETRY_READY" && audit
+        && (!(audit.outcome === "not_sent" || audit.outcome === "no_result_confirmed")
+          || audit.automatic_retry_allowed !== true || entry.attempts_used >= entry.max_attempts)) {
+        throw new Error("RETRY_READY 未绑定可安全 retry 的明确无结果 audit");
+      }
+      if (entry.state === "BLOCKED_AMBIGUOUS" && audit?.outcome !== "unknown") {
+        throw new Error("BLOCKED_AMBIGUOUS 未绑定 unknown audit");
+      }
+      if (entry.committed_request_sha256) {
+        const committed = await this.loadCommittedRequestUnlocked(run, executionPlan, entryIndex, entry.committed_request_sha256);
+        if (entry.state !== "SCHEMA_VALIDATED_COMMITTED" || committed.request_id !== entry.request_id
+          || committed.attempt_sha256 !== audit?.attempt_sha256 || committed.intent_sha256 !== activeIntent?.intent_sha256
+          || Date.parse(committed.transport_and_schema_verified_at) > Date.parse(checkpoint.created_at)) {
+          throw new Error("SCHEMA_VALIDATED_COMMITTED provenance/time 无效");
+        }
+      } else if (entry.state === "SCHEMA_VALIDATED_COMMITTED") {
+        throw new Error("SCHEMA_VALIDATED_COMMITTED 缺少 committed object");
+      }
+    }
+    if (checkpoint.terminal_reason_sha256) {
+      const reason = await this.loadTerminalReason(run.run_sha256, checkpoint.terminal_reason_sha256);
+      const entry = checkpoint.entries.find((item) => item.request_id === reason.request_id);
+      if (!entry || !entry.latest_attempt_audit_sha256 || entry.latest_attempt_audit_sha256 !== reason.source_attempt_sha256
+        || !["BLOCKED_AMBIGUOUS", "FAILED_CLOSED"].includes(entry.state)
+        || Date.parse(reason.created_at) > Date.parse(checkpoint.created_at)) {
+        throw new Error("Terminal reason 未绑定 terminal checkpoint/request/audit");
+      }
+      const audit = await this.loadAttemptUnlocked(
+        run,
+        executionPlan,
+        checkpoint.entries.findIndex((item) => item.request_id === reason.request_id),
+        reason.source_attempt_sha256,
+      );
+      if (terminalDetailHash(audit) !== reason.detail_sha256
+        || (reason.reason_code === "ambiguous_unknown_attempt" && audit.outcome !== "unknown")
+        || (reason.reason_code === "provider_length" && audit.stop_reason !== "length")
+        || (reason.reason_code === "provider_error" && audit.stop_reason !== "error")
+        || (reason.reason_code === "attempt_budget_exhausted"
+          && !((audit.outcome === "not_sent" || audit.outcome === "no_result_confirmed")
+            && entry.attempts_used >= entry.max_attempts))) {
+        throw new Error("Terminal reason code/detail 与 attempt provenance 不一致");
+      }
     }
   }
 
@@ -773,6 +1369,33 @@ export class FormalOracleRunStore {
   }
   private intentPath(runSha256: string, intentSha256: string): string {
     return `${this.intentDirectory(runSha256, intentSha256)}/intent.json`;
+  }
+  private attemptDirectory(runSha256: string, attemptSha256: string): string {
+    return `${this.runPath(runSha256)}/objects/attempt-audits/${attemptSha256}`;
+  }
+  private attemptPath(runSha256: string, attemptSha256: string): string {
+    return `${this.attemptDirectory(runSha256, attemptSha256)}/attempt-audit.json`;
+  }
+  private responseDirectory(runSha256: string, responseSha256: string): string {
+    return `${this.runPath(runSha256)}/objects/responses/${responseSha256}`;
+  }
+  private parsedResponseDirectory(runSha256: string, parsedSha256: string): string {
+    return `${this.runPath(runSha256)}/objects/parsed-responses/${parsedSha256}`;
+  }
+  private parsedResponsePath(runSha256: string, parsedSha256: string): string {
+    return this.parsedResponseObjectUri(runSha256, parsedSha256);
+  }
+  private committedRequestDirectory(runSha256: string, committedSha256: string): string {
+    return `${this.runPath(runSha256)}/objects/committed-requests/${committedSha256}`;
+  }
+  private committedRequestPath(runSha256: string, committedSha256: string): string {
+    return `${this.committedRequestDirectory(runSha256, committedSha256)}/committed-request.json`;
+  }
+  private terminalReasonDirectory(runSha256: string, reasonSha256: string): string {
+    return `${this.runPath(runSha256)}/objects/terminal-reasons/${reasonSha256}`;
+  }
+  private terminalReasonPath(runSha256: string, reasonSha256: string): string {
+    return `${this.terminalReasonDirectory(runSha256, reasonSha256)}/terminal-reason.json`;
   }
   private requestPayloadDirectory(runSha256: string, payloadSha256: string): string {
     return `${this.runPath(runSha256)}/objects/request-payloads/${payloadSha256}`;

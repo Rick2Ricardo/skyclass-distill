@@ -117,6 +117,7 @@ function attempt(request = intent()): RequestAttemptAuditV1 {
     request_object_uri: request.request_object_uri,
     response_object_uri: "objects/responses/response-001.json",
     response_bytes_sha256: "3".repeat(64),
+    parsed_response_object_uri: "objects/parsed-responses/response-001.json",
     parsed_response_sha256: hashPublicBlindResponse({ schema_version: "fixture-v1", score: 1 }),
     submitted_visuals: request.visuals,
     model: request.model,
@@ -152,11 +153,12 @@ function committed(request = intent(), receipt = attempt(request)): CommittedReq
     intent_sha256: request.intent_sha256,
     attempt_sha256: receipt.attempt_sha256,
     attempt_ordinal: receipt.attempt_ordinal,
-    response_object_uri: String(receipt.response_object_uri),
+    response_object_uri: String(receipt.parsed_response_object_uri),
     response_sha256: String(receipt.parsed_response_sha256),
-    validator_version: "oracle-gate-response-validator-v1",
-    verified_at: "2026-08-12T00:00:03.000Z",
-    verified: true,
+    validator_version: "oracle-gate-response-structural-validator-v1",
+    transport_and_schema_verified_at: "2026-08-12T00:00:03.000Z",
+    transport_and_schema_verified: true,
+    semantic_review_status: "pending_external_blind_review",
     provider_stop_confirmed: true,
   };
   value.committed_request_sha256 = hashCommittedRequest(value);
@@ -169,7 +171,7 @@ function entry(state: OracleGateCheckpointEntryV1["state"], request = intent(), 
   if (state === "RETRY_READY") return { ...common, state, resume_action: "dispatch_new_attempt", attempts_used: 1, active_intent_sha256: request.intent_sha256, latest_attempt_audit_sha256: receipt.attempt_sha256, committed_request_sha256: null };
   if (state === "DISPATCH_INTENT_COMMITTED") return { ...common, state, resume_action: "block_ambiguous", attempts_used: 0, active_intent_sha256: request.intent_sha256, latest_attempt_audit_sha256: null, committed_request_sha256: null };
   if (state === "RECEIPT_COMMITTED") return { ...common, state, resume_action: "verify_receipt", attempts_used: 1, active_intent_sha256: request.intent_sha256, latest_attempt_audit_sha256: receipt.attempt_sha256, committed_request_sha256: null };
-  if (state === "VERIFIED_COMMITTED") return { ...common, state, resume_action: "skip_verified", attempts_used: 1, active_intent_sha256: request.intent_sha256, latest_attempt_audit_sha256: receipt.attempt_sha256, committed_request_sha256: record.committed_request_sha256 };
+  if (state === "SCHEMA_VALIDATED_COMMITTED") return { ...common, state, resume_action: "skip_schema_validated", attempts_used: 1, active_intent_sha256: request.intent_sha256, latest_attempt_audit_sha256: receipt.attempt_sha256, committed_request_sha256: record.committed_request_sha256 };
   if (state === "BLOCKED_AMBIGUOUS") return { ...common, state, resume_action: "block_ambiguous", attempts_used: 1, active_intent_sha256: request.intent_sha256, latest_attempt_audit_sha256: receipt.attempt_sha256, committed_request_sha256: null };
   return { ...common, state, resume_action: "block_failed", attempts_used: 0, active_intent_sha256: null, latest_attempt_audit_sha256: null, committed_request_sha256: null };
 }
@@ -188,14 +190,14 @@ function checkpoint(
     retry_ready: state === "RETRY_READY" ? 1 : 0,
     dispatch_intent_committed: state === "DISPATCH_INTENT_COMMITTED" ? 1 : 0,
     receipt_committed: state === "RECEIPT_COMMITTED" ? 1 : 0,
-    verified_committed: state === "VERIFIED_COMMITTED" ? 1 : 0,
+    schema_validated_committed: state === "SCHEMA_VALIDATED_COMMITTED" ? 1 : 0,
     blocked_ambiguous: state === "BLOCKED_AMBIGUOUS" ? 1 : 0,
     failed_closed: state === "FAILED_CLOSED" ? 1 : 0,
   };
   const runState = state === "PENDING" && generation === 0 ? "SEALED_READY"
     : state === "BLOCKED_AMBIGUOUS" ? "BLOCKED_AMBIGUOUS"
       : state === "FAILED_CLOSED" ? "FAILED_CLOSED"
-        : state === "VERIFIED_COMMITTED" ? "EXECUTION_COMPLETE" : "RUNNING";
+        : state === "SCHEMA_VALIDATED_COMMITTED" ? "EXECUTION_COMPLETE" : "RUNNING";
   const value: RunCheckpointV1 = {
     schema_version: "oracle-gate-run-checkpoint-v1",
     checkpoint_sha256: HASH,
@@ -290,7 +292,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     const initial = checkpoint("PENDING");
     const dispatch = checkpoint("DISPATCH_INTENT_COMMITTED", 1, initial);
     const received = checkpoint("RECEIPT_COMMITTED", 2, dispatch);
-    const completed = checkpoint("VERIFIED_COMMITTED", 3, received);
+    const completed = checkpoint("SCHEMA_VALIDATED_COMMITTED", 3, received);
     const published = publicPackage();
     const key = answerKey(published);
     expect(validateCompletedFormalRunArtifactChain({
@@ -327,15 +329,15 @@ describe("Formal Oracle content-addressed run contracts", () => {
     expect(validateRequestIntent(request).issues.map((item) => item.path)).toEqual(expect.arrayContaining(["request_object_uri", "seed", "intent_sha256"]));
   });
 
-  it("keeps dispatch intent, receipt, and verified commit as distinct durable states", () => {
+  it("keeps dispatch intent, receipt, and schema-validated commit as distinct durable states", () => {
     const initial = checkpoint("PENDING");
     const dispatch = checkpoint("DISPATCH_INTENT_COMMITTED", 1, initial);
     const receipt = checkpoint("RECEIPT_COMMITTED", 2, dispatch);
-    const verified = checkpoint("VERIFIED_COMMITTED", 3, receipt);
+    const schemaValidated = checkpoint("SCHEMA_VALIDATED_COMMITTED", 3, receipt);
     expect(validateRunCheckpoint(initial)).toEqual({ valid: true, issues: [] });
     expect(validateRunCheckpointTransition(initial, dispatch)).toEqual({ valid: true, issues: [] });
     expect(validateRunCheckpointTransition(dispatch, receipt)).toEqual({ valid: true, issues: [] });
-    expect(validateRunCheckpointTransition(receipt, verified)).toEqual({ valid: true, issues: [] });
+    expect(validateRunCheckpointTransition(receipt, schemaValidated)).toEqual({ valid: true, issues: [] });
   });
 
   it("forbids automatic retry and redispatch after an ambiguous attempt", () => {
@@ -345,6 +347,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     unknown.provider_response_received = false;
     unknown.response_object_uri = null;
     unknown.response_bytes_sha256 = null;
+    unknown.parsed_response_object_uri = null;
     unknown.parsed_response_sha256 = null;
     unknown.stop_reason = null;
     unknown.error_code = "transport_outcome_unknown";
@@ -364,18 +367,18 @@ describe("Formal Oracle content-addressed run contracts", () => {
     expect(validateRunCheckpointTransition(ambiguous, redispatch).issues.some((item) => item.message.includes("非法 request 状态转换"))).toBe(true);
   });
 
-  it("starts from a clean sealed checkpoint and freezes verified provenance", () => {
-    const forgedInitial = checkpoint("VERIFIED_COMMITTED");
+  it("starts from a clean sealed checkpoint and freezes schema-validated provenance", () => {
+    const forgedInitial = checkpoint("SCHEMA_VALIDATED_COMMITTED");
     expect(validateRunCheckpoint(forgedInitial).issues.some((item) => item.path === "generation")).toBe(true);
 
     const initial = checkpoint("PENDING");
     const dispatch = checkpoint("DISPATCH_INTENT_COMMITTED", 1, initial);
     const receipt = checkpoint("RECEIPT_COMMITTED", 2, dispatch);
-    const verified = checkpoint("VERIFIED_COMMITTED", 3, receipt);
-    const rebound = checkpoint("VERIFIED_COMMITTED", 4, verified);
+    const schemaValidated = checkpoint("SCHEMA_VALIDATED_COMMITTED", 3, receipt);
+    const rebound = checkpoint("SCHEMA_VALIDATED_COMMITTED", 4, schemaValidated);
     rebound.entries[0].active_intent_sha256 = "9".repeat(64);
     rebound.checkpoint_sha256 = hashRunCheckpoint(rebound);
-    expect(validateRunCheckpointTransition(verified, rebound).issues.some((item) => item.message.includes("逐字段不可变"))).toBe(true);
+    expect(validateRunCheckpointTransition(schemaValidated, rebound).issues.some((item) => item.message.includes("逐字段不可变"))).toBe(true);
 
     const dirtyPending = checkpoint("PENDING");
     dirtyPending.entries[0].attempts_used = 1;
@@ -394,6 +397,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     failed.provider_request_id = null;
     failed.response_object_uri = null;
     failed.response_bytes_sha256 = null;
+    failed.parsed_response_object_uri = null;
     failed.parsed_response_sha256 = null;
     failed.stop_reason = null;
     failed.error_code = "not-sent";
@@ -464,6 +468,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     firstAttempt.provider_response_received = false;
     firstAttempt.response_object_uri = null;
     firstAttempt.response_bytes_sha256 = null;
+    firstAttempt.parsed_response_object_uri = null;
     firstAttempt.parsed_response_sha256 = null;
     firstAttempt.stop_reason = null;
     firstAttempt.error_code = "transport_outcome_unknown";
@@ -483,12 +488,12 @@ describe("Formal Oracle content-addressed run contracts", () => {
     secondAttempt.finished_at = "2026-08-12T00:00:03.000Z";
     secondAttempt.attempt_sha256 = hashRequestAttemptAudit(secondAttempt);
     const record = committed(secondIntent, secondAttempt);
-    record.verified_at = "2026-08-12T00:00:03.000Z";
+    record.transport_and_schema_verified_at = "2026-08-12T00:00:03.000Z";
     record.committed_request_sha256 = hashCommittedRequest(record);
     const initial = checkpoint("PENDING");
     const dispatch = checkpoint("DISPATCH_INTENT_COMMITTED", 1, initial);
     const received = checkpoint("RECEIPT_COMMITTED", 2, dispatch);
-    const completed = checkpoint("VERIFIED_COMMITTED", 3, received);
+    const completed = checkpoint("SCHEMA_VALIDATED_COMMITTED", 3, received);
     const published = publicPackage();
     const key = answerKey(published);
     const result = validateCompletedFormalRunArtifactChain({
@@ -530,7 +535,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     const initial = checkpoint("PENDING");
     const dispatch = checkpoint("DISPATCH_INTENT_COMMITTED", 1, initial);
     const received = checkpoint("RECEIPT_COMMITTED", 2, dispatch);
-    const completed = checkpoint("VERIFIED_COMMITTED", 3, received);
+    const completed = checkpoint("SCHEMA_VALIDATED_COMMITTED", 3, received);
     const published = publicPackage();
     published.items[0].response = { explanation: "TEACHER-1" };
     published.items[0].response_sha256 = hashPublicBlindResponse(published.items[0].response);
@@ -568,6 +573,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     firstAttempt.provider_request_id = null;
     firstAttempt.response_object_uri = null;
     firstAttempt.response_bytes_sha256 = null;
+    firstAttempt.parsed_response_object_uri = null;
     firstAttempt.parsed_response_sha256 = null;
     firstAttempt.stop_reason = null;
     firstAttempt.error_code = "provider-confirmed-no-result";
@@ -588,7 +594,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     secondAttempt.finished_at = "2026-08-12T00:00:05.000Z";
     secondAttempt.attempt_sha256 = hashRequestAttemptAudit(secondAttempt);
     const record = committed(secondIntent, secondAttempt);
-    record.verified_at = "2026-08-12T00:00:06.000Z";
+    record.transport_and_schema_verified_at = "2026-08-12T00:00:06.000Z";
     record.committed_request_sha256 = hashCommittedRequest(record);
 
     const initial = checkpoint("PENDING");
@@ -605,7 +611,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     const receipt2 = checkpoint("RECEIPT_COMMITTED", 5, dispatch2);
     receipt2.entries[0] = { ...receipt2.entries[0], active_intent_sha256: secondIntent.intent_sha256, latest_attempt_audit_sha256: secondAttempt.attempt_sha256, attempts_used: 2 };
     receipt2.checkpoint_sha256 = hashRunCheckpoint(receipt2);
-    const completed = checkpoint("VERIFIED_COMMITTED", 6, receipt2);
+    const completed = checkpoint("SCHEMA_VALIDATED_COMMITTED", 6, receipt2);
     completed.entries[0] = { ...completed.entries[0], active_intent_sha256: secondIntent.intent_sha256, latest_attempt_audit_sha256: secondAttempt.attempt_sha256, committed_request_sha256: record.committed_request_sha256, attempts_used: 2 };
     completed.checkpoint_sha256 = hashRunCheckpoint(completed);
     const published = publicPackage();

@@ -6,14 +6,14 @@ export type OracleGateRequestState =
   | "RETRY_READY"
   | "DISPATCH_INTENT_COMMITTED"
   | "RECEIPT_COMMITTED"
-  | "VERIFIED_COMMITTED"
+  | "SCHEMA_VALIDATED_COMMITTED"
   | "BLOCKED_AMBIGUOUS"
   | "FAILED_CLOSED";
 export type OracleGateResumeAction =
   | "dispatch_new_attempt"
   | "block_ambiguous"
   | "verify_receipt"
-  | "skip_verified"
+  | "skip_schema_validated"
   | "block_failed";
 export type OracleGateRunState =
   | "SEALED_READY"
@@ -115,8 +115,11 @@ export interface RequestAttemptAuditV1 {
   provider_request_id: string | null;
   request_sha256: string;
   request_object_uri: string;
+  /** Immutable provider-original JSON UTF-8 bytes. */
   response_object_uri: string | null;
   response_bytes_sha256: string | null;
+  /** Immutable canonical JSON object deterministically parsed from response_object_uri. */
+  parsed_response_object_uri: string | null;
   parsed_response_sha256: string | null;
   submitted_visuals: OracleGateRunVisualV1[];
   model: string;
@@ -139,6 +142,7 @@ export interface RequestAttemptAuditV1 {
   automatic_retry_allowed: boolean;
 }
 
+/** Structural/transport commitment only; semantic acceptance is deliberately pending. */
 export interface CommittedRequestV1 {
   schema_version: "oracle-gate-committed-request-v1";
   committed_request_sha256: string;
@@ -151,8 +155,9 @@ export interface CommittedRequestV1 {
   response_object_uri: string;
   response_sha256: string;
   validator_version: string;
-  verified_at: string;
-  verified: true;
+  transport_and_schema_verified_at: string;
+  transport_and_schema_verified: true;
+  semantic_review_status: "pending_external_blind_review";
   provider_stop_confirmed: true;
 }
 
@@ -173,7 +178,7 @@ export interface OracleGateCheckpointCountsV1 {
   retry_ready: number;
   dispatch_intent_committed: number;
   receipt_committed: number;
-  verified_committed: number;
+  schema_validated_committed: number;
   blocked_ambiguous: number;
   failed_closed: number;
 }
@@ -549,7 +554,7 @@ export function validateRequestAttemptAudit(input: unknown): OracleGateRunValida
   const issues: OracleGateRunValidationIssue[] = [];
   const issue = (path: string, message: string): void => { issues.push({ path, message }); };
   if (!isRecord(input)) return report([{ path: "$", message: "必须是对象" }]);
-  const keys = ["schema_version", "attempt_sha256", "run_sha256", "request_id", "idempotency_key", "intent_sha256", "attempt_ordinal", "started_at", "finished_at", "latency_ms", "provider_id", "provider_request_id", "request_sha256", "request_object_uri", "response_object_uri", "response_bytes_sha256", "parsed_response_sha256", "submitted_visuals", "model", "transport", "temperature", "max_input_tokens", "max_output_tokens", "timeout_ms", "seed", "cache_retention", "tools_policy", "outcome", "provider_response_received", "stop_reason", "error_code", "error_message", "usage", "pricing_table_sha256", "cost_microunits", "automatic_retry_allowed"];
+  const keys = ["schema_version", "attempt_sha256", "run_sha256", "request_id", "idempotency_key", "intent_sha256", "attempt_ordinal", "started_at", "finished_at", "latency_ms", "provider_id", "provider_request_id", "request_sha256", "request_object_uri", "response_object_uri", "response_bytes_sha256", "parsed_response_object_uri", "parsed_response_sha256", "submitted_visuals", "model", "transport", "temperature", "max_input_tokens", "max_output_tokens", "timeout_ms", "seed", "cache_retention", "tools_policy", "outcome", "provider_response_received", "stop_reason", "error_code", "error_message", "usage", "pricing_table_sha256", "cost_microunits", "automatic_retry_allowed"];
   if (!exactKeys(input, keys)) issue("$", "字段集合无效");
   if (input.schema_version !== "oracle-gate-request-attempt-audit-v1") issue("schema_version", "版本无效");
   for (const field of ["attempt_sha256", "run_sha256", "idempotency_key", "intent_sha256", "request_sha256"] as const) if (!isSha(input[field])) issue(field, "必须是 SHA-256");
@@ -560,6 +565,7 @@ export function validateRequestAttemptAudit(input: unknown): OracleGateRunValida
   if (input.provider_request_id !== null && !isNonEmpty(input.provider_request_id)) issue("provider_request_id", "必须为 null 或非空字符串");
   if (!isSafeUri(input.request_object_uri)) issue("request_object_uri", "必须是受控相对路径");
   if (input.response_object_uri !== null && !isSafeUri(input.response_object_uri)) issue("response_object_uri", "必须为 null 或受控相对路径");
+  if (input.parsed_response_object_uri !== null && !isSafeUri(input.parsed_response_object_uri)) issue("parsed_response_object_uri", "必须为 null 或受控相对路径");
   for (const field of ["response_bytes_sha256", "parsed_response_sha256", "pricing_table_sha256"] as const) if (input[field] !== null && !isSha(input[field])) issue(field, "必须为 null 或 SHA-256");
   if (!isDenseArray(input.submitted_visuals)) issue("submitted_visuals", "必须是稠密数组且不得有额外属性");
   else input.submitted_visuals.forEach((visual, index) => validateVisual(visual, `submitted_visuals[${index}]`, issues));
@@ -577,17 +583,20 @@ export function validateRequestAttemptAudit(input: unknown): OracleGateRunValida
   if (typeof input.automatic_retry_allowed !== "boolean") issue("automatic_retry_allowed", "必须是 boolean");
 
   if (input.outcome === "result_received") {
-    if (input.provider_response_received !== true || !isSafeUri(input.response_object_uri) || !isSha(input.response_bytes_sha256) || !isSha(input.parsed_response_sha256) || input.usage === null) issue("outcome", "result_received 必须具有完整响应、hash 与 usage");
+    if (input.provider_response_received !== true || !isSafeUri(input.response_object_uri) || !isSha(input.response_bytes_sha256)
+      || !isSafeUri(input.parsed_response_object_uri) || !isSha(input.parsed_response_sha256) || input.usage === null) issue("outcome", "result_received 必须具有完整 raw/parsed 响应、hash 与 usage");
     if (!isNonEmpty(input.provider_request_id) || !["stop", "length", "error"].includes(String(input.stop_reason))) issue("outcome", "result_received 必须具有 provider request ID 与明确 stop reason");
     if (!isSha(input.pricing_table_sha256) || !isNonNegativeSafeInteger(input.cost_microunits)) issue("cost", "result_received 必须具有冻结 pricing table 与 cost");
     if (isRecord(input.usage) && (input.usage.cache_read_tokens !== 0 || input.usage.cache_write_tokens !== 0)) issue("usage", "cache_retention=none 时 cache token 必须为 0");
     if (input.automatic_retry_allowed !== false || input.error_code !== null || input.error_message !== null) issue("automatic_retry_allowed", "已收到结果不得自动重试或携带 error");
   } else if (input.outcome === "not_sent" || input.outcome === "no_result_confirmed") {
-    if (input.provider_response_received !== false || input.response_object_uri !== null || input.response_bytes_sha256 !== null || input.parsed_response_sha256 !== null || input.usage !== null || input.stop_reason !== null || input.pricing_table_sha256 !== null || input.cost_microunits !== null) issue("outcome", "确认无结果时不得声称存在响应、stop、usage 或 cost");
+    if (input.provider_response_received !== false || input.response_object_uri !== null || input.response_bytes_sha256 !== null
+      || input.parsed_response_object_uri !== null || input.parsed_response_sha256 !== null || input.usage !== null || input.stop_reason !== null || input.pricing_table_sha256 !== null || input.cost_microunits !== null) issue("outcome", "确认无结果时不得声称存在响应、stop、usage 或 cost");
     if (typeof input.automatic_retry_allowed !== "boolean" || !isNonEmpty(input.error_code) || !isNonEmpty(input.error_message)) issue("automatic_retry_allowed", "确认无结果的失败必须记录错误；是否重试由 intent 预算决定");
     if (input.outcome === "not_sent" && input.provider_request_id !== null) issue("provider_request_id", "not_sent 不得声称 provider request ID");
   } else if (input.outcome === "unknown") {
-    if (input.provider_response_received !== false || input.response_object_uri !== null || input.response_bytes_sha256 !== null || input.parsed_response_sha256 !== null || input.usage !== null || input.stop_reason !== null || input.pricing_table_sha256 !== null || input.cost_microunits !== null) issue("outcome", "unknown 不得声称存在可验证响应、stop、usage 或 cost");
+    if (input.provider_response_received !== false || input.response_object_uri !== null || input.response_bytes_sha256 !== null
+      || input.parsed_response_object_uri !== null || input.parsed_response_sha256 !== null || input.usage !== null || input.stop_reason !== null || input.pricing_table_sha256 !== null || input.cost_microunits !== null) issue("outcome", "unknown 不得声称存在可验证响应、stop、usage 或 cost");
     if (input.automatic_retry_allowed !== false || !isNonEmpty(input.error_code) || !isNonEmpty(input.error_message)) issue("automatic_retry_allowed", "ambiguous/unknown 必须禁止自动重试并记录错误");
   }
   addHashIssue(issues, input as unknown as RequestAttemptAuditV1, input.attempt_sha256, "attempt_sha256", hashRequestAttemptAudit);
@@ -598,15 +607,16 @@ export function validateCommittedRequest(input: unknown): OracleGateRunValidatio
   const issues: OracleGateRunValidationIssue[] = [];
   const issue = (path: string, message: string): void => { issues.push({ path, message }); };
   if (!isRecord(input)) return report([{ path: "$", message: "必须是对象" }]);
-  const keys = ["schema_version", "committed_request_sha256", "run_sha256", "request_id", "idempotency_key", "intent_sha256", "attempt_sha256", "attempt_ordinal", "response_object_uri", "response_sha256", "validator_version", "verified_at", "verified", "provider_stop_confirmed"];
+  const keys = ["schema_version", "committed_request_sha256", "run_sha256", "request_id", "idempotency_key", "intent_sha256", "attempt_sha256", "attempt_ordinal", "response_object_uri", "response_sha256", "validator_version", "transport_and_schema_verified_at", "transport_and_schema_verified", "semantic_review_status", "provider_stop_confirmed"];
   if (!exactKeys(input, keys)) issue("$", "字段集合无效");
   if (input.schema_version !== "oracle-gate-committed-request-v1") issue("schema_version", "版本无效");
   for (const field of ["committed_request_sha256", "run_sha256", "idempotency_key", "intent_sha256", "attempt_sha256", "response_sha256"] as const) if (!isSha(input[field])) issue(field, "必须是 SHA-256");
   if (!isId(input.request_id) || !isNonEmpty(input.validator_version)) issue("identity", "request_id/validator_version 格式无效");
   if (!isPositiveSafeInteger(input.attempt_ordinal)) issue("attempt_ordinal", "必须是正安全整数");
   if (!isSafeUri(input.response_object_uri)) issue("response_object_uri", "必须是受控相对路径");
-  if (!isCanonicalTime(input.verified_at)) issue("verified_at", "必须是 canonical ISO 时间");
-  if (input.verified !== true || input.provider_stop_confirmed !== true) issue("verified", "committed request 必须已验证且 provider stop 已确认");
+  if (!isCanonicalTime(input.transport_and_schema_verified_at)) issue("transport_and_schema_verified_at", "必须是 canonical ISO 时间");
+  if (input.transport_and_schema_verified !== true || input.provider_stop_confirmed !== true) issue("transport_and_schema_verified", "committed request 必须完成 transport/schema 验证且 provider stop 已确认");
+  if (input.semantic_review_status !== "pending_external_blind_review") issue("semantic_review_status", "语义结论必须留给 external blind review");
   addHashIssue(issues, input as unknown as CommittedRequestV1, input.committed_request_sha256, "committed_request_sha256", hashCommittedRequest);
   return report(issues);
 }
@@ -616,7 +626,7 @@ const RESUME_ACTION_BY_STATE: Record<OracleGateRequestState, OracleGateResumeAct
   RETRY_READY: "dispatch_new_attempt",
   DISPATCH_INTENT_COMMITTED: "block_ambiguous",
   RECEIPT_COMMITTED: "verify_receipt",
-  VERIFIED_COMMITTED: "skip_verified",
+  SCHEMA_VALIDATED_COMMITTED: "skip_schema_validated",
   BLOCKED_AMBIGUOUS: "block_ambiguous",
   FAILED_CLOSED: "block_failed",
 };
@@ -637,7 +647,7 @@ function validateCheckpointEntry(raw: unknown, path: string, issues: OracleGateR
   if (state === "RETRY_READY" && (!isPositiveSafeInteger(raw.attempts_used) || !isPositiveSafeInteger(raw.max_attempts) || raw.attempts_used >= raw.max_attempts || !isSha(raw.active_intent_sha256) || !isSha(raw.latest_attempt_audit_sha256) || raw.committed_request_sha256 !== null)) issue("state", "RETRY_READY 必须保留已确认无结果的 intent/audit 且仍有 attempt 预算");
   if (state === "DISPATCH_INTENT_COMMITTED" && (!isSha(raw.active_intent_sha256) || raw.committed_request_sha256 !== null)) issue("state", "dispatch intent 状态必须且只能具有 active intent");
   if (state === "RECEIPT_COMMITTED" && (!isSha(raw.active_intent_sha256) || !isSha(raw.latest_attempt_audit_sha256) || raw.committed_request_sha256 !== null || !isPositiveSafeInteger(raw.attempts_used))) issue("state", "receipt 状态必须具有 intent、attempt audit 和正 attempt 计数");
-  if (state === "VERIFIED_COMMITTED" && (!isSha(raw.active_intent_sha256) || !isSha(raw.latest_attempt_audit_sha256) || !isSha(raw.committed_request_sha256) || !isPositiveSafeInteger(raw.attempts_used))) issue("state", "verified 状态必须具有完整引用");
+  if (state === "SCHEMA_VALIDATED_COMMITTED" && (!isSha(raw.active_intent_sha256) || !isSha(raw.latest_attempt_audit_sha256) || !isSha(raw.committed_request_sha256) || !isPositiveSafeInteger(raw.attempts_used))) issue("state", "schema-validated 状态必须具有完整引用");
   if (state === "BLOCKED_AMBIGUOUS" && (!isSha(raw.active_intent_sha256) || !isSha(raw.latest_attempt_audit_sha256)
     || !isPositiveSafeInteger(raw.attempts_used) || raw.committed_request_sha256 !== null)) {
     issue("state", "ambiguous 状态必须保留 intent、unknown attempt audit 和正 attempt 计数，且不得具有 commit");
@@ -651,7 +661,7 @@ function checkpointCounts(entries: OracleGateCheckpointEntryV1[]): OracleGateChe
     retry_ready: entries.filter((item) => item.state === "RETRY_READY").length,
     dispatch_intent_committed: entries.filter((item) => item.state === "DISPATCH_INTENT_COMMITTED").length,
     receipt_committed: entries.filter((item) => item.state === "RECEIPT_COMMITTED").length,
-    verified_committed: entries.filter((item) => item.state === "VERIFIED_COMMITTED").length,
+    schema_validated_committed: entries.filter((item) => item.state === "SCHEMA_VALIDATED_COMMITTED").length,
     blocked_ambiguous: entries.filter((item) => item.state === "BLOCKED_AMBIGUOUS").length,
     failed_closed: entries.filter((item) => item.state === "FAILED_CLOSED").length,
   };
@@ -672,7 +682,7 @@ export function validateRunCheckpoint(input: unknown): OracleGateRunValidationRe
   if (!["SEALED_READY", "RUNNING", "INTERRUPTED_SAFE", "BLOCKED_AMBIGUOUS", "FAILED_CLOSED", "EXECUTION_COMPLETE"].includes(String(input.run_state))) issue("run_state", "值无效");
   if (input.terminal_reason_sha256 !== null && !isSha(input.terminal_reason_sha256)) issue("terminal_reason_sha256", "必须为 null 或 SHA-256");
   if (!isPositiveSafeInteger(input.request_count)) issue("request_count", "必须是正安全整数");
-  if (!isRecord(input.counts) || !exactKeys(input.counts, ["pending", "retry_ready", "dispatch_intent_committed", "receipt_committed", "verified_committed", "blocked_ambiguous", "failed_closed"])) issue("counts", "字段集合无效");
+  if (!isRecord(input.counts) || !exactKeys(input.counts, ["pending", "retry_ready", "dispatch_intent_committed", "receipt_committed", "schema_validated_committed", "blocked_ambiguous", "failed_closed"])) issue("counts", "字段集合无效");
   else for (const [field, value] of Object.entries(input.counts)) if (!isNonNegativeSafeInteger(value)) issue(`counts.${field}`, "必须是非负安全整数");
   if (!isDenseArray(input.entries)) issue("entries", "必须是稠密数组且不得有额外属性");
   else {
@@ -689,7 +699,7 @@ export function validateRunCheckpoint(input: unknown): OracleGateRunValidationRe
     const states = entryRecords.map((entry) => entry.state);
     if (input.generation === 0 && (input.run_state !== "SEALED_READY" || states.some((state) => state !== "PENDING"))) issue("generation", "generation 0 必须是全量干净 PENDING 的 SEALED_READY");
     if (input.run_state === "SEALED_READY" && states.some((state) => state !== "PENDING")) issue("run_state", "SEALED_READY 只能包含 PENDING");
-    if (input.run_state === "EXECUTION_COMPLETE" && states.some((state) => state !== "VERIFIED_COMMITTED")) issue("run_state", "EXECUTION_COMPLETE 必须全部 VERIFIED_COMMITTED");
+    if (input.run_state === "EXECUTION_COMPLETE" && states.some((state) => state !== "SCHEMA_VALIDATED_COMMITTED")) issue("run_state", "EXECUTION_COMPLETE 仅表示全部请求 transport/schema validated；不表示语义 review 通过");
     if (input.run_state === "BLOCKED_AMBIGUOUS" && !states.includes("BLOCKED_AMBIGUOUS")) issue("run_state", "BLOCKED_AMBIGUOUS 必须至少有一个 ambiguous request");
     if (input.run_state === "RUNNING" && states.some((state) => state === "BLOCKED_AMBIGUOUS" || state === "FAILED_CLOSED")) issue("run_state", "RUNNING 不得包含 blocked/failed request");
     if (input.run_state === "FAILED_CLOSED" && !states.includes("FAILED_CLOSED")) issue("run_state", "FAILED_CLOSED 必须至少有一个 failed request");
@@ -705,8 +715,8 @@ const REQUEST_TRANSITIONS: Record<OracleGateRequestState, ReadonlySet<OracleGate
   PENDING: new Set(["PENDING", "DISPATCH_INTENT_COMMITTED", "FAILED_CLOSED"]),
   RETRY_READY: new Set(["RETRY_READY", "DISPATCH_INTENT_COMMITTED", "FAILED_CLOSED"]),
   DISPATCH_INTENT_COMMITTED: new Set(["DISPATCH_INTENT_COMMITTED", "RECEIPT_COMMITTED", "BLOCKED_AMBIGUOUS", "FAILED_CLOSED"]),
-  RECEIPT_COMMITTED: new Set(["RECEIPT_COMMITTED", "RETRY_READY", "VERIFIED_COMMITTED", "FAILED_CLOSED"]),
-  VERIFIED_COMMITTED: new Set(["VERIFIED_COMMITTED"]),
+  RECEIPT_COMMITTED: new Set(["RECEIPT_COMMITTED", "RETRY_READY", "SCHEMA_VALIDATED_COMMITTED", "FAILED_CLOSED"]),
+  SCHEMA_VALIDATED_COMMITTED: new Set(["SCHEMA_VALIDATED_COMMITTED"]),
   BLOCKED_AMBIGUOUS: new Set(["BLOCKED_AMBIGUOUS", "FAILED_CLOSED"]),
   FAILED_CLOSED: new Set(["FAILED_CLOSED"]),
 };
@@ -742,7 +752,7 @@ export function validateRunCheckpointTransition(previous: unknown, next: unknown
     if (!REQUEST_TRANSITIONS[prior.state].has(current.state)) issues.push({ path: `next.entries.${prior.request_id}.state`, message: `非法 request 状态转换：${prior.state} -> ${current.state}` });
     if (current.attempts_used < prior.attempts_used) issues.push({ path: `next.entries.${prior.request_id}.attempts_used`, message: "累计 attempts 不得回退" });
     if (prior.state === current.state && stableJson(prior) !== stableJson(current)) issues.push({ path: `next.entries.${prior.request_id}`, message: "同状态 checkpoint 不得重绑定 provenance" });
-    if (prior.state === "VERIFIED_COMMITTED" && stableJson(prior) !== stableJson(current)) issues.push({ path: `next.entries.${prior.request_id}`, message: "已验证 entry 必须逐字段不可变" });
+    if (prior.state === "SCHEMA_VALIDATED_COMMITTED" && stableJson(prior) !== stableJson(current)) issues.push({ path: `next.entries.${prior.request_id}`, message: "schema-validated entry 必须逐字段不可变" });
     if (prior.state === "PENDING" && current.state === "DISPATCH_INTENT_COMMITTED"
       && (current.attempts_used !== 0 || current.latest_attempt_audit_sha256 !== null)) {
       issues.push({ path: `next.entries.${prior.request_id}`, message: "首次 dispatch 必须从干净 PENDING 开始" });
@@ -761,7 +771,7 @@ export function validateRunCheckpointTransition(previous: unknown, next: unknown
         || current.attempts_used !== prior.attempts_used + 1)) {
       issues.push({ path: `next.entries.${prior.request_id}`, message: "ambiguous 必须绑定本次 unknown attempt audit" });
     }
-    if (prior.state === "RECEIPT_COMMITTED" && (current.state === "RETRY_READY" || current.state === "VERIFIED_COMMITTED")
+    if (prior.state === "RECEIPT_COMMITTED" && (current.state === "RETRY_READY" || current.state === "SCHEMA_VALIDATED_COMMITTED")
       && (current.active_intent_sha256 !== prior.active_intent_sha256
         || current.latest_attempt_audit_sha256 !== prior.latest_attempt_audit_sha256
         || current.attempts_used !== prior.attempts_used)) {
@@ -886,8 +896,11 @@ export function validateCommittedRequestAgainstAttempt(
   const record = committed as CommittedRequestV1;
   if (attempt.outcome !== "result_received" || attempt.stop_reason !== "stop") issues.push({ path: "audit", message: "只有 stop 完成的 result_received 才能 commit" });
   if (record.run_sha256 !== request.run_sha256 || record.request_id !== request.request_id || record.idempotency_key !== request.idempotency_key || record.intent_sha256 !== request.intent_sha256) issues.push({ path: "committed.identity", message: "与 intent 不一致" });
-  if (record.attempt_sha256 !== attempt.attempt_sha256 || record.attempt_ordinal !== attempt.attempt_ordinal || record.response_object_uri !== attempt.response_object_uri || record.response_sha256 !== attempt.parsed_response_sha256) issues.push({ path: "committed.response", message: "与 attempt receipt 不一致" });
-  if (Date.parse(record.verified_at) < Date.parse(attempt.finished_at)) issues.push({ path: "committed.verified_at", message: "不得早于 attempt finished_at" });
+  if (record.attempt_sha256 !== attempt.attempt_sha256 || record.attempt_ordinal !== attempt.attempt_ordinal
+    || record.response_object_uri !== attempt.parsed_response_object_uri || record.response_sha256 !== attempt.parsed_response_sha256) {
+    issues.push({ path: "committed.response", message: "与 attempt parsed response receipt 不一致" });
+  }
+  if (Date.parse(record.transport_and_schema_verified_at) < Date.parse(attempt.finished_at)) issues.push({ path: "committed.transport_and_schema_verified_at", message: "不得早于 attempt finished_at" });
   return report(issues);
 }
 
@@ -1033,7 +1046,7 @@ export function validateCompletedFormalRunArtifactChain(input: {
           issues.push({ path, message: "retry dispatch 必须精确保留上一 attempt audit" });
         }
       }
-      if (["RECEIPT_COMMITTED", "RETRY_READY", "BLOCKED_AMBIGUOUS", "VERIFIED_COMMITTED"].includes(entry.state)) {
+      if (["RECEIPT_COMMITTED", "RETRY_READY", "BLOCKED_AMBIGUOUS", "SCHEMA_VALIDATED_COMMITTED"].includes(entry.state)) {
         if (!activeIntent || !latestAudit || activeIntent.attempt_ordinal !== entry.attempts_used
           || latestAudit.attempt_ordinal !== entry.attempts_used || latestAudit.intent_sha256 !== activeIntent.intent_sha256
           || Date.parse(latestAudit.finished_at) > checkpointTime) {
@@ -1048,11 +1061,11 @@ export function validateCompletedFormalRunArtifactChain(input: {
       if (entry.state === "BLOCKED_AMBIGUOUS" && latestAudit && latestAudit.outcome !== "unknown") {
         issues.push({ path, message: "BLOCKED_AMBIGUOUS 必须来自 unknown audit" });
       }
-      if (entry.state === "VERIFIED_COMMITTED" && committedRecord
+      if (entry.state === "SCHEMA_VALIDATED_COMMITTED" && committedRecord
         && (!latestAudit || committedRecord.attempt_sha256 !== latestAudit.attempt_sha256
           || committedRecord.intent_sha256 !== activeIntent?.intent_sha256
-          || Date.parse(committedRecord.verified_at) > checkpointTime)) {
-        issues.push({ path, message: "VERIFIED_COMMITTED 必须绑定当前 intent/audit/commit 且验证先于 checkpoint" });
+          || Date.parse(committedRecord.transport_and_schema_verified_at) > checkpointTime)) {
+        issues.push({ path, message: "SCHEMA_VALIDATED_COMMITTED 必须绑定当前 intent/audit/commit 且结构验证先于 checkpoint" });
       }
     }
   }
@@ -1114,11 +1127,11 @@ export function validateCompletedFormalRunArtifactChain(input: {
       continue;
     }
     push(`committed.${requestId}`, validateCommittedRequestAgainstAttempt(latestIntent, latestAttempt, record));
-    if (Date.parse(checkpoint.created_at) < Date.parse(record.verified_at)
-      || Date.parse(answerKey.created_at) < Date.parse(record.verified_at)) {
-      issues.push({ path: `committed.${requestId}`, message: "terminal checkpoint 与 answer key 不得早于已验证响应" });
+    if (Date.parse(checkpoint.created_at) < Date.parse(record.transport_and_schema_verified_at)
+      || Date.parse(answerKey.created_at) < Date.parse(record.transport_and_schema_verified_at)) {
+      issues.push({ path: `committed.${requestId}`, message: "terminal checkpoint 与 answer key 不得早于 transport/schema validated response" });
     }
-    if (!entry || entry.state !== "VERIFIED_COMMITTED" || entry.active_intent_sha256 !== latestIntent.intent_sha256
+    if (!entry || entry.state !== "SCHEMA_VALIDATED_COMMITTED" || entry.active_intent_sha256 !== latestIntent.intent_sha256
       || entry.latest_attempt_audit_sha256 !== latestAttempt.attempt_sha256
       || entry.committed_request_sha256 !== record.committed_request_sha256
       || entry.attempts_used !== group.length || entry.max_attempts !== latestIntent.max_attempts) {

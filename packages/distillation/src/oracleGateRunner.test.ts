@@ -130,7 +130,7 @@ describe("Oracle Gate executable smoke", () => {
             observed_board_actions: [],
             generalized_teaching_capability: { name: "证据约束讲解", mechanism: "先观察再抽象", action_program: ["确认可见变化"] },
             evidence_claims: [],
-            uncertainties: [],
+            uncertainties: ["Alice passed the exam"],
           },
           audit,
         };
@@ -151,6 +151,7 @@ describe("Oracle Gate executable smoke", () => {
     ))).toBe(true);
     expect(JSON.stringify(result.blind_items)).not.toMatch(/transcript_only|static_final_board|uniform_frame|oracle_delta|condition_sha256/);
     expect(result.private_answer_key).toHaveLength(8);
+    expect(result.blind_items.every((item) => JSON.stringify(item.response).includes("Alice passed the exam"))).toBe(true);
   });
 
   it("keeps the formal path closed until Gold, teacher, seed, and temporal gates are satisfied", () => {
@@ -180,11 +181,11 @@ describe("Oracle Gate executable smoke", () => {
       evidence_claims: [{ claim: "看到了图", evidence_slot: "visual-1" }],
       uncertainties: [],
     };
-    expect(() => validateOracleGateResponse(response, new Set(["transcript", "uncertain"]))).toThrow("evidence_slot 无效");
+    expect(() => validateOracleGateResponse(response, "transcript_only")).toThrow("evidence_slot 无效");
     expect(() => validateOracleGateResponse({
       ...response,
       evidence_claims: [],
       generalized_teaching_capability: { ...response.generalized_teaching_capability, arm: "oracle_delta" },
-    }, new Set(["transcript", "uncertain"]))).toThrow("未注册字段");
+    }, "transcript_only")).toThrow("字段集合无效");
   });
 });
