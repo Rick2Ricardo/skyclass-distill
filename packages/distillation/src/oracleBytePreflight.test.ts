@@ -1,5 +1,5 @@
-import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { createHash, generateKeyPairSync, sign, type KeyLike } from "node:crypto";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PNG } from "pngjs";
@@ -11,14 +11,22 @@ import {
   canonicalOracleGateFormalInputPayload,
   canonicalOracleGateFormalSpecPayload,
   canonicalSignedGoldDatasetPayload,
+  hashFormalRunContract,
+  hashRunCheckpoint,
   oracleGateByteInventorySha256Preimage,
+  ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
   type GoldReviewDecisionRecord,
   type GoldReviewEvent,
   type OracleGateByteInventory,
   type OracleGateFormalInputManifest,
   type OracleGateFormalSpec,
+  type OracleGateLedgerRegistryV1,
+  type FormalRunContractV1,
+  type GoldLedgerSnapshotV1,
+  type RunCheckpointV1,
   type SignedGoldDataset,
 } from "../../contracts/src/index.js";
+import { canonicalizeOracleGateCanvas } from "../../media/src/oracleGateCanvas.js";
 import { canonicalImagePixels } from "../../media/src/imageEvidence.js";
 import {
   hashSignedSpeechAlignmentContent,
@@ -32,8 +40,20 @@ import {
 } from "../../media/src/speechEvidence.js";
 import type { OracleGateFrameDeriver } from "../../media/src/videoEvidence.js";
 import { deriveOracleGateFormalCaseId } from "./oracleFormalPreflight.js";
+import { prepareOracleGateFormalStructuralPreflight } from "./oracleFormalPreflight.js";
 import { prepareOracleGateBytePreflight } from "./oracleBytePreflight.js";
 import { prepareOracleGateFrameDerivationPreflight } from "./oracleFrameDerivationPreflight.js";
+import {
+  assertActiveFormalOracleCompositionCapability,
+  withComposedFormalOracleRunGenesis,
+  type ComposeFormalOracleRunGenesisInput,
+  type FormalOracleCompositionCapability,
+} from "./oracleCompositionGate.js";
+import { assertActiveOracleLedgerCapability } from "./oracleTrustedPreflight.js";
+import { FormalOracleRunStore, hashFormalOracleExecutionPlan } from "../../store/src/formalOracleRunStore.js";
+import type { FormalOracleExecutionPlanV1, FormalOracleHeadPinV1 } from "../../store/src/formalOracleRunStore.js";
+import type { FrozenOracleRegistryStore } from "../../store/src/frozenOracleRegistryStore.js";
+import type { GoldLedgerAttestor } from "../../store/src/goldLedgerAttestor.js";
 
 function sha(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
@@ -502,4 +522,262 @@ describe("Formal Oracle source-frame derivation preflight", () => {
     jpeg.inventory.inventory_sha256 = sha(oracleGateByteInventorySha256Preimage(jpeg.inventory));
     await expect(prepareOracleGateFrameDerivationPreflight({ ...jpeg, frame_deriver: jpeg.video_probe })).rejects.toThrow(/mime_type|MIME|canonical PNG/);
   });
+});
+
+async function buildCompositionFixture(): Promise<ComposeFormalOracleRunGenesisInput> {
+  const fixture = await buildFixture();
+  const systemPromptBytes = Buffer.from("frozen formal system prompt\n", "utf8");
+  fixture.spec.prompt.system_sha256 = sha(systemPromptBytes);
+  fixture.spec.prompt.output_schema_sha256 = ORACLE_GATE_RESPONSE_SCHEMA_SHA256;
+  fixture.spec.spec_sha256 = sha(canonicalOracleGateFormalSpecPayload(fixture.spec));
+  const structural = prepareOracleGateFormalStructuralPreflight(fixture);
+  const frame = await prepareOracleGateFrameDerivationPreflight({ ...fixture, frame_deriver: fixture.video_probe });
+  const artifacts = await Promise.all(structural.schedule.map(async (item, index) => {
+    const user = Buffer.from(`rendered-user-${index}\n`, "utf8");
+    const request = Buffer.from(`request-payload-${index}\n`, "utf8");
+    const byteCase = fixture.inventory.cases.find((candidate) => candidate.case_id === item.case_id)!;
+    const sourceUri = item.arm === "static_final_board" ? byteCase.static_final.asset_uri
+      : item.arm === "uniform_frame" ? byteCase.uniform_frame.asset_uri
+        : byteCase.oracle_comparison.asset_uri;
+    const visual = item.arm === "transcript_only" ? [] : [canonicalizeOracleGateCanvas(
+      await readFile(join(fixture.root, sourceUri)),
+      item.arm,
+    ).bytes];
+    return { request_id: item.request_id, request_payload_bytes: request, rendered_user_prompt_bytes: user, visual_bytes: visual };
+  }));
+  const executionPlan: FormalOracleExecutionPlanV1 = {
+    schema_version: "formal-oracle-execution-plan-v1",
+    execution_plan_sha256: "0".repeat(64),
+    items: structural.schedule.map((item, index) => {
+      const visualBytes = artifacts[index].visual_bytes[0];
+      return {
+        request_id: item.request_id,
+        idempotency_key: item.idempotency_key,
+        schedule_index: index,
+        case_id: item.case_id,
+        arm: item.arm,
+        seed: item.seed,
+        model: fixture.spec.model,
+        request_payload_sha256: sha(artifacts[index].request_payload_bytes),
+        system_prompt_sha256: fixture.spec.prompt.system_sha256,
+        user_prompt_sha256: sha(artifacts[index].rendered_user_prompt_bytes),
+        output_schema_sha256: fixture.spec.prompt.output_schema_sha256,
+        visuals: visualBytes ? [{
+          label: "visual-1" as const,
+          object_uri: `composition-canvases/${item.request_id}.jpg`,
+          sha256: sha(visualBytes),
+          mime_type: "image/jpeg" as const,
+          width: 1920 as const,
+          height: 360 as const,
+          byte_length: visualBytes.byteLength,
+        }] : [],
+        transport: fixture.spec.transport,
+        temperature: fixture.spec.temperature,
+        max_input_tokens: fixture.spec.budget.max_input_tokens,
+        max_output_tokens: fixture.spec.budget.max_output_tokens,
+        timeout_ms: fixture.spec.budget.timeout_ms,
+        max_attempts: fixture.spec.budget.max_attempts,
+        cache_retention: fixture.spec.cache_retention,
+        tools_policy: fixture.spec.tools_policy,
+      };
+    }),
+  };
+  executionPlan.execution_plan_sha256 = hashFormalOracleExecutionPlan(executionPlan);
+  const registrySha = "4".repeat(64);
+  const run: FormalRunContractV1 = {
+    schema_version: "oracle-gate-formal-run-contract-v1",
+    run_sha256: "0".repeat(64),
+    canonicalization: "oracle-gate-run-canonical-json-v1",
+    signed_gold_dataset_sha256: fixture.dataset.dataset_sha256,
+    formal_input_manifest_sha256: fixture.manifest.manifest_sha256,
+    formal_spec_sha256: fixture.spec.spec_sha256,
+    schedule_sha256: structural.schedule_sha256,
+    execution_plan_sha256: executionPlan.execution_plan_sha256,
+    ledger_registry_sha256: registrySha,
+    media_attestation_sha256: frame.preflight_sha256,
+    speech_attestation_sha256: fixture.inventory.inventory_sha256,
+    code_revision: fixture.spec.code_revision,
+    build_artifact_sha256: "5".repeat(64),
+    blinding_secret_commitment_sha256: "6".repeat(64),
+    blinding_scheme: "hmac-sha256-run-request-v1",
+    rating_plan_sha256: "7".repeat(64),
+    statistics_plan_sha256: "8".repeat(64),
+    run_store_uri: "board2skill/formal-oracle/run-store",
+    request_count: structural.request_count,
+    directory_mode: "0700",
+    file_mode: "0600",
+    lock_scheme: "exclusive-create-owner-nonce-v1",
+    checkpoint_scheme: "immutable-hash-chain-head-v1",
+    remote_idempotency_mode: "local_only_fail_closed",
+    api_execution_allowed: false,
+  };
+  run.run_sha256 = hashFormalRunContract(run);
+  const initialCheckpoint: RunCheckpointV1 = {
+    schema_version: "oracle-gate-run-checkpoint-v1",
+    checkpoint_sha256: "0".repeat(64),
+    run_sha256: run.run_sha256,
+    schedule_sha256: run.schedule_sha256,
+    generation: 0,
+    previous_checkpoint_sha256: null,
+    created_at: "2026-08-12T04:00:00.000Z",
+    run_state: "SEALED_READY",
+    terminal_reason_sha256: null,
+    request_count: run.request_count,
+    counts: { pending: run.request_count, retry_ready: 0, dispatch_intent_committed: 0, receipt_committed: 0, schema_validated_committed: 0, blocked_ambiguous: 0, failed_closed: 0 },
+    entries: executionPlan.items.map((item) => ({
+      request_id: item.request_id,
+      idempotency_key: item.idempotency_key,
+      state: "PENDING",
+      resume_action: "dispatch_new_attempt",
+      max_attempts: item.max_attempts,
+      attempts_used: 0,
+      active_intent_sha256: null,
+      latest_attempt_audit_sha256: null,
+      committed_request_sha256: null,
+    })),
+  };
+  initialCheckpoint.checkpoint_sha256 = hashRunCheckpoint(initialCheckpoint);
+  const expectedHead: FormalOracleHeadPinV1 = {
+    schema_version: "formal-oracle-head-pin-v1",
+    run_sha256: run.run_sha256,
+    generation: 0,
+    checkpoint_sha256: initialCheckpoint.checkpoint_sha256,
+  };
+  const snapshot: GoldLedgerSnapshotV1 = {
+    schema_version: "gold-ledger-snapshot-v1",
+    snapshot_sha256: "9".repeat(64),
+    dataset_sha256: fixture.dataset.dataset_sha256,
+    queue_sha256: "a".repeat(64),
+    gold_manifest_sha256: "b".repeat(64),
+    ledger_tree_sha256: "c".repeat(64),
+    package_count: fixture.dataset.package_count,
+    reviewed_group_count: fixture.dataset.reviewed_group_count,
+    accepted_event_count: fixture.dataset.accepted_event_count,
+    entries: [],
+  };
+  const registry = {
+    registry_sha256: registrySha,
+    ledger_snapshot: snapshot,
+    formal_input_manifest_sha256: fixture.manifest.manifest_sha256,
+    formal_spec_sha256: fixture.spec.spec_sha256,
+    resource_manifest_sha256: fixture.manifest.resource_manifest_sha256,
+    schedule_sha256: structural.schedule_sha256,
+    code_revision: fixture.spec.code_revision,
+    build_artifact_sha256: run.build_artifact_sha256,
+    case_count: structural.case_count,
+    event_count: structural.event_count,
+    request_count: structural.request_count,
+  } as OracleGateLedgerRegistryV1;
+  const registryStore = {
+    async withPinnedLedgerRegistry<T>(pinned: string, keys: ReadonlyMap<string, unknown>, callback: (value: OracleGateLedgerRegistryV1) => Promise<T>): Promise<T> {
+      if (pinned !== registrySha) throw new Error("pinned registry mismatch");
+      if (!keys.size) throw new Error("trusted registry keys missing");
+      return callback(registry);
+    },
+  } as unknown as FrozenOracleRegistryStore;
+  const attestor = {
+    async withCurrentSnapshot<T>(expected: string, callback: (value: { snapshot: GoldLedgerSnapshotV1; dataset: SignedGoldDataset; queue: never }) => Promise<T>): Promise<T> {
+      if (expected !== fixture.dataset.dataset_sha256) throw new Error("dataset mismatch");
+      return callback({ snapshot, dataset: fixture.dataset, queue: {} as never });
+    },
+  } as unknown as GoldLedgerAttestor;
+  const dataDir = await mkdtemp(join(tmpdir(), "oracle-composition-store-"));
+  return {
+    attestor,
+    registry_store: registryStore,
+    pinned_registry_sha256: registrySha,
+    trusted_registry_public_keys: new Map([["registry-key", generateKeyPairSync("ed25519").publicKey]]),
+    root: fixture.root,
+    dataset: fixture.dataset,
+    manifest: fixture.manifest,
+    spec: fixture.spec,
+    inventory: fixture.inventory,
+    frame_deriver: fixture.video_probe,
+    trusted_speech_reviewer_keys: fixture.trusted_speech_reviewer_keys,
+    run_store: new FormalOracleRunStore(dataDir),
+    run,
+    execution_plan: executionPlan,
+    system_prompt_bytes: systemPromptBytes,
+    execution_artifacts: artifacts,
+    expected_genesis_head: expectedHead,
+    initial_checkpoint: initialCheckpoint,
+    composed_at: "2026-08-12T04:00:01.000Z",
+  };
+}
+
+describe("Formal Oracle externally-pinned composition gate", () => {
+  it("binds the full frozen chain to a create-once all-PENDING genesis while every downstream gate stays closed", async () => {
+    const input = await buildCompositionFixture();
+    let borrowed: FormalOracleCompositionCapability | undefined;
+    const result = await withComposedFormalOracleRunGenesis({
+      ...input,
+      callback: async (capability) => {
+        borrowed = capability;
+        assertActiveFormalOracleCompositionCapability(capability);
+        expect(() => JSON.stringify(capability)).toThrow("不得序列化");
+        expect(capability).toMatchObject({
+          stage: "composition_attested_only",
+          rights_registry_status: "pending_external_authoritative_head",
+          request_payload_rendering_status: "pending_strict_canonical_builder",
+          toolchain_capsule_status: "pending_external_immutable_capsule",
+          composition_record_authenticity_status: "pending_external_trusted_signature_or_worm",
+          external_head_pin_status: "pending_external_monotonic_worm",
+          blind_package_status: "pending",
+          statistics_status: "pending",
+          api_execution_allowed: false,
+        });
+        expect(capability.attestation).toMatchObject({
+          record_trust: "non_authoritative_composition_record",
+          ledger_registry_sha256: input.run.ledger_registry_sha256,
+          media_attestation_sha256: input.run.media_attestation_sha256,
+          speech_attestation_sha256: input.run.speech_attestation_sha256,
+          head_pin: input.expected_genesis_head,
+        });
+        return capability.attestation.composition_sha256;
+      },
+    });
+    expect(result).toMatch(/^[a-f0-9]{64}$/);
+    expect(() => assertActiveFormalOracleCompositionCapability(borrowed!)).toThrow("无效、已过期");
+    expect(() => assertActiveOracleLedgerCapability(borrowed as never)).toThrow("无效、已过期");
+    const snapshot = await input.run_store.inspectRun(input.run.run_sha256, input.expected_genesis_head);
+    expect(snapshot.checkpoint.run_state).toBe("SEALED_READY");
+    expect(snapshot.checkpoint.entries.every((entry) => entry.state === "PENDING" && entry.attempts_used === 0)).toBe(true);
+  }, 30_000);
+
+  it("fails closed before returning a capability on root, bytes, plan, pin, and create-once drift", async () => {
+    const registry = await buildCompositionFixture();
+    registry.run.ledger_registry_sha256 = "f".repeat(64);
+    registry.run.run_sha256 = hashFormalRunContract(registry.run);
+    await expect(withComposedFormalOracleRunGenesis({ ...registry, callback: async () => "bad" })).rejects.toThrow(/registry|expected_head|checkpoint/i);
+
+    const payload = await buildCompositionFixture();
+    payload.execution_artifacts[0].request_payload_bytes = Buffer.from("drift");
+    await expect(withComposedFormalOracleRunGenesis({ ...payload, callback: async () => "bad" })).rejects.toThrow("Execution artifact bytes");
+
+    const pin = await buildCompositionFixture();
+    pin.expected_genesis_head.checkpoint_sha256 = "f".repeat(64);
+    await expect(withComposedFormalOracleRunGenesis({ ...pin, callback: async () => "bad" })).rejects.toThrow(/pin|HEAD/i);
+
+    const once = await buildCompositionFixture();
+    await withComposedFormalOracleRunGenesis({ ...once, callback: async () => undefined });
+    await expect(withComposedFormalOracleRunGenesis({ ...once, callback: async () => "bad" })).rejects.toThrow("create-once");
+  }, 60_000);
+
+  it("snapshots caller-owned JSON, bytes and key maps before asynchronous verification", async () => {
+    const input = await buildCompositionFixture();
+    const originalProbe = input.frame_deriver.probe.bind(input.frame_deriver);
+    let release!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    input.frame_deriver.probe = async (path) => { entered(); await paused; return originalProbe(path); };
+    const pending = withComposedFormalOracleRunGenesis({ ...input, callback: async (capability) => capability.attestation.run_sha256 });
+    await started;
+    input.manifest.cases[0].source_video_id = "caller-mutated";
+    input.system_prompt_bytes.fill(0);
+    input.execution_artifacts[0].request_payload_bytes.fill(0);
+    (input.trusted_speech_reviewer_keys as Map<string, KeyLike>).clear();
+    release();
+    await expect(pending).resolves.toBe(input.run.run_sha256);
+  }, 30_000);
 });

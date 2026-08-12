@@ -584,6 +584,34 @@ export class FormalOracleRunStore {
   }
 
   async createSealedRun(input: CreateSealedRunInput): Promise<FormalOracleRunSnapshot> {
+    this.assertCreateSealedRunInput(input);
+    const runSha = input.run.run_sha256;
+    return this.withRunLock(runSha, () => this.createSealedRunUnlocked(input));
+  }
+
+  /**
+   * Creates genesis and lends the exact generation-0 snapshot without releasing
+   * the run lock in between. Used by higher composition gates after they have
+   * acquired registry -> ledger locks; callers must never invert that order.
+   */
+  async createSealedRunWithPinnedSnapshot<T>(
+    input: CreateSealedRunInput,
+    expectedGenesisHead: FormalOracleHeadPinV1,
+    callback: (snapshot: FormalOracleRunSnapshot) => Promise<T>,
+  ): Promise<T> {
+    this.assertCreateSealedRunInput(input);
+    assertHeadPin(input.run.run_sha256, expectedGenesisHead, {
+      schema_version: "formal-oracle-run-head-v1",
+      run_sha256: input.run.run_sha256,
+      generation: input.initial_checkpoint.generation,
+      checkpoint_sha256: input.initial_checkpoint.checkpoint_sha256,
+      updated_at: input.initial_checkpoint.created_at,
+      api_execution_allowed: false,
+    });
+    return this.withRunLock(input.run.run_sha256, async () => callback(await this.createSealedRunUnlocked(input)));
+  }
+
+  private assertCreateSealedRunInput(input: CreateSealedRunInput): void {
     validationError("Formal run contract", validateFormalRunContract(input.run));
     validationError("Initial checkpoint", validateRunCheckpoint(input.initial_checkpoint));
     assertStrictFormalSpec(input.formal_spec, input.run);
@@ -600,8 +628,10 @@ export class FormalOracleRunStore {
       || input.initial_checkpoint.request_count !== input.run.request_count) {
       throw new Error("Initial checkpoint 未绑定 Formal run contract");
     }
-    const runSha = input.run.run_sha256;
-    return this.withRunLock(runSha, async () => {
+  }
+
+  private async createSealedRunUnlocked(input: CreateSealedRunInput): Promise<FormalOracleRunSnapshot> {
+      const runSha = input.run.run_sha256;
       const existingHead = await this.privateFs.readOptionalFile(this.headPath(runSha));
       if (existingHead) throw new Error("run HEAD 已存在；createSealedRun 严格 create-once，后续必须使用 external pin inspect");
       await this.privateFs.ensureDirectory(this.runPath(runSha));
@@ -633,12 +663,25 @@ export class FormalOracleRunStore {
       const head = this.makeHead(input.initial_checkpoint);
       await this.privateFs.replaceFileAtomic(this.headPath(runSha), privateCanonicalJsonBytes(head));
       return this.loadRunUnlocked(runSha, this.pinFromHead(head));
-    });
   }
 
   async inspectRun(runSha256: string, expectedHead: FormalOracleHeadPinV1): Promise<FormalOracleRunSnapshot> {
     assertPrivateSha256(runSha256, "run_sha256");
     return this.withRunLock(runSha256, () => this.loadRunUnlocked(runSha256, expectedHead));
+  }
+
+  /**
+   * Holds the run's owner-nonce cross-process lock while lending an exact pinned
+   * snapshot to a controlled callback. This does not make the local HEAD
+   * monotonic: callers still need an external WORM/monotonic pin authority.
+   */
+  async withPinnedRunSnapshot<T>(
+    runSha256: string,
+    expectedHead: FormalOracleHeadPinV1,
+    callback: (snapshot: FormalOracleRunSnapshot) => Promise<T>,
+  ): Promise<T> {
+    assertPrivateSha256(runSha256, "run_sha256");
+    return this.withRunLock(runSha256, async () => callback(await this.loadRunUnlocked(runSha256, expectedHead)));
   }
 
   async resumeRun(runSha256: string, expectedHead: FormalOracleHeadPinV1): Promise<FormalOracleResumePlan> {

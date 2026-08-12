@@ -9,8 +9,17 @@ const activeCapabilities = new WeakSet<object>();
 export interface OracleLedgerAttestedCapability {
   readonly stage: "ledger_attested_only";
   readonly registry_sha256: string;
+  readonly ledger_snapshot_sha256: string;
   readonly dataset_sha256: string;
+  readonly formal_input_manifest_sha256: string;
+  readonly formal_spec_sha256: string;
+  readonly resource_manifest_sha256: string;
   readonly schedule_sha256: string;
+  readonly code_revision: string;
+  readonly build_artifact_sha256: string;
+  readonly case_count: number;
+  readonly event_count: number;
+  readonly request_count: number;
 }
 
 class LedgerCapability implements OracleLedgerAttestedCapability {
@@ -18,8 +27,17 @@ class LedgerCapability implements OracleLedgerAttestedCapability {
 
   constructor(
     readonly registry_sha256: string,
+    readonly ledger_snapshot_sha256: string,
     readonly dataset_sha256: string,
+    readonly formal_input_manifest_sha256: string,
+    readonly formal_spec_sha256: string,
+    readonly resource_manifest_sha256: string,
     readonly schedule_sha256: string,
+    readonly code_revision: string,
+    readonly build_artifact_sha256: string,
+    readonly case_count: number,
+    readonly event_count: number,
+    readonly request_count: number,
   ) {
     Object.freeze(this);
   }
@@ -92,7 +110,20 @@ export async function withLedgerAttestedOracleRegistry<T>(input: {
         || snapshot.queue_sha256 !== registry.ledger_snapshot.queue_sha256) {
         throw new Error("当前 Gold ledger 已相对 pinned registry 漂移");
       }
-      const capability = new LedgerCapability(registry.registry_sha256, snapshot.dataset_sha256, registry.schedule_sha256);
+      const capability = new LedgerCapability(
+        registry.registry_sha256,
+        snapshot.snapshot_sha256,
+        snapshot.dataset_sha256,
+        registry.formal_input_manifest_sha256,
+        registry.formal_spec_sha256,
+        registry.resource_manifest_sha256,
+        registry.schedule_sha256,
+        registry.code_revision,
+        registry.build_artifact_sha256,
+        registry.case_count,
+        registry.event_count,
+        registry.request_count,
+      );
       activeCapabilities.add(capability);
       try {
         return await input.callback(capability);

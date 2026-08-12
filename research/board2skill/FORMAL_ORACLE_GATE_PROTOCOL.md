@@ -1,6 +1,6 @@
 # Formal Oracle Gate v1：正式四组实验协议
 
-> 状态：`private_run_store_first_slice_implemented / execution_blocked`
+> 状态：`externally_pinned_composition_first_slice_implemented / execution_blocked`
 >
 > 日期：2026-08-12
 >
@@ -60,6 +60,9 @@
 - 已冻结浏览器安全的内容寻址 run/intents/attempt receipts/commits/checkpoints/private answer key/public blind package contracts；完整结构验证必须提交从 generation 0 到终态的连续 checkpoint 历史。确认无结果只能在剩余 attempt 预算内进入 `RETRY_READY`，ambiguous 请求不得重发，attempt audit 不得重放，`SCHEMA_VALIDATED_COMMITTED` 的字节、传输与 schema provenance 逐字段不可变，公开盲包按大小写无关方式拒绝 private answer-key 值。该状态不声称自由文本语义正确；teacher-only 违规、无证据学生结果等必须作为盲评失败样本保留和评分，不能在运行阶段筛掉。
 - 私有运行仓库两个薄片已经实现真实 `0700/0600` 内容寻址存储、跨进程 owner-nonce 锁、create-once HEAD、连续 checkpoint、强制 external HEAD pin、dispatch intent 前的不可变请求落盘，以及 attempt receipt、raw→parsed、结构验证与 fail-closed retry/terminal 状态。`schedule_sha256` 继续精确绑定结构预检的 8 字段 `case × arm × seed` 调度；独立 `execution_plan_sha256` 冻结每个请求的渲染后 prompt、视觉引用、完整 request payload SHA、模型、token/timeout/retry 与 cache/tool 策略。实际提交时必须满足 `plan = intent = request bytes` 三方哈希一致，任一 durable dispatch 在恢复时一律按 ambiguous 阻断，不能自动重发；语义审查仍固定为 `pending_external_blind_review`。
 - 该 store 只证明私有字节、完整四臂×全 seed 矩阵、计划与 checkpoint 绑定；它不独立证明 case 是当前 Signed Gold 的全集，也不重做事件数、教师数和 operation 覆盖。正式执行前必须在同一受控调用链内，把 `run.ledger_registry_sha256`、`run.schedule_sha256`、数据集/manifest/spec/build 哈希与进程外 pinned Ed25519 registry capability 逐项组合，并把最新 HEAD pin 保存在外部单调/WORM 系统。本地同 UID 可删除并恢复旧 HEAD；旧 pin 也随之回退时，store 自身无法证明历史曾经前进。因此本层全部接口仍固定 `api_execution_allowed=false`，不能单独成为执行令牌。
+- externally-pinned composition 第一薄片已按固定锁序 `registry → Gold ledger → media/ASR/frame → run store` 组合上述层：入口先冻结 dataset/manifest/spec/inventory/run/plan/checkpoint、真实 prompt/request/visual bytes，并把外部 registry/speech trusted key 规范化为独立 Ed25519 SPKI 快照；随后在 pinned registry 与当前 Gold ledger 的同一 callback 内重跑 structural、全部媒体/ASR 字节和 source-frame derivation，逐项闭合 registry snapshot、Signed Gold、manifest/spec/resource root、schedule、code/build、inventory、frame proofs、execution plan 与 run root，最后在 run owner-nonce 锁内 create-once 提交并核对 exact external generation-0 HEAD pin、`SEALED_READY` 和全 `PENDING` provenance。任一层失败不会借出部分 capability；成功也只在 callback 内借出不可序列化、不可伪造的 `composition_attested_only` capability，离开 callback 即失效。
+- composition JSON 是 `non_authoritative_composition_record`：其自哈希只证明内容地址，不证明跨进程真实性。`run.media_attestation_sha256` 在本组合中精确映射 source-frame preflight SHA；`run.speech_attestation_sha256` 映射 byte inventory SHA，但 inventory 单独仍是 `untrusted_inventory`，只有本 callback 确实重跑签字 ASR/字节验证后才获得组合内含义。当前只闭合 declared resource-manifest root，authoritative rights/withdrawal active head 仍为 `pending_external_authoritative_head`；ffmpeg 动态依赖/不可变 capsule、composition 外部签名/WORM、外部单调 HEAD 也均 pending。
+- 当前 execution plan 可证明 plan/request bytes 哈希一致、视觉 bytes 来自已验证 case/arm 的 canonical canvas、system/rendered-user bytes hash 一致；但尚未有 strict canonical request payload builder 解析证明 payload 内的 model/system/user/visual/seed/temperature/token/timeout/cache/tools 语义，因此 `request_payload_rendering_status=pending_strict_canonical_builder`。该缺口连同 rights/toolchain/authenticity/WORM、盲包和统计使 composition 明确不能成为 execution gate，`api_execution_allowed=false`。
 - 只有资产/语音字节复核、私有 checkpoint store、盲评协议与统计器也在同一受控调用链内通过后才能执行正式 API。
 
 ## 5. 评分与统计
