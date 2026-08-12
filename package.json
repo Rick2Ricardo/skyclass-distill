@@ -12,6 +12,13 @@
     "packages/*"
   ],
   "scripts": {
+    "runtime:check": "node scripts/assert-node-engine.mjs",
+    "predev": "npm run runtime:check",
+    "pretest": "npm run runtime:check",
+    "pretypecheck": "npm run runtime:check",
+    "prebuild": "npm run runtime:check",
+    "prebuild:server": "npm run runtime:check",
+    "prebuild:web": "npm run runtime:check",
     "build:server": "tsc -p tsconfig.server.json",
     "build:web": "npm --workspace anyteacher-web run build",
     "build": "npm run clean:dist && npm run build:server && npm run build:web",

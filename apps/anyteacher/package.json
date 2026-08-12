@@ -5,8 +5,10 @@
   "type": "module",
   "main": "../../dist/apps/anyteacher/src/server.js",
   "scripts": {
+    "predev": "npm --prefix ../.. run runtime:check",
     "build": "npm --prefix ../.. run build:server",
     "dev": "tsx watch src/server.ts",
+    "preserver": "npm --prefix ../.. run runtime:check",
     "server": "node ../../dist/apps/anyteacher/src/server.js"
   },
   "engines": {

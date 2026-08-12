@@ -9,8 +9,10 @@ import {
 export const FORMAL_ORACLE_PROVIDER_BODY_PROFILE = "pi-openai-completions-fetch-boundary-v1" as const;
 export const FORMAL_ORACLE_PROVIDER_TOKEN_FIELD = "max_completion_tokens" as const;
 export const FORMAL_ORACLE_PREPARED_ADAPTER_VERSION = "formal-oracle-pi-fetch-boundary-adapter-v1" as const;
+export const FORMAL_ORACLE_REQUIRED_NODE_ENGINE = ">=22.19.0" as const;
+
 export const FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES = Object.freeze({
-  schema_version: "formal-oracle-pi-observed-local-dependency-hashes-v1",
+  schema_version: "formal-oracle-pi-observed-local-dependency-hashes-v2",
   pi_ai_version: "0.84.1",
   pi_openai_completions_source_sha256: "727d744f20985f667151e8ecee3ad30af388d9d66d91a92d0fb9ad3261da4363",
   pi_package_json_sha256: "c69acef56f6b9510ef0b3db2d35fb1f22c240bd0b11fd588c3e860042ed98b04",
@@ -19,9 +21,8 @@ export const FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES = Object.freeze({
   openai_request_encoder_source_sha256: "f531d2038dfc1aec9a0637fedaa9524920fbf94f353955034cd9c11165a2969b",
   openai_chat_completions_source_sha256: "e132e527ddda22e76c41340b92c3c00883bf1fe0b44d418fede2197ade7af34c",
   openai_package_json_sha256: "24889958f2fc85ccd36ab0af48725cddd10a08faa74f72747f9711a3eeda1b31",
-  observed_node_version: "v22.13.0",
-  required_node_engine: ">=22.19.0",
-  node_engine_status: "pending_incompatible_node_engine",
+  required_node_engine: FORMAL_ORACLE_REQUIRED_NODE_ENGINE,
+  node_engine_status: "pending_runtime_fetch_boundary_check",
   external_toolchain_authenticity_status: "pending_external_immutable_capsule",
   api_execution_allowed: false,
 } as const);
@@ -62,7 +63,7 @@ export interface FormalOraclePreparedProviderRequestArtifactV1 {
   readonly provider_endpoint_account_status: "pending_external_runtime_binding";
   readonly formal_transport_compatibility_status: "pending_local_fake_fetch_proof";
   readonly observed_local_dependency_hashes: typeof FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES;
-  readonly runtime_toolchain_status: "pending_incompatible_node_engine_and_external_immutable_capsule";
+  readonly runtime_toolchain_status: "pending_runtime_proof_and_external_immutable_capsule";
   readonly provider_response_capture_status: "pending_strict_sse_capture_contract";
   readonly api_execution_allowed: false;
 }
@@ -233,7 +234,7 @@ function createArtifact(envelope: FormalOraclePiRequestArtifact, body: FormalOra
     provider_endpoint_account_status: "pending_external_runtime_binding" as const,
     formal_transport_compatibility_status: "pending_local_fake_fetch_proof" as const,
     observed_local_dependency_hashes: FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES,
-    runtime_toolchain_status: "pending_incompatible_node_engine_and_external_immutable_capsule" as const,
+    runtime_toolchain_status: "pending_runtime_proof_and_external_immutable_capsule" as const,
     provider_response_capture_status: "pending_strict_sse_capture_contract" as const,
     api_execution_allowed: false as const,
   });
@@ -297,7 +298,7 @@ export function revalidateFormalOraclePreparedProviderRequestArtifact(
     || value.provider_endpoint_account_status !== "pending_external_runtime_binding" || value.api_execution_allowed !== false) {
     throw new Error("Prepared provider request profile/provenance/status 漂移");
   }
-  if (value.runtime_toolchain_status !== "pending_incompatible_node_engine_and_external_immutable_capsule"
+  if (value.runtime_toolchain_status !== "pending_runtime_proof_and_external_immutable_capsule"
     || value.provider_response_capture_status !== "pending_strict_sse_capture_contract"
     || value.formal_transport_compatibility_status !== "pending_local_fake_fetch_proof"
     || value.observed_local_dependency_hashes !== FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES) {

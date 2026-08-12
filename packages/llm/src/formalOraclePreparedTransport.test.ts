@@ -43,9 +43,12 @@ describe("Formal Oracle non-production Pi fetch-boundary proof", () => {
     expect(proof).toMatchObject({
       fetch_count: 1, on_payload_count: 1, on_payload_replacement: false,
       completion_method: "models.complete_non_simple", requested_max_tokens: 2048,
-      captured_max_completion_tokens: 2048, node_engine_status: "pending_incompatible_node_engine",
+      captured_max_completion_tokens: 2048, runtime_node_version: process.version,
+      required_node_engine: ">=22.19.0", node_engine_status: "compatible_runtime_proved",
       redirect_policy_status: "pending_not_bound_by_pi_sdk_fetch_boundary",
-      runtime_toolchain_status: "pending_incompatible_node_engine_and_external_immutable_capsule",
+      runtime_toolchain_status: "runtime_engine_and_local_hashes_proved_external_immutable_capsule_pending",
+      local_dependency_manifest_sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      proof_sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
       proof_status: "local_fake_fetch_exact_body_proved_non_executable", api_execution_allowed: false,
       provider_response_capture_status: "local_memory_fake_sse_proved_external_provider_pending",
       local_fake_response_stream_proof: {

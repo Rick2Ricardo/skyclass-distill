@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES,
+  FORMAL_ORACLE_REQUIRED_NODE_ENGINE,
   assertFormalOraclePreparedProviderRequestArtifact,
   revalidateFormalOraclePreparedProviderRequestArtifact,
   type FormalOraclePreparedProviderRequestArtifactV1,
@@ -16,30 +17,12 @@ import {
   type FormalOraclePiResponseStreamArtifactV1,
   type FormalOraclePiResponseStreamProofV1,
 } from "../../contracts/src/oracle-gate-pi-response-stream.js";
-
-export interface FormalOraclePiFetchBoundaryProofV1 {
-  schema_version: "formal-oracle-pi-fetch-boundary-proof-v1";
-  request_envelope_sha256: string;
-  provider_body_sha256: string;
-  captured_url: "https://example.invalid/v1/chat/completions";
-  captured_method: "POST";
-  fetch_count: 1;
-  on_payload_count: 1;
-  on_payload_replacement: false;
-  sdk_retry_count_header: "0";
-  completion_method: "models.complete_non_simple";
-  requested_max_tokens: number;
-  captured_max_completion_tokens: number;
-  redirect_policy_status: "pending_not_bound_by_pi_sdk_fetch_boundary";
-  node_engine_status: "pending_incompatible_node_engine";
-  runtime_toolchain_status: "pending_incompatible_node_engine_and_external_immutable_capsule";
-  provider_endpoint_account_status: "pending_external_runtime_binding";
-  local_fake_response_stream_proof: Readonly<FormalOraclePiResponseStreamProofV1>;
-  provider_response_capture_status: "local_memory_fake_sse_proved_external_provider_pending";
-  external_toolchain_authenticity_status: "pending_external_immutable_capsule";
-  proof_status: "local_fake_fetch_exact_body_proved_non_executable";
-  api_execution_allowed: false;
-}
+import {
+  hashFormalOraclePiFetchBoundaryProofV1,
+  hashFormalOraclePiObservedLocalDependencyManifestV1,
+  validateFormalOraclePiFetchBoundaryProofV1,
+  type FormalOraclePiFetchBoundaryProofV1,
+} from "../../contracts/src/oracle-gate-pi-fetch-boundary-proof.js";
 
 export interface FormalOraclePiFetchBoundaryProofResultV1 {
   readonly proof: Readonly<FormalOraclePiFetchBoundaryProofV1>;
@@ -72,6 +55,19 @@ const COMPAT = Object.freeze({
   chatTemplateKwargs: undefined,
   chatTemplateArgs: undefined,
 });
+
+function nodeVersionParts(value: string): [number, number, number] {
+  const match = /^v(\d+)\.(\d+)\.(\d+)$/.exec(value);
+  if (!match) throw new Error(`Formal Oracle Node version 无效：${value}`);
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function assertCompatibleNodeEngine(value: string): void {
+  const [major, minor] = nodeVersionParts(value);
+  if (major < 22 || (major === 22 && minor < 19)) {
+    throw new Error(`Formal Oracle runtime Node ${value} 低于 ${FORMAL_ORACLE_REQUIRED_NODE_ENGINE}`);
+  }
+}
 
 function bytes(value: unknown): Uint8Array {
   if (typeof value === "string") return new TextEncoder().encode(value);
@@ -111,7 +107,7 @@ export async function proveNonProductionFormalOraclePiFetchBoundary(input: {
   signal?: AbortSignal;
 }): Promise<FormalOraclePiFetchBoundaryProofResultV1> {
   assertFormalOraclePreparedProviderRequestArtifact(input.prepared);
-  if (process.version !== FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES.observed_node_version) throw new Error("Pi fetch-boundary Node observation 与冻结 local hashes 不一致");
+  assertCompatibleNodeEngine(process.version);
   await assertObservedLocalToolchain();
   const prepared = revalidateFormalOraclePreparedProviderRequestArtifact(input.prepared);
   const envelope = prepared.body;
@@ -161,7 +157,7 @@ export async function proveNonProductionFormalOraclePiFetchBoundary(input: {
     if (url !== "https://example.invalid/v1/chat/completions" || init?.method !== "POST"
       || headers.get("content-type") !== "application/json" || headers.get("authorization") !== `Bearer ${dummyApiKey}`
       || headers.get("x-stainless-package-version") !== "6.26.0" || headers.get("x-stainless-runtime") !== "node"
-      || headers.get("x-stainless-runtime-version") !== FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES.observed_node_version
+      || headers.get("x-stainless-runtime-version") !== process.version
       || headers.get("x-stainless-retry-count") !== "0" || !equal(actual, prepared.body_bytes)
       || sha256Hex(actual) !== prepared.provider_body_sha256) {
       throw new Error("Pi actual fetch init URL/header/body 未精确匹配 prepared artifact");
@@ -238,7 +234,7 @@ export async function proveNonProductionFormalOraclePiFetchBoundary(input: {
       raw_stop_reason: result.rawStopReason, usage: result.usage,
     })}`);
   }
-  const proof: FormalOraclePiFetchBoundaryProofV1 = Object.freeze({
+  const proofPayload = {
     schema_version: "formal-oracle-pi-fetch-boundary-proof-v1",
     request_envelope_sha256: prepared.request_envelope_sha256,
     provider_body_sha256: prepared.provider_body_sha256,
@@ -252,14 +248,22 @@ export async function proveNonProductionFormalOraclePiFetchBoundary(input: {
     requested_max_tokens: envelope.max_completion_tokens,
     captured_max_completion_tokens: envelope.max_completion_tokens,
     redirect_policy_status: "pending_not_bound_by_pi_sdk_fetch_boundary",
-    node_engine_status: "pending_incompatible_node_engine",
-    runtime_toolchain_status: "pending_incompatible_node_engine_and_external_immutable_capsule",
+    runtime_node_version: process.version,
+    required_node_engine: FORMAL_ORACLE_REQUIRED_NODE_ENGINE,
+    node_engine_status: "compatible_runtime_proved",
+    runtime_toolchain_status: "runtime_engine_and_local_hashes_proved_external_immutable_capsule_pending",
+    local_dependency_manifest_sha256: hashFormalOraclePiObservedLocalDependencyManifestV1(process.version),
     provider_endpoint_account_status: "pending_external_runtime_binding",
     local_fake_response_stream_proof: revalidatedResponseStreamArtifact.proof,
     provider_response_capture_status: "local_memory_fake_sse_proved_external_provider_pending",
     external_toolchain_authenticity_status: "pending_external_immutable_capsule",
     proof_status: "local_fake_fetch_exact_body_proved_non_executable",
+    proof_sha256: "0".repeat(64),
     api_execution_allowed: false,
-  });
+  } satisfies FormalOraclePiFetchBoundaryProofV1;
+  proofPayload.proof_sha256 = hashFormalOraclePiFetchBoundaryProofV1(proofPayload);
+  const proofReport = validateFormalOraclePiFetchBoundaryProofV1(proofPayload);
+  if (!proofReport.valid) throw new Error(`Pi fetch-boundary proof 合同无效：${proofReport.issues[0]}`);
+  const proof: FormalOraclePiFetchBoundaryProofV1 = Object.freeze(proofPayload);
   return Object.freeze({ proof, response_stream_artifact: revalidatedResponseStreamArtifact });
 }

@@ -88,6 +88,70 @@ export function hashFormalOraclePiResponseStreamProofV1(proof: FormalOraclePiRes
   return sha256Hex(`${FORMAL_ORACLE_PI_RESPONSE_STREAM_PROOF_DOMAIN}${canonicalFormalOraclePiResponseStreamProofPayloadV1(proof)}`);
 }
 
+/**
+ * Validates a persisted derivation proof without trusting the code that
+ * produced it. Raw SSE provenance is deliberately outside this pure contract;
+ * the run store separately reparses the referenced raw bytes.
+ */
+export function validateFormalOraclePiResponseStreamProofV1(input: unknown): { valid: boolean; issues: string[] } {
+  const issues: string[] = [];
+  if (!isRecord(input)) return { valid: false, issues: ["Pi SSE proof 必须是对象"] };
+  const keys = [
+    "schema_version", "proof_sha256", "request_envelope_sha256", "provider_body_sha256", "raw_sse_sha256",
+    "raw_sse_byte_length", "assistant_content_sha256", "assistant_content_byte_length", "response_id", "model", "created",
+    "role_prelude_count", "content_event_count", "finish_reason", "done_count", "expected_max_input_tokens",
+    "expected_max_output_tokens", "raw_usage", "normalized_usage", "provider_response_scope", "store_integration_status",
+    "external_provider_response_status", "api_execution_allowed",
+  ] as const;
+  try { exactKeys(input, keys, "Pi SSE proof"); } catch (error) { issues.push((error as Error).message); }
+  const shaFields = ["proof_sha256", "request_envelope_sha256", "provider_body_sha256", "raw_sse_sha256", "assistant_content_sha256"] as const;
+  for (const field of shaFields) if (typeof input[field] !== "string" || !/^[a-f0-9]{64}$/.test(input[field])) issues.push(`Pi SSE proof.${field} 无效`);
+  if (input.schema_version !== FORMAL_ORACLE_PI_RESPONSE_STREAM_VERSION) issues.push("Pi SSE proof 版本无效");
+  for (const field of ["raw_sse_byte_length", "assistant_content_byte_length", "content_event_count", "expected_max_input_tokens", "expected_max_output_tokens"] as const) {
+    if (!Number.isSafeInteger(input[field]) || Number(input[field]) <= 0) issues.push(`Pi SSE proof.${field} 必须为正安全整数`);
+  }
+  if (!Number.isSafeInteger(input.created) || Number(input.created) < 0) issues.push("Pi SSE proof.created 无效");
+  if (input.role_prelude_count !== 0 && input.role_prelude_count !== 1) issues.push("Pi SSE proof.role_prelude_count 无效");
+  if (input.finish_reason !== "stop" || input.done_count !== 1) issues.push("Pi SSE proof stop/DONE 不变量无效");
+  if (typeof input.response_id !== "string" || !/^chatcmpl-[A-Za-z0-9._-]+$/.test(input.response_id) || typeof input.model !== "string" || !input.model || input.model.trim() !== input.model) issues.push("Pi SSE proof id/model 无效");
+  else {
+    try { assertScalar(input.model, "Pi SSE proof.model"); } catch (error) { issues.push((error as Error).message); }
+  }
+  if (input.provider_response_scope !== "untrusted_sse_entity_strict_derivation_only"
+    || input.store_integration_status !== "formal_run_store_v2_abcd_integrated"
+    || input.external_provider_response_status !== "pending_endpoint_account_exactly_once_and_capture"
+    || input.api_execution_allowed !== false) issues.push("Pi SSE proof 信任/API 边界无效");
+  if (!isRecord(input.raw_usage) || !isRecord(input.normalized_usage)) issues.push("Pi SSE proof usage 缺失");
+  else {
+    try {
+      exactKeys(input.raw_usage, ["prompt_tokens", "completion_tokens", "total_tokens", "prompt_tokens_details", "completion_tokens_details"], "Pi SSE proof.raw_usage");
+      exactKeys(input.normalized_usage, ["input_tokens", "output_tokens", "total_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens"], "Pi SSE proof.normalized_usage");
+      if (!isRecord(input.raw_usage.prompt_tokens_details) || !isRecord(input.raw_usage.completion_tokens_details)) throw new Error("Pi SSE proof usage details 无效");
+      exactKeys(input.raw_usage.prompt_tokens_details, ["cached_tokens"], "Pi SSE proof.prompt_tokens_details");
+      exactKeys(input.raw_usage.completion_tokens_details, ["reasoning_tokens"], "Pi SSE proof.completion_tokens_details");
+      const rawInput = input.raw_usage.prompt_tokens;
+      const rawOutput = input.raw_usage.completion_tokens;
+      const rawTotal = input.raw_usage.total_tokens;
+      if (![rawInput, rawOutput, rawTotal].every((value) => Number.isSafeInteger(value) && Number(value) >= 0)
+        || rawTotal !== Number(rawInput) + Number(rawOutput)
+        || Number(rawInput) > Number(input.expected_max_input_tokens)
+        || Number(rawOutput) > Number(input.expected_max_output_tokens)
+        || input.raw_usage.prompt_tokens_details.cached_tokens !== 0
+        || input.raw_usage.completion_tokens_details.reasoning_tokens !== 0
+        || input.normalized_usage.input_tokens !== rawInput || input.normalized_usage.output_tokens !== rawOutput
+        || input.normalized_usage.total_tokens !== rawTotal || input.normalized_usage.cache_read_tokens !== 0
+        || input.normalized_usage.cache_write_tokens !== 0 || input.normalized_usage.reasoning_tokens !== 0) {
+        throw new Error("Pi SSE proof usage/budget 映射无效");
+      }
+    } catch (error) { issues.push((error as Error).message); }
+  }
+  try {
+    if (typeof input.proof_sha256 === "string"
+      && hashFormalOraclePiResponseStreamProofV1(input as unknown as FormalOraclePiResponseStreamProofV1) !== input.proof_sha256) issues.push("Pi SSE proof 内容寻址哈希不匹配");
+  } catch { issues.push("Pi SSE proof 无法规范序列化"); }
+  return { valid: issues.length === 0, issues };
+}
+
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

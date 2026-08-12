@@ -1,22 +1,27 @@
 import { createHash, createPublicKey, KeyObject, type KeyLike } from "node:crypto";
 import type {
-  FormalOracleCompositionAttestationV1,
+  FormalOracleCompositionAttestationV2,
   OracleGateByteInventory,
   OracleGateFormalInputManifest,
   OracleGateFormalSpec,
   OracleGateFrameDerivationPreflightV1,
+  FormalOracleLocalPiProofBindingV1,
   SignedGoldDataset,
 } from "../../contracts/src/index.js";
 import {
   hashFormalOracleCompositionAttestation,
+  hashFormalOracleLocalPiProofSet,
   validateFormalOracleCompositionAttestation,
+  validateFormalOracleCompositionAttestationAgainstExecutionPlan,
   validateOracleGateFrameDerivationPreflight,
 } from "../../contracts/src/index.js";
 import {
   buildFormalOraclePiRequestEnvelope,
-  type FormalOraclePiRequestArtifact,
 } from "../../contracts/src/oracle-gate-request.js";
-import { buildFormalOraclePreparedProviderRequest } from "../../contracts/src/oracle-gate-provider-request.js";
+import {
+  buildFormalOraclePreparedProviderRequest,
+  type FormalOraclePreparedProviderRequestArtifactV1,
+} from "../../contracts/src/oracle-gate-provider-request.js";
 import {
   FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
   FORMAL_ORACLE_USER_PROMPT_VERSION,
@@ -34,6 +39,7 @@ import { GoldLedgerAttestor } from "../../store/src/goldLedgerAttestor.js";
 import { prepareOracleGateBytePreflight, type OracleGateBytePreflight } from "./oracleBytePreflight.js";
 import { prepareOracleGateFormalStructuralPreflight } from "./oracleFormalPreflight.js";
 import { prepareOracleGateFrameDerivationPreflight } from "./oracleFrameDerivationPreflight.js";
+import { proveNonProductionFormalOraclePiFetchBoundary } from "../../llm/src/formalOraclePreparedTransport.js";
 import {
   assertActiveOracleLedgerCapability,
   withLedgerAttestedOracleRegistry,
@@ -71,18 +77,18 @@ export interface ComposeFormalOracleRunGenesisInput {
 
 export interface FormalOracleCompositionCapability {
   readonly stage: "composition_attested_only";
-  readonly attestation: Readonly<FormalOracleCompositionAttestationV1>;
+  readonly attestation: Readonly<FormalOracleCompositionAttestationV2>;
   readonly head_pin: Readonly<FormalOracleHeadPinV1>;
   readonly rights_registry_status: "pending_external_authoritative_head";
   readonly request_envelope_serialization_status: "completed";
   readonly provider_body_serialization_status: "completed_pi_body_serialization_candidate";
-  readonly provider_body_transport_compatibility_status: "pending_per_request_local_fake_fetch_proof";
+  readonly provider_body_transport_compatibility_status: "completed_per_request_local_fake_fetch_proof_non_executable";
   readonly user_prompt_derivation_status: "completed";
   readonly input_token_budget_status: "pending_model_specific_tokenizer";
   readonly provider_wire_binding_status: "pending_external_endpoint_account_validation";
   readonly provider_account_endpoint_status: "pending_external_runtime_binding";
   readonly provider_response_capture_status: "pending_strict_sse_capture_contract";
-  readonly provider_runtime_engine_status: "pending_incompatible_node_engine";
+  readonly provider_runtime_engine_status: "compatible_runtime_proved_external_capsule_pending";
   readonly toolchain_capsule_status: "pending_external_immutable_capsule";
   readonly composition_record_authenticity_status: "pending_external_trusted_signature_or_worm";
   readonly external_head_pin_status: "pending_external_monotonic_worm";
@@ -98,13 +104,13 @@ class CompositionCapability implements FormalOracleCompositionCapability {
   readonly rights_registry_status = "pending_external_authoritative_head" as const;
   readonly request_envelope_serialization_status = "completed" as const;
   readonly provider_body_serialization_status = "completed_pi_body_serialization_candidate" as const;
-  readonly provider_body_transport_compatibility_status = "pending_per_request_local_fake_fetch_proof" as const;
+  readonly provider_body_transport_compatibility_status = "completed_per_request_local_fake_fetch_proof_non_executable" as const;
   readonly user_prompt_derivation_status = "completed" as const;
   readonly input_token_budget_status = "pending_model_specific_tokenizer" as const;
   readonly provider_wire_binding_status = "pending_external_endpoint_account_validation" as const;
   readonly provider_account_endpoint_status = "pending_external_runtime_binding" as const;
   readonly provider_response_capture_status = "pending_strict_sse_capture_contract" as const;
-  readonly provider_runtime_engine_status = "pending_incompatible_node_engine" as const;
+  readonly provider_runtime_engine_status = "compatible_runtime_proved_external_capsule_pending" as const;
   readonly toolchain_capsule_status = "pending_external_immutable_capsule" as const;
   readonly composition_record_authenticity_status = "pending_external_trusted_signature_or_worm" as const;
   readonly external_head_pin_status = "pending_external_monotonic_worm" as const;
@@ -113,7 +119,7 @@ class CompositionCapability implements FormalOracleCompositionCapability {
   readonly api_execution_allowed = false as const;
 
   constructor(
-    readonly attestation: Readonly<FormalOracleCompositionAttestationV1>,
+    readonly attestation: Readonly<FormalOracleCompositionAttestationV2>,
     readonly head_pin: Readonly<FormalOracleHeadPinV1>,
   ) { Object.freeze(this); }
 
@@ -348,7 +354,7 @@ function assertExecutionArtifacts(input: {
   spec: OracleGateFormalSpec;
   byte_preflight: OracleGateBytePreflight;
   user_template_bytes: Uint8Array;
-}): FormalOraclePiRequestArtifact[] {
+}): FormalOraclePreparedProviderRequestArtifactV1[] {
   if (digest(input.system_prompt_bytes) !== input.spec.prompt.system_sha256) {
     throw new Error("System prompt bytes 未绑定 formal spec hash");
   }
@@ -427,15 +433,54 @@ function assertExecutionArtifacts(input: {
       || prepared.token_field !== planItem.provider_token_field) {
       throw new Error(`Built request envelope/provider body 双 hash 未绑定 execution plan：${planItem.request_id}`);
     }
-    return built;
+    return prepared;
   });
+}
+
+async function provePreparedRequests(
+  plan: FormalOracleExecutionPlanV1,
+  prepared: readonly FormalOraclePreparedProviderRequestArtifactV1[],
+): Promise<FormalOracleLocalPiProofBindingV1[]> {
+  if (prepared.length !== plan.items.length) throw new Error("Local Pi proof 请求数量未闭合 execution plan");
+  const bindings: FormalOracleLocalPiProofBindingV1[] = [];
+  for (const [index, artifact] of prepared.entries()) {
+    const item = plan.items[index];
+    if (!item) throw new Error("Local Pi proof 缺少 execution plan item");
+    const result = await proveNonProductionFormalOraclePiFetchBoundary({ prepared: artifact });
+    const proof = result.proof;
+    if (proof.request_envelope_sha256 !== item.request_envelope_sha256
+      || proof.provider_body_sha256 !== item.provider_body_sha256
+      || proof.requested_max_tokens !== item.max_output_tokens
+      || proof.captured_max_completion_tokens !== item.max_output_tokens
+      || proof.fetch_count !== 1 || proof.on_payload_count !== 1 || proof.on_payload_replacement !== false
+      || proof.sdk_retry_count_header !== "0" || proof.completion_method !== "models.complete_non_simple"
+      || proof.node_engine_status !== "compatible_runtime_proved"
+      || proof.runtime_toolchain_status !== "runtime_engine_and_local_hashes_proved_external_immutable_capsule_pending"
+      || proof.proof_status !== "local_fake_fetch_exact_body_proved_non_executable"
+      || proof.api_execution_allowed !== false) {
+      throw new Error(`Local Pi proof 未精确绑定 execution plan/runtime：${item.request_id}`);
+    }
+    bindings.push(Object.freeze({
+      schedule_index: item.schedule_index,
+      request_id: item.request_id,
+      request_envelope_sha256: proof.request_envelope_sha256,
+      provider_body_sha256: proof.provider_body_sha256,
+      proof,
+    }));
+  }
+  if (new Set(bindings.map((binding) => binding.request_id)).size !== plan.items.length
+    || new Set(bindings.map((binding) => binding.proof.runtime_node_version)).size !== 1) {
+    throw new Error("Local Pi proof 必须唯一覆盖全部请求并使用同一兼容 Node runtime");
+  }
+  return bindings;
 }
 
 /**
  * Composes all currently implemented Formal Oracle preconditions under the
  * pinned registry + current ledger callback and atomically creates the run-store
- * genesis HEAD. It never imports or invokes an LLM/API client and never returns
- * an execution token. The returned genesis pin still must be durably retained
+ * genesis HEAD. It invokes only the internal no-network Pi fake-fetch proof for
+ * every planned request and never returns a sender or execution token. The
+ * returned genesis pin still must be durably retained
  * by a separate monotonic/WORM authority before any future execution gate.
  * The execution plan binds a strict canonical future-adapter envelope covering
  * model/prompt/visual/seed/budget/retry policy. The deterministic user prompt
@@ -489,7 +534,7 @@ export async function withComposedFormalOracleRunGenesis<T>(
         spec: input.spec,
         schedule_sha256: structural.schedule_sha256,
       });
-      assertExecutionArtifacts({
+      const preparedRequests = assertExecutionArtifacts({
         plan: input.execution_plan,
         artifacts: input.execution_artifacts,
         system_prompt_bytes: input.system_prompt_bytes,
@@ -497,6 +542,12 @@ export async function withComposedFormalOracleRunGenesis<T>(
         spec: input.spec,
         byte_preflight: bytePreflight,
       });
+      const localPiProofs = await provePreparedRequests(input.execution_plan, preparedRequests);
+      const localPiProofSetSha256 = hashFormalOracleLocalPiProofSet(localPiProofs);
+      const localPiDependencyManifestSha256 = localPiProofs[0]?.proof.local_dependency_manifest_sha256;
+      if (!localPiDependencyManifestSha256 || localPiProofs.length !== input.run.request_count) {
+        throw new Error("Local Pi proof 必须精确覆盖 run.request_count");
+      }
       if (input.run.media_attestation_sha256 !== framePreflight.preflight_sha256
         || input.run.speech_attestation_sha256 !== input.inventory.inventory_sha256
         || input.run.execution_plan_sha256 !== input.execution_plan.execution_plan_sha256
@@ -504,8 +555,8 @@ export async function withComposedFormalOracleRunGenesis<T>(
         throw new Error("Run media/speech/execution plan/time roots 未绑定当前 composition");
       }
 
-      const attestation: FormalOracleCompositionAttestationV1 = {
-        schema_version: "formal-oracle-composition-attestation-v1",
+      const attestation: FormalOracleCompositionAttestationV2 = {
+        schema_version: "formal-oracle-composition-attestation-v2",
         composition_sha256: "0".repeat(64),
         record_trust: "non_authoritative_composition_record",
         status: "composition_attested_only",
@@ -526,6 +577,7 @@ export async function withComposedFormalOracleRunGenesis<T>(
         speech_attestation_sha256: input.inventory.inventory_sha256,
         run_sha256: input.run.run_sha256,
         execution_plan_sha256: input.execution_plan.execution_plan_sha256,
+        request_count: input.run.request_count,
         genesis_checkpoint_sha256: input.initial_checkpoint.checkpoint_sha256,
         genesis_generation: 0,
         head_pin: {
@@ -538,13 +590,17 @@ export async function withComposedFormalOracleRunGenesis<T>(
         rights_registry_status: "pending_external_authoritative_head",
         request_envelope_serialization_status: "completed",
         provider_body_serialization_status: "completed_pi_body_serialization_candidate",
-        provider_body_transport_compatibility_status: "pending_per_request_local_fake_fetch_proof",
+        provider_body_transport_compatibility_status: "completed_per_request_local_fake_fetch_proof_non_executable",
+        local_pi_fetch_boundary_proof_count: localPiProofs.length,
+        local_pi_fetch_boundary_proof_set_sha256: localPiProofSetSha256,
+        local_pi_fetch_boundary_proofs: localPiProofs,
+        local_pi_fetch_boundary_dependency_manifest_sha256: localPiDependencyManifestSha256,
         user_prompt_derivation_status: "completed",
         input_token_budget_status: "pending_model_specific_tokenizer",
         provider_wire_binding_status: "pending_external_endpoint_account_validation",
         provider_account_endpoint_status: "pending_external_runtime_binding",
         provider_response_capture_status: "pending_strict_sse_capture_contract",
-        provider_runtime_engine_status: "pending_incompatible_node_engine",
+        provider_runtime_engine_status: "compatible_runtime_proved_external_capsule_pending",
         toolchain_capsule_status: "pending_external_immutable_capsule",
         composition_record_authenticity_status: "pending_external_trusted_signature_or_worm",
         external_head_pin_status: "pending_external_monotonic_worm",
@@ -555,6 +611,8 @@ export async function withComposedFormalOracleRunGenesis<T>(
       attestation.composition_sha256 = hashFormalOracleCompositionAttestation(attestation);
       const attestationReport = validateFormalOracleCompositionAttestation(attestation);
       if (!attestationReport.valid) throw new Error(`Composition attestation 无效：${attestationReport.issues[0]?.path} ${attestationReport.issues[0]?.message}`);
+      const planBindingReport = validateFormalOracleCompositionAttestationAgainstExecutionPlan(attestation, input.execution_plan);
+      if (!planBindingReport.valid) throw new Error(`Composition execution-plan proof binding 无效：${planBindingReport.issues[0]?.path} ${planBindingReport.issues[0]?.message}`);
 
       return input.run_store.createSealedRunWithPinnedSnapshot({
         run: input.run,

@@ -772,8 +772,8 @@ describe("Formal Oracle externally-pinned composition gate", () => {
           rights_registry_status: "pending_external_authoritative_head",
           request_envelope_serialization_status: "completed",
           provider_body_serialization_status: "completed_pi_body_serialization_candidate",
-          provider_body_transport_compatibility_status: "pending_per_request_local_fake_fetch_proof",
-          provider_runtime_engine_status: "pending_incompatible_node_engine",
+          provider_body_transport_compatibility_status: "completed_per_request_local_fake_fetch_proof_non_executable",
+          provider_runtime_engine_status: "compatible_runtime_proved_external_capsule_pending",
           user_prompt_derivation_status: "completed",
           input_token_budget_status: "pending_model_specific_tokenizer",
           provider_wire_binding_status: "pending_external_endpoint_account_validation",
@@ -792,7 +792,12 @@ describe("Formal Oracle externally-pinned composition gate", () => {
           media_attestation_sha256: input.run.media_attestation_sha256,
           speech_attestation_sha256: input.run.speech_attestation_sha256,
           head_pin: input.expected_genesis_head,
+          local_pi_fetch_boundary_proof_count: input.execution_plan.items.length,
         });
+        expect(capability.attestation.local_pi_fetch_boundary_proofs.map((proof) => proof.request_id))
+          .toEqual(input.execution_plan.items.map((item) => item.request_id));
+        expect(new Set(capability.attestation.local_pi_fetch_boundary_proofs.map((proof) => proof.proof.runtime_node_version)))
+          .toEqual(new Set([process.version]));
         const verifiedCases = (await prepareOracleGateBytePreflight({ ...input, video_probe: input.frame_deriver })).cases;
         const renderedByCase = new Map<string, Array<{ arm: string; prompt: ReturnType<typeof parseFormalOracleUserPromptBytes> }>>();
         for (const item of input.execution_plan.items) {
@@ -853,6 +858,13 @@ describe("Formal Oracle externally-pinned composition gate", () => {
     const callerPrompt = await buildCompositionFixture();
     (callerPrompt.execution_artifacts[0] as unknown as Record<string, unknown>).rendered_user_prompt_bytes = Buffer.from("caller-controlled");
     await expect(withComposedFormalOracleRunGenesis({ ...callerPrompt, callback: async () => "bad" })).rejects.toThrow("strict 字段集合");
+
+    const proofRoot = await buildCompositionFixture();
+    proofRoot.execution_plan.items[0].provider_body_sha256 = "f".repeat(64);
+    proofRoot.execution_plan.execution_plan_sha256 = hashFormalOracleExecutionPlan(proofRoot.execution_plan);
+    proofRoot.run.execution_plan_sha256 = proofRoot.execution_plan.execution_plan_sha256;
+    proofRoot.run.run_sha256 = hashFormalRunContract(proofRoot.run);
+    await expect(withComposedFormalOracleRunGenesis({ ...proofRoot, callback: async () => "bad" })).rejects.toThrow(/provider body|双 hash|proof|run|checkpoint/i);
 
     const pin = await buildCompositionFixture();
     pin.expected_genesis_head.checkpoint_sha256 = "f".repeat(64);

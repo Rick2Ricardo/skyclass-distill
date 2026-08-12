@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "npm --prefix ../../.. run runtime:check",
     "dev": "vite --config vite.config.ts",
+    "prebuild": "npm --prefix ../../.. run runtime:check",
     "build": "tsc --noEmit -p tsconfig.json && vite build --config vite.config.ts",
+    "prepreview": "npm --prefix ../../.. run runtime:check",
     "preview": "vite preview --config vite.config.ts"
   },
   "dependencies": {
