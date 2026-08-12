@@ -3,8 +3,13 @@ import {
   validateFormalOraclePiFetchBoundaryProofV1,
   type FormalOraclePiFetchBoundaryProofV1,
 } from "./oracle-gate-pi-fetch-boundary-proof.js";
+import {
+  validateFormalOracleInputTokenCountReceiptSet,
+  validateFormalOracleInputTokenCountReceiptSetAgainstExecutionPlan,
+  type FormalOracleInputTokenCountReceiptSetV1,
+} from "./oracle-gate-input-token-count.js";
 
-export const FORMAL_ORACLE_COMPOSITION_ATTESTATION_DOMAIN = "skyclass/formal-oracle/composition-attestation/v2\0";
+export const FORMAL_ORACLE_COMPOSITION_ATTESTATION_DOMAIN = "skyclass/formal-oracle/composition-attestation/v3\0";
 export const FORMAL_ORACLE_LOCAL_PI_PROOF_SET_DOMAIN = "skyclass/formal-oracle/local-pi-proof-set/v1\0";
 
 export interface FormalOracleLocalPiProofBindingV1 {
@@ -35,8 +40,8 @@ export interface FormalOracleLocalPiExpectedPlanItemV1 {
  * attested meaning inside this composition record, after the composition gate
  * has rerun the byte/ASR verifier; an inventory document by itself is untrusted.
  */
-export interface FormalOracleCompositionAttestationV2 {
-  schema_version: "formal-oracle-composition-attestation-v2";
+export interface FormalOracleCompositionAttestationV3 {
+  schema_version: "formal-oracle-composition-attestation-v3";
   composition_sha256: string;
   record_trust: "non_authoritative_composition_record";
   status: "composition_attested_only";
@@ -76,7 +81,11 @@ export interface FormalOracleCompositionAttestationV2 {
   local_pi_fetch_boundary_proofs: FormalOracleLocalPiProofBindingV1[];
   local_pi_fetch_boundary_dependency_manifest_sha256: string;
   user_prompt_derivation_status: "completed";
-  input_token_budget_status: "pending_model_specific_tokenizer";
+  input_token_count_receipt_set_sha256: string | null;
+  input_token_count_receipt_count: number;
+  input_token_count_receipts_binding_status: "not_supplied" | "responses_exact_count_receipts_bound_transport_incompatible";
+  input_token_count_receipt_set: FormalOracleInputTokenCountReceiptSetV1 | null;
+  input_token_budget_status: "pending_exact_chat_completions_count_authority";
   provider_wire_binding_status: "pending_external_endpoint_account_validation";
   provider_account_endpoint_status: "pending_external_runtime_binding";
   provider_response_capture_status: "pending_strict_sse_capture_contract";
@@ -156,14 +165,14 @@ function isSafeUri(value: unknown): value is string {
 }
 
 export function canonicalFormalOracleCompositionAttestationPayload(
-  input: FormalOracleCompositionAttestationV2,
+  input: FormalOracleCompositionAttestationV3,
 ): string {
   const { composition_sha256: _hash, ...payload } = input;
   return stableJson(payload);
 }
 
 export function hashFormalOracleCompositionAttestation(
-  input: FormalOracleCompositionAttestationV2,
+  input: FormalOracleCompositionAttestationV3,
 ): string {
   return sha256Hex(`${FORMAL_ORACLE_COMPOSITION_ATTESTATION_DOMAIN}${canonicalFormalOracleCompositionAttestationPayload(input)}`);
 }
@@ -232,6 +241,10 @@ export function validateFormalOracleCompositionAttestationAgainstExecutionPlan(
       issue(`local_pi_fetch_boundary_proofs[${index}].proof`, "必须精确绑定 execution plan model/input/output budgets");
     }
   }
+  if (input.input_token_count_receipt_set !== null) {
+    const tokenReport = validateFormalOracleInputTokenCountReceiptSetAgainstExecutionPlan(input.input_token_count_receipt_set, plan);
+    issues.push(...tokenReport.issues.map((item) => ({ path: `input_token_count_receipt_set.${item.path}`, message: item.message })));
+  }
   return { valid: issues.length === 0, issues };
 }
 
@@ -249,13 +262,14 @@ export function validateFormalOracleCompositionAttestation(
     "speech_attestation_sha256", "run_sha256", "execution_plan_sha256", "request_count", "genesis_checkpoint_sha256",
     "genesis_generation", "head_pin", "run_store_uri", "rights_registry_status", "request_envelope_serialization_status", "provider_body_serialization_status", "provider_body_transport_compatibility_status",
     "local_pi_fetch_boundary_proof_count", "local_pi_fetch_boundary_proof_set_sha256", "local_pi_fetch_boundary_proofs", "local_pi_fetch_boundary_dependency_manifest_sha256",
-    "user_prompt_derivation_status", "input_token_budget_status",
+    "user_prompt_derivation_status", "input_token_count_receipt_set_sha256", "input_token_count_receipt_count",
+    "input_token_count_receipts_binding_status", "input_token_count_receipt_set", "input_token_budget_status",
     "provider_wire_binding_status", "provider_account_endpoint_status", "provider_response_capture_status", "provider_runtime_engine_status",
     "toolchain_capsule_status", "composition_record_authenticity_status", "external_head_pin_status", "blind_package_status", "statistics_status",
     "api_execution_allowed",
   ] as const;
   if (!exactKeys(input, keys)) issue("$", "字段集合无效");
-  if (input.schema_version !== "formal-oracle-composition-attestation-v2") issue("schema_version", "版本无效");
+  if (input.schema_version !== "formal-oracle-composition-attestation-v3") issue("schema_version", "版本无效");
   if (input.record_trust !== "non_authoritative_composition_record") issue("record_trust", "自哈希 composition record 不是跨进程真实性证明");
   if (input.status !== "composition_attested_only") issue("status", "只能是 composition_attested_only");
   if (!isCanonicalTime(input.composed_at)) issue("composed_at", "必须是 canonical ISO 时间");
@@ -315,7 +329,20 @@ export function validateFormalOracleCompositionAttestation(
     if (runtimeVersions.size !== 1 || ![...runtimeVersions].every(compatibleNode)) issue("local_pi_fetch_boundary_proofs", "所有请求必须使用同一兼容 Node runtime");
   }
   if (input.user_prompt_derivation_status !== "completed") issue("user_prompt_derivation_status", "rendered user prompt 必须由冻结 template grammar 与 verified case transcript 确定性派生");
-  if (input.input_token_budget_status !== "pending_model_specific_tokenizer") issue("input_token_budget_status", "max_input_tokens 只是冻结预算，尚未由 model-specific tokenizer/image accounting 证明");
+  if (input.input_token_count_receipt_set === null) {
+    if (input.input_token_count_receipt_set_sha256 !== null || input.input_token_count_receipt_count !== 0
+      || input.input_token_count_receipts_binding_status !== "not_supplied") issue("input_token_count_receipt_set", "未提供 receipt set 时根/数量/status 必须为 null/0/not_supplied");
+  } else {
+    const tokenReport = validateFormalOracleInputTokenCountReceiptSet(input.input_token_count_receipt_set);
+    if (!tokenReport.valid) issue("input_token_count_receipt_set", "input-token receipt set 合同无效");
+    if (!isRecord(input.input_token_count_receipt_set)
+      || input.input_token_count_receipt_set_sha256 !== input.input_token_count_receipt_set.receipt_set_sha256
+      || input.input_token_count_receipt_count !== input.input_token_count_receipt_set.receipt_count
+      || input.input_token_count_receipts_binding_status !== "responses_exact_count_receipts_bound_transport_incompatible") {
+      issue("input_token_count_receipt_set", "receipt set 根/数量/binding status 未闭合");
+    }
+  }
+  if (input.input_token_budget_status !== "pending_exact_chat_completions_count_authority") issue("input_token_budget_status", "Responses API count receipt 不适用于当前 Pi Chat Completions body；精确预算门必须 pending");
   if (input.provider_wire_binding_status !== "pending_external_endpoint_account_validation") issue("provider_wire_binding_status", "真实 provider endpoint/account 与 Pi SDK equivalence 仍待外部门验证");
   if (input.provider_account_endpoint_status !== "pending_external_runtime_binding") issue("provider_account_endpoint_status", "provider account/endpoint 必须保持外部运行时待绑定");
   if (input.provider_response_capture_status !== "pending_strict_sse_capture_contract") issue("provider_response_capture_status", "stream response bytes/SSE usage/stop capture 尚未闭合");
@@ -327,7 +354,7 @@ export function validateFormalOracleCompositionAttestation(
   if (input.api_execution_allowed !== false) issue("api_execution_allowed", "composition attestation 不得授权 API");
   if (isSha(input.composition_sha256)) {
     try {
-      if (hashFormalOracleCompositionAttestation(input as unknown as FormalOracleCompositionAttestationV2) !== input.composition_sha256) {
+      if (hashFormalOracleCompositionAttestation(input as unknown as FormalOracleCompositionAttestationV3) !== input.composition_sha256) {
         issue("composition_sha256", "内容寻址哈希不匹配");
       }
     } catch { issue("composition_sha256", "内容不能规范序列化"); }

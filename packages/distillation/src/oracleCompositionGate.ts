@@ -1,6 +1,6 @@
 import { createHash, createPublicKey, KeyObject, type KeyLike } from "node:crypto";
 import type {
-  FormalOracleCompositionAttestationV2,
+  FormalOracleCompositionAttestationV3,
   OracleGateByteInventory,
   OracleGateFormalInputManifest,
   OracleGateFormalSpec,
@@ -46,6 +46,10 @@ import {
   type OracleLedgerAttestedCapability,
 } from "./oracleTrustedPreflight.js";
 import type { FormalRunContractV1, RunCheckpointV1 } from "../../contracts/src/oracle-gate-run.js";
+import {
+  assertActiveFormalOracleInputTokenCountReceiptCapability,
+  type FormalOracleInputTokenCountReceiptCapabilityV1,
+} from "./oracleInputTokenCountReceiptGate.js";
 
 export interface FormalOracleExecutionArtifactV1 {
   request_id: string;
@@ -73,18 +77,20 @@ export interface ComposeFormalOracleRunGenesisInput {
   expected_genesis_head: FormalOracleHeadPinV1;
   initial_checkpoint: RunCheckpointV1;
   composed_at: string;
+  input_token_count_receipt_capability?: FormalOracleInputTokenCountReceiptCapabilityV1;
 }
 
 export interface FormalOracleCompositionCapability {
   readonly stage: "composition_attested_only";
-  readonly attestation: Readonly<FormalOracleCompositionAttestationV2>;
+  readonly attestation: Readonly<FormalOracleCompositionAttestationV3>;
   readonly head_pin: Readonly<FormalOracleHeadPinV1>;
   readonly rights_registry_status: "pending_external_authoritative_head";
   readonly request_envelope_serialization_status: "completed";
   readonly provider_body_serialization_status: "completed_pi_body_serialization_candidate";
   readonly provider_body_transport_compatibility_status: "completed_per_request_local_fake_fetch_proof_non_executable";
   readonly user_prompt_derivation_status: "completed";
-  readonly input_token_budget_status: "pending_model_specific_tokenizer";
+  readonly input_token_count_receipts_binding_status: "not_supplied" | "responses_exact_count_receipts_bound_transport_incompatible";
+  readonly input_token_budget_status: "pending_exact_chat_completions_count_authority";
   readonly provider_wire_binding_status: "pending_external_endpoint_account_validation";
   readonly provider_account_endpoint_status: "pending_external_runtime_binding";
   readonly provider_response_capture_status: "pending_strict_sse_capture_contract";
@@ -106,7 +112,8 @@ class CompositionCapability implements FormalOracleCompositionCapability {
   readonly provider_body_serialization_status = "completed_pi_body_serialization_candidate" as const;
   readonly provider_body_transport_compatibility_status = "completed_per_request_local_fake_fetch_proof_non_executable" as const;
   readonly user_prompt_derivation_status = "completed" as const;
-  readonly input_token_budget_status = "pending_model_specific_tokenizer" as const;
+  readonly input_token_count_receipts_binding_status: "not_supplied" | "responses_exact_count_receipts_bound_transport_incompatible";
+  readonly input_token_budget_status = "pending_exact_chat_completions_count_authority" as const;
   readonly provider_wire_binding_status = "pending_external_endpoint_account_validation" as const;
   readonly provider_account_endpoint_status = "pending_external_runtime_binding" as const;
   readonly provider_response_capture_status = "pending_strict_sse_capture_contract" as const;
@@ -119,9 +126,12 @@ class CompositionCapability implements FormalOracleCompositionCapability {
   readonly api_execution_allowed = false as const;
 
   constructor(
-    readonly attestation: Readonly<FormalOracleCompositionAttestationV2>,
+    readonly attestation: Readonly<FormalOracleCompositionAttestationV3>,
     readonly head_pin: Readonly<FormalOracleHeadPinV1>,
-  ) { Object.freeze(this); }
+  ) {
+    this.input_token_count_receipts_binding_status = attestation.input_token_count_receipts_binding_status;
+    Object.freeze(this);
+  }
 
   toJSON(): never {
     throw new Error("Formal Oracle composition capability 是 callback 内临时能力，不得序列化或持久化");
@@ -226,6 +236,7 @@ function snapshotCompositionInput(input: ComposeFormalOracleRunGenesisInput): Co
     user_template_bytes: cloneBytes(input.user_template_bytes),
     execution_artifacts: cloneExecutionArtifacts(input.execution_artifacts),
     frame_deriver: snapshotFrameDeriver(input.frame_deriver),
+    input_token_count_receipt_capability: input.input_token_count_receipt_capability,
   };
 }
 
@@ -496,6 +507,9 @@ export async function withComposedFormalOracleRunGenesis<T>(
   if (typeof callback !== "function") throw new Error("composition callback 必须是函数");
   const input = snapshotCompositionInput(rawInput);
   canonicalTime(input.composed_at, "composed_at");
+  if (input.input_token_count_receipt_capability) {
+    assertActiveFormalOracleInputTokenCountReceiptCapability(input.input_token_count_receipt_capability);
+  }
   return withLedgerAttestedOracleRegistry({
     attestor: input.attestor,
     registryStore: input.registry_store,
@@ -555,8 +569,12 @@ export async function withComposedFormalOracleRunGenesis<T>(
         throw new Error("Run media/speech/execution plan/time roots 未绑定当前 composition");
       }
 
-      const attestation: FormalOracleCompositionAttestationV2 = {
-        schema_version: "formal-oracle-composition-attestation-v2",
+      if (input.input_token_count_receipt_capability) {
+        assertActiveFormalOracleInputTokenCountReceiptCapability(input.input_token_count_receipt_capability);
+      }
+      const tokenReceiptSet = input.input_token_count_receipt_capability?.receipt_set ?? null;
+      const attestation: FormalOracleCompositionAttestationV3 = {
+        schema_version: "formal-oracle-composition-attestation-v3",
         composition_sha256: "0".repeat(64),
         record_trust: "non_authoritative_composition_record",
         status: "composition_attested_only",
@@ -596,7 +614,11 @@ export async function withComposedFormalOracleRunGenesis<T>(
         local_pi_fetch_boundary_proofs: localPiProofs,
         local_pi_fetch_boundary_dependency_manifest_sha256: localPiDependencyManifestSha256,
         user_prompt_derivation_status: "completed",
-        input_token_budget_status: "pending_model_specific_tokenizer",
+        input_token_count_receipt_set_sha256: tokenReceiptSet?.receipt_set_sha256 ?? null,
+        input_token_count_receipt_count: tokenReceiptSet?.receipt_count ?? 0,
+        input_token_count_receipts_binding_status: tokenReceiptSet === null ? "not_supplied" : "responses_exact_count_receipts_bound_transport_incompatible",
+        input_token_count_receipt_set: tokenReceiptSet,
+        input_token_budget_status: "pending_exact_chat_completions_count_authority",
         provider_wire_binding_status: "pending_external_endpoint_account_validation",
         provider_account_endpoint_status: "pending_external_runtime_binding",
         provider_response_capture_status: "pending_strict_sse_capture_contract",
@@ -621,6 +643,9 @@ export async function withComposedFormalOracleRunGenesis<T>(
         execution_plan: input.execution_plan,
         initial_checkpoint: input.initial_checkpoint,
       }, input.expected_genesis_head, async (lockedSnapshot) => {
+        if (input.input_token_count_receipt_capability) {
+          assertActiveFormalOracleInputTokenCountReceiptCapability(input.input_token_count_receipt_capability);
+        }
         if (lockedSnapshot.head_pin.generation !== 0
           || lockedSnapshot.head_pin.run_sha256 !== input.run.run_sha256
           || lockedSnapshot.head_pin.checkpoint_sha256 !== input.initial_checkpoint.checkpoint_sha256

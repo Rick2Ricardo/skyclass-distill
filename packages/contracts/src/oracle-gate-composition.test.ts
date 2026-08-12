@@ -4,7 +4,7 @@ import {
   hashFormalOracleLocalPiProofSet,
   validateFormalOracleCompositionAttestation,
   validateFormalOracleCompositionAttestationAgainstExecutionPlan,
-  type FormalOracleCompositionAttestationV2,
+  type FormalOracleCompositionAttestationV3,
 } from "./oracle-gate-composition.js";
 import {
   hashFormalOraclePiFetchBoundaryProofV1,
@@ -12,6 +12,12 @@ import {
   type FormalOraclePiFetchBoundaryProofV1,
 } from "./oracle-gate-pi-fetch-boundary-proof.js";
 import { hashFormalOraclePiResponseStreamProofV1, type FormalOraclePiResponseStreamProofV1 } from "./oracle-gate-pi-response-stream.js";
+import {
+  createFormalOracleInputTokenCountReceipt,
+  createFormalOracleInputTokenCountReceiptSet,
+  createFormalOracleInputTokenCountRequestCapture,
+  createFormalOracleInputTokenCountResponseCapture,
+} from "./oracle-gate-input-token-count.js";
 
 function fullProof(): FormalOraclePiFetchBoundaryProofV1 {
   const sse: FormalOraclePiResponseStreamProofV1 = {
@@ -50,7 +56,7 @@ function fullProof(): FormalOraclePiFetchBoundaryProofV1 {
   return proof;
 }
 
-function fixture(): FormalOracleCompositionAttestationV2 {
+function fixture(): FormalOracleCompositionAttestationV3 {
   const proofs = [{
     schedule_index: 0,
     request_id: "REQ-1",
@@ -58,8 +64,8 @@ function fixture(): FormalOracleCompositionAttestationV2 {
     provider_body_sha256: "1".repeat(64),
     proof: fullProof(),
   }];
-  const value: FormalOracleCompositionAttestationV2 = {
-    schema_version: "formal-oracle-composition-attestation-v2",
+  const value: FormalOracleCompositionAttestationV3 = {
+    schema_version: "formal-oracle-composition-attestation-v3",
     composition_sha256: "0".repeat(64),
     record_trust: "non_authoritative_composition_record",
     status: "composition_attested_only",
@@ -99,7 +105,11 @@ function fixture(): FormalOracleCompositionAttestationV2 {
     local_pi_fetch_boundary_proofs: proofs,
     local_pi_fetch_boundary_dependency_manifest_sha256: proofs[0].proof.local_dependency_manifest_sha256,
     user_prompt_derivation_status: "completed",
-    input_token_budget_status: "pending_model_specific_tokenizer",
+    input_token_count_receipt_set_sha256: null,
+    input_token_count_receipt_count: 0,
+    input_token_count_receipts_binding_status: "not_supplied",
+    input_token_count_receipt_set: null,
+    input_token_budget_status: "pending_exact_chat_completions_count_authority",
     provider_wire_binding_status: "pending_external_endpoint_account_validation",
     provider_account_endpoint_status: "pending_external_runtime_binding",
     provider_response_capture_status: "pending_strict_sse_capture_contract",
@@ -125,6 +135,52 @@ describe("Formal Oracle composition attestation contract", () => {
     })).toEqual({ valid: true, issues: [] });
     const legacy = { ...fixture(), schema_version: "formal-oracle-composition-attestation-v1" };
     expect(validateFormalOracleCompositionAttestation(legacy).valid).toBe(false);
+  });
+
+  it("binds a complete Responses count-receipt set without upgrading the Pi Chat execution budget", () => {
+    const value = fixture();
+    const requestCapture = createFormalOracleInputTokenCountRequestCapture({
+      schema_version: "formal-oracle-input-token-count-request-capture-v1", record_trust: "non_authoritative_count_request_capture",
+      schedule_index: 0, request_id: "REQ-1", model: "gpt-5.5", request_envelope_sha256: "0".repeat(64), provider_body_sha256: "1".repeat(64),
+      max_input_tokens: 1024, count_request_entity_sha256: "2".repeat(64), count_request_entity_byte_length: 123,
+      authority_id: "openai-responses-input-tokens", authority_profile: "openai-responses-input-token-count-v1", authority_version: "2026-08-13",
+      counted_transport_profile: "openai-responses-api", captured_at: "2026-08-13T01:02:02.000Z", external_endpoint_account_status: "pending_external_runtime_binding", api_execution_allowed: false,
+    });
+    const responseCapture = createFormalOracleInputTokenCountResponseCapture({
+      schema_version: "formal-oracle-input-token-count-response-capture-v1", record_trust: "non_authoritative_count_response_capture",
+      schedule_index: 0, request_id: "REQ-1", model: "gpt-5.5", count_request_capture_sha256: requestCapture.capture_sha256,
+      count_response_entity_sha256: "3".repeat(64), count_response_entity_byte_length: 42, exact_input_tokens: 900,
+      authority_id: "openai-responses-input-tokens", authority_profile: "openai-responses-input-token-count-v1", authority_version: "2026-08-13",
+      received_at: "2026-08-13T01:02:03.000Z", external_endpoint_account_status: "pending_external_runtime_binding", api_execution_allowed: false,
+    });
+    const receipt = createFormalOracleInputTokenCountReceipt({
+      schema_version: "formal-oracle-input-token-count-receipt-v1", record_trust: "non_authoritative_persistent_count_receipt",
+      schedule_index: 0, request_id: "REQ-1", model: "gpt-5.5", request_envelope_sha256: "0".repeat(64),
+      provider_body_sha256: "1".repeat(64), max_input_tokens: 1024, exact_input_tokens: 900,
+      count_request_capture_sha256: requestCapture.capture_sha256, count_response_capture_sha256: responseCapture.capture_sha256,
+      authority_id: "openai-responses-input-tokens", authority_profile: "openai-responses-input-token-count-v1", authority_version: "2026-08-13",
+      counted_transport_profile: "openai-responses-api", execution_transport_profile: "pi-chat-completions",
+      transport_equivalence_status: "not_proved_incompatible_request_entity", counted_at: "2026-08-13T01:02:03.000Z",
+      external_authority_authenticity_status: "pending_external_endpoint_account_signature_or_worm", api_execution_allowed: false,
+    });
+    const set = createFormalOracleInputTokenCountReceiptSet({
+      schema_version: "formal-oracle-input-token-count-receipt-set-v1", record_trust: "non_authoritative_persistent_count_receipt_set",
+      execution_plan_sha256: value.execution_plan_sha256, receipt_count: 1, receipts: [receipt],
+      count_request_captures: [requestCapture], count_response_captures: [responseCapture],
+      binding_status: "responses_exact_count_receipts_bound_transport_incompatible",
+      current_execution_budget_status: "pending_exact_chat_completions_count_authority",
+      external_authority_authenticity_status: "pending_external_endpoint_account_signature_or_worm",
+      external_persistence_status: "pending_external_monotonic_worm", api_execution_allowed: false,
+    });
+    value.input_token_count_receipt_set = set;
+    value.input_token_count_receipt_set_sha256 = set.receipt_set_sha256;
+    value.input_token_count_receipt_count = 1;
+    value.input_token_count_receipts_binding_status = "responses_exact_count_receipts_bound_transport_incompatible";
+    value.composition_sha256 = hashFormalOracleCompositionAttestation(value);
+    const plan = { execution_plan_sha256: value.execution_plan_sha256, items: [{ schedule_index: 0, request_id: "REQ-1",
+      request_envelope_sha256: "0".repeat(64), provider_body_sha256: "1".repeat(64), model: "gpt-5.5", max_input_tokens: 1024, max_output_tokens: 64 }] };
+    expect(validateFormalOracleCompositionAttestationAgainstExecutionPlan(value, plan)).toEqual({ valid: true, issues: [] });
+    expect(value.input_token_budget_status).toBe("pending_exact_chat_completions_count_authority");
   });
 
   it("rejects reordered/rewritten plan bindings and arbitrary proof roots", () => {
@@ -213,7 +269,7 @@ describe("Formal Oracle composition attestation contract", () => {
       { statistics_status: "complete" },
     ]) {
       const value = { ...fixture(), ...patch };
-      value.composition_sha256 = hashFormalOracleCompositionAttestation(value as FormalOracleCompositionAttestationV2);
+      value.composition_sha256 = hashFormalOracleCompositionAttestation(value as FormalOracleCompositionAttestationV3);
       expect(validateFormalOracleCompositionAttestation(value).valid).toBe(false);
     }
   });

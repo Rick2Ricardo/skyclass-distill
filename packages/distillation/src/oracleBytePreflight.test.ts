@@ -35,6 +35,10 @@ import {
   type GoldLedgerSnapshotV1,
   type RunCheckpointV1,
   type SignedGoldDataset,
+  createFormalOracleInputTokenCountReceipt,
+  createFormalOracleInputTokenCountReceiptSet,
+  createFormalOracleInputTokenCountRequestCapture,
+  createFormalOracleInputTokenCountResponseCapture,
 } from "../../contracts/src/index.js";
 import { canonicalizeOracleGateCanvas } from "../../media/src/oracleGateCanvas.js";
 import { canonicalImagePixels } from "../../media/src/imageEvidence.js";
@@ -60,6 +64,9 @@ import {
   type FormalOracleCompositionCapability,
 } from "./oracleCompositionGate.js";
 import { assertActiveOracleLedgerCapability } from "./oracleTrustedPreflight.js";
+import {
+  withValidatedFormalOracleInputTokenCountReceiptSet,
+} from "./oracleInputTokenCountReceiptGate.js";
 import { FormalOracleRunStore, hashFormalOracleExecutionPlan } from "../../store/src/formalOracleRunStore.js";
 import type { FormalOracleExecutionPlanV1, FormalOracleHeadPinV1 } from "../../store/src/formalOracleRunStore.js";
 import type { FrozenOracleRegistryStore } from "../../store/src/frozenOracleRegistryStore.js";
@@ -775,7 +782,8 @@ describe("Formal Oracle externally-pinned composition gate", () => {
           provider_body_transport_compatibility_status: "completed_per_request_local_fake_fetch_proof_non_executable",
           provider_runtime_engine_status: "compatible_runtime_proved_external_capsule_pending",
           user_prompt_derivation_status: "completed",
-          input_token_budget_status: "pending_model_specific_tokenizer",
+          input_token_count_receipts_binding_status: "not_supplied",
+          input_token_budget_status: "pending_exact_chat_completions_count_authority",
           provider_wire_binding_status: "pending_external_endpoint_account_validation",
           provider_account_endpoint_status: "pending_external_runtime_binding",
           provider_response_capture_status: "pending_strict_sse_capture_contract",
@@ -874,6 +882,111 @@ describe("Formal Oracle externally-pinned composition gate", () => {
     await withComposedFormalOracleRunGenesis({ ...once, callback: async () => undefined });
     await expect(withComposedFormalOracleRunGenesis({ ...once, callback: async () => "bad" })).rejects.toThrow("create-once");
   }, 60_000);
+
+  it("binds in-memory Responses count receipts per plan item but keeps the current Pi budget gate pending", async () => {
+    const input = await buildCompositionFixture();
+    const countRequestCaptures = input.execution_plan.items.map((item) => createFormalOracleInputTokenCountRequestCapture({
+      schema_version: "formal-oracle-input-token-count-request-capture-v1", record_trust: "non_authoritative_count_request_capture",
+      schedule_index: item.schedule_index, request_id: item.request_id, model: item.model, request_envelope_sha256: item.request_envelope_sha256,
+      provider_body_sha256: item.provider_body_sha256, max_input_tokens: item.max_input_tokens,
+      count_request_entity_sha256: sha(`count-request-entity-${item.schedule_index}`), count_request_entity_byte_length: 100 + item.schedule_index,
+      authority_id: "memory-fixture-authority", authority_profile: "openai-responses-input-token-count-v1", authority_version: "fixture-v1",
+      counted_transport_profile: "openai-responses-api", captured_at: "2026-08-12T04:00:00.250Z",
+      external_endpoint_account_status: "pending_external_runtime_binding", api_execution_allowed: false,
+    }));
+    const countResponseCaptures = input.execution_plan.items.map((item) => createFormalOracleInputTokenCountResponseCapture({
+      schema_version: "formal-oracle-input-token-count-response-capture-v1", record_trust: "non_authoritative_count_response_capture",
+      schedule_index: item.schedule_index, request_id: item.request_id, model: item.model,
+      count_request_capture_sha256: countRequestCaptures[item.schedule_index].capture_sha256,
+      count_response_entity_sha256: sha(`count-response-entity-${item.schedule_index}`), count_response_entity_byte_length: 40 + item.schedule_index,
+      exact_input_tokens: item.max_input_tokens - 1, authority_id: "memory-fixture-authority",
+      authority_profile: "openai-responses-input-token-count-v1", authority_version: "fixture-v1", received_at: "2026-08-12T04:00:00.500Z",
+      external_endpoint_account_status: "pending_external_runtime_binding", api_execution_allowed: false,
+    }));
+    const receipts = input.execution_plan.items.map((item) => createFormalOracleInputTokenCountReceipt({
+      schema_version: "formal-oracle-input-token-count-receipt-v1", record_trust: "non_authoritative_persistent_count_receipt",
+      schedule_index: item.schedule_index, request_id: item.request_id, model: item.model,
+      request_envelope_sha256: item.request_envelope_sha256, provider_body_sha256: item.provider_body_sha256,
+      max_input_tokens: item.max_input_tokens, exact_input_tokens: item.max_input_tokens - 1,
+      count_request_capture_sha256: countRequestCaptures[item.schedule_index].capture_sha256,
+      count_response_capture_sha256: countResponseCaptures[item.schedule_index].capture_sha256,
+      authority_id: "memory-fixture-authority", authority_profile: "openai-responses-input-token-count-v1", authority_version: "fixture-v1",
+      counted_transport_profile: "openai-responses-api", execution_transport_profile: "pi-chat-completions",
+      transport_equivalence_status: "not_proved_incompatible_request_entity", counted_at: "2026-08-12T04:00:00.500Z",
+      external_authority_authenticity_status: "pending_external_endpoint_account_signature_or_worm", api_execution_allowed: false,
+    }));
+    const receiptSet = createFormalOracleInputTokenCountReceiptSet({
+      schema_version: "formal-oracle-input-token-count-receipt-set-v1", record_trust: "non_authoritative_persistent_count_receipt_set",
+      execution_plan_sha256: input.execution_plan.execution_plan_sha256, receipt_count: receipts.length, receipts,
+      count_request_captures: countRequestCaptures, count_response_captures: countResponseCaptures,
+      binding_status: "responses_exact_count_receipts_bound_transport_incompatible",
+      current_execution_budget_status: "pending_exact_chat_completions_count_authority",
+      external_authority_authenticity_status: "pending_external_endpoint_account_signature_or_worm",
+      external_persistence_status: "pending_external_monotonic_worm", api_execution_allowed: false,
+    });
+    await withValidatedFormalOracleInputTokenCountReceiptSet({
+      receipt_set: receiptSet, execution_plan: input.execution_plan,
+      callback: async (countCapability) => withComposedFormalOracleRunGenesis({
+        ...input, input_token_count_receipt_capability: countCapability,
+        callback: async (capability) => {
+          expect(capability.input_token_count_receipts_binding_status).toBe("responses_exact_count_receipts_bound_transport_incompatible");
+          expect(capability.input_token_budget_status).toBe("pending_exact_chat_completions_count_authority");
+          expect(capability.attestation.input_token_count_receipt_set_sha256).toBe(receiptSet.receipt_set_sha256);
+          expect(capability.api_execution_allowed).toBe(false);
+        },
+      }),
+    });
+  }, 30_000);
+
+  it("rejects an input-token receipt capability that expires before the run-store lock callback", async () => {
+    const input = await buildCompositionFixture();
+    let release!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    const originalProbe = input.frame_deriver.probe.bind(input.frame_deriver);
+    input.frame_deriver.probe = async (path) => { entered(); await paused; return originalProbe(path); };
+    const item = input.execution_plan.items[0];
+    const requestCapture = createFormalOracleInputTokenCountRequestCapture({
+      schema_version: "formal-oracle-input-token-count-request-capture-v1", record_trust: "non_authoritative_count_request_capture",
+      schedule_index: item.schedule_index, request_id: item.request_id, model: item.model, request_envelope_sha256: item.request_envelope_sha256,
+      provider_body_sha256: item.provider_body_sha256, max_input_tokens: item.max_input_tokens, count_request_entity_sha256: sha("expire-request"),
+      count_request_entity_byte_length: 100, authority_id: "memory-fixture-authority", authority_profile: "openai-responses-input-token-count-v1",
+      authority_version: "fixture-v1", counted_transport_profile: "openai-responses-api", captured_at: "2026-08-12T04:00:00.250Z",
+      external_endpoint_account_status: "pending_external_runtime_binding", api_execution_allowed: false,
+    });
+    const responseCapture = createFormalOracleInputTokenCountResponseCapture({
+      schema_version: "formal-oracle-input-token-count-response-capture-v1", record_trust: "non_authoritative_count_response_capture",
+      schedule_index: item.schedule_index, request_id: item.request_id, model: item.model, count_request_capture_sha256: requestCapture.capture_sha256,
+      count_response_entity_sha256: sha("expire-response"), count_response_entity_byte_length: 40, exact_input_tokens: item.max_input_tokens - 1,
+      authority_id: "memory-fixture-authority", authority_profile: "openai-responses-input-token-count-v1", authority_version: "fixture-v1",
+      received_at: "2026-08-12T04:00:00.500Z", external_endpoint_account_status: "pending_external_runtime_binding", api_execution_allowed: false,
+    });
+    const receipt = createFormalOracleInputTokenCountReceipt({
+      schema_version: "formal-oracle-input-token-count-receipt-v1", record_trust: "non_authoritative_persistent_count_receipt",
+      schedule_index: item.schedule_index, request_id: item.request_id, model: item.model, request_envelope_sha256: item.request_envelope_sha256,
+      provider_body_sha256: item.provider_body_sha256, max_input_tokens: item.max_input_tokens, exact_input_tokens: item.max_input_tokens - 1,
+      count_request_capture_sha256: requestCapture.capture_sha256, count_response_capture_sha256: responseCapture.capture_sha256,
+      authority_id: "memory-fixture-authority", authority_profile: "openai-responses-input-token-count-v1", authority_version: "fixture-v1",
+      counted_transport_profile: "openai-responses-api", execution_transport_profile: "pi-chat-completions",
+      transport_equivalence_status: "not_proved_incompatible_request_entity", counted_at: "2026-08-12T04:00:00.500Z",
+      external_authority_authenticity_status: "pending_external_endpoint_account_signature_or_worm", api_execution_allowed: false,
+    });
+    const plan = { execution_plan_sha256: input.execution_plan.execution_plan_sha256, items: [item] };
+    const receiptSet = createFormalOracleInputTokenCountReceiptSet({
+      schema_version: "formal-oracle-input-token-count-receipt-set-v1", record_trust: "non_authoritative_persistent_count_receipt_set",
+      execution_plan_sha256: plan.execution_plan_sha256, receipt_count: 1, count_request_captures: [requestCapture], count_response_captures: [responseCapture], receipts: [receipt],
+      binding_status: "responses_exact_count_receipts_bound_transport_incompatible", current_execution_budget_status: "pending_exact_chat_completions_count_authority",
+      external_authority_authenticity_status: "pending_external_endpoint_account_signature_or_worm", external_persistence_status: "pending_external_monotonic_worm", api_execution_allowed: false,
+    });
+    let pending!: Promise<unknown>;
+    await withValidatedFormalOracleInputTokenCountReceiptSet({ receipt_set: receiptSet, execution_plan: plan, callback: async (capability) => {
+      pending = withComposedFormalOracleRunGenesis({ ...input, input_token_count_receipt_capability: capability, callback: async () => undefined });
+      await started;
+    }});
+    release();
+    await expect(pending).rejects.toThrow("已过期");
+  }, 30_000);
 
   it("snapshots caller-owned JSON, bytes and key maps before asynchronous verification", async () => {
     const input = await buildCompositionFixture();
