@@ -16,6 +16,7 @@ export * from "./oracle-gate-invalid-response.js";
 export * from "./oracle-gate-user-prompt.js";
 export * from "./oracle-gate-run.js";
 export * from "./oracle-gate-trusted.js";
+export * from "./oracle-gate-transport-authority.js";
 export * from "./signed-gold.js";
 export * from "./skill-distillation.js";
 export * from "./temporal-board.js";
