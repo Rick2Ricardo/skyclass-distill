@@ -1,4 +1,7 @@
 import { sha256Hex } from "./sha256.js";
+import {
+  FORMAL_ORACLE_PI_RESPONSE_STREAM_VERSION,
+} from "./oracle-gate-pi-response-stream.js";
 
 export type OracleGateRunArm = "transcript_only" | "static_final_board" | "uniform_frame" | "oracle_delta";
 export type OracleGateRequestState =
@@ -102,12 +105,13 @@ export interface OracleGateRunTokenUsageV1 {
   total_tokens: number;
   cache_read_tokens: number;
   cache_write_tokens: number;
+  reasoning_tokens: number;
 }
 
 export type OracleGateAttemptOutcome = "result_received" | "not_sent" | "no_result_confirmed" | "unknown";
 
-export interface RequestAttemptAuditV1 {
-  schema_version: "oracle-gate-request-attempt-audit-v1";
+export interface RequestAttemptAuditV2 {
+  schema_version: "oracle-gate-request-attempt-audit-v2";
   attempt_sha256: string;
   run_sha256: string;
   request_id: string;
@@ -118,15 +122,29 @@ export interface RequestAttemptAuditV1 {
   finished_at: string;
   latency_ms: number;
   provider_id: string;
-  provider_request_id: string | null;
-  request_sha256: string;
-  request_object_uri: string;
-  /** Immutable assistant-content JSON UTF-8 bytes; raw provider SSE is not yet integrated here. */
-  response_object_uri: string | null;
-  response_bytes_sha256: string | null;
-  /** Immutable canonical JSON object deterministically parsed from response_object_uri. */
-  parsed_response_object_uri: string | null;
-  parsed_response_sha256: string | null;
+  /** Untrusted declared metadata until a future external header-capture contract binds it; never authoritative for A/B/C/D or commit. */
+  provider_http_request_id: string | null;
+  completion_id: string | null;
+  request_envelope_sha256: string;
+  request_envelope_object_uri: string;
+  provider_body_sha256: string;
+  provider_body_object_uri: string;
+  /** A: exact fetch-observed SSE entity bytes (not TCP/HTTP-original bytes). */
+  fetch_observed_sse_object_uri: string | null;
+  fetch_observed_sse_bytes_sha256: string | null;
+  fetch_observed_sse_byte_length: number | null;
+  /** B: canonical persisted strict-parser derivation record, domain-addressed. */
+  sse_derivation_object_uri: string | null;
+  sse_derivation_record_sha256: string | null;
+  sse_parser_version: typeof FORMAL_ORACLE_PI_RESPONSE_STREAM_VERSION | null;
+  /** C: assistant-content JSON bytes deterministically concatenated from A. */
+  assistant_content_object_uri: string | null;
+  assistant_content_bytes_sha256: string | null;
+  assistant_content_byte_length: number | null;
+  /** D: canonical response JSON deterministically parsed from C. */
+  canonical_response_object_uri: string | null;
+  canonical_response_bytes_sha256: string | null;
+  canonical_response_commitment_sha256: string | null;
   submitted_visuals: OracleGateRunVisualV1[];
   model: string;
   transport: "pi";
@@ -139,7 +157,7 @@ export interface RequestAttemptAuditV1 {
   tools_policy: "none";
   outcome: OracleGateAttemptOutcome;
   provider_response_received: boolean;
-  stop_reason: "stop" | "length" | "error" | null;
+  stop_reason: "stop" | null;
   error_code: string | null;
   error_message: string | null;
   usage: OracleGateRunTokenUsageV1 | null;
@@ -149,8 +167,8 @@ export interface RequestAttemptAuditV1 {
 }
 
 /** Structural/transport commitment only; semantic acceptance is deliberately pending. */
-export interface CommittedRequestV1 {
-  schema_version: "oracle-gate-committed-request-v1";
+export interface CommittedRequestV2 {
+  schema_version: "oracle-gate-committed-request-v2";
   committed_request_sha256: string;
   run_sha256: string;
   request_id: string;
@@ -158,8 +176,9 @@ export interface CommittedRequestV1 {
   intent_sha256: string;
   attempt_sha256: string;
   attempt_ordinal: number;
-  response_object_uri: string;
-  response_sha256: string;
+  canonical_response_object_uri: string;
+  canonical_response_bytes_sha256: string;
+  canonical_response_commitment_sha256: string;
   validator_version: string;
   transport_and_schema_verified_at: string;
   transport_and_schema_verified: true;
@@ -257,8 +276,8 @@ export interface OracleGateRunValidationReport {
 
 export const FORMAL_RUN_CONTRACT_DOMAIN = "skyclass/formal-oracle/run-contract/v1\0";
 export const REQUEST_INTENT_DOMAIN = "skyclass/formal-oracle/request-intent/v1\0";
-export const REQUEST_ATTEMPT_AUDIT_DOMAIN = "skyclass/formal-oracle/request-attempt-audit/v1\0";
-export const COMMITTED_REQUEST_DOMAIN = "skyclass/formal-oracle/committed-request/v1\0";
+export const REQUEST_ATTEMPT_AUDIT_DOMAIN = "skyclass/formal-oracle/request-attempt-audit/v2\0";
+export const COMMITTED_REQUEST_DOMAIN = "skyclass/formal-oracle/committed-request/v2\0";
 export const RUN_CHECKPOINT_DOMAIN = "skyclass/formal-oracle/run-checkpoint/v1\0";
 export const PRIVATE_ANSWER_KEY_DOMAIN = "skyclass/formal-oracle/private-answer-key/v1\0";
 export const PUBLIC_BLIND_PACKAGE_DOMAIN = "skyclass/formal-oracle/public-blind-package/v1\0";
@@ -329,19 +348,19 @@ export function hashRequestIntent(input: RequestIntentV1): string {
   return domainHash(REQUEST_INTENT_DOMAIN, canonicalRequestIntentPayload(input));
 }
 
-export function canonicalRequestAttemptAuditPayload(input: RequestAttemptAuditV1): string {
+export function canonicalRequestAttemptAuditPayload(input: RequestAttemptAuditV2): string {
   return stableJson(withoutField(input, "attempt_sha256"));
 }
 
-export function hashRequestAttemptAudit(input: RequestAttemptAuditV1): string {
+export function hashRequestAttemptAudit(input: RequestAttemptAuditV2): string {
   return domainHash(REQUEST_ATTEMPT_AUDIT_DOMAIN, canonicalRequestAttemptAuditPayload(input));
 }
 
-export function canonicalCommittedRequestPayload(input: CommittedRequestV1): string {
+export function canonicalCommittedRequestPayload(input: CommittedRequestV2): string {
   return stableJson(withoutField(input, "committed_request_sha256"));
 }
 
-export function hashCommittedRequest(input: CommittedRequestV1): string {
+export function hashCommittedRequest(input: CommittedRequestV2): string {
   return domainHash(COMMITTED_REQUEST_DOMAIN, canonicalCommittedRequestPayload(input));
 }
 
@@ -554,8 +573,8 @@ export function validateRequestIntent(input: unknown): OracleGateRunValidationRe
 
 function validateUsage(raw: unknown, path: string, issues: OracleGateRunValidationIssue[]): void {
   if (!isRecord(raw)) { issues.push({ path, message: "必须是对象" }); return; }
-  if (!exactKeys(raw, ["input_tokens", "output_tokens", "total_tokens", "cache_read_tokens", "cache_write_tokens"])) issues.push({ path, message: "字段集合无效" });
-  for (const field of ["input_tokens", "output_tokens", "total_tokens", "cache_read_tokens", "cache_write_tokens"] as const) if (!isNonNegativeSafeInteger(raw[field])) issues.push({ path: `${path}.${field}`, message: "必须是非负安全整数" });
+  if (!exactKeys(raw, ["input_tokens", "output_tokens", "total_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens"])) issues.push({ path, message: "字段集合无效" });
+  for (const field of ["input_tokens", "output_tokens", "total_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens"] as const) if (!isNonNegativeSafeInteger(raw[field])) issues.push({ path: `${path}.${field}`, message: "必须是非负安全整数" });
   if (isNonNegativeSafeInteger(raw.total_tokens) && isNonNegativeSafeInteger(raw.input_tokens) && isNonNegativeSafeInteger(raw.output_tokens)
     && raw.total_tokens !== raw.input_tokens + raw.output_tokens) issues.push({ path: `${path}.total_tokens`, message: "必须等于 input + output" });
 }
@@ -564,19 +583,22 @@ export function validateRequestAttemptAudit(input: unknown): OracleGateRunValida
   const issues: OracleGateRunValidationIssue[] = [];
   const issue = (path: string, message: string): void => { issues.push({ path, message }); };
   if (!isRecord(input)) return report([{ path: "$", message: "必须是对象" }]);
-  const keys = ["schema_version", "attempt_sha256", "run_sha256", "request_id", "idempotency_key", "intent_sha256", "attempt_ordinal", "started_at", "finished_at", "latency_ms", "provider_id", "provider_request_id", "request_sha256", "request_object_uri", "response_object_uri", "response_bytes_sha256", "parsed_response_object_uri", "parsed_response_sha256", "submitted_visuals", "model", "transport", "temperature", "max_input_tokens", "max_output_tokens", "timeout_ms", "seed", "cache_retention", "tools_policy", "outcome", "provider_response_received", "stop_reason", "error_code", "error_message", "usage", "pricing_table_sha256", "cost_microunits", "automatic_retry_allowed"];
+  const keys = ["schema_version", "attempt_sha256", "run_sha256", "request_id", "idempotency_key", "intent_sha256", "attempt_ordinal", "started_at", "finished_at", "latency_ms", "provider_id", "provider_http_request_id", "completion_id", "request_envelope_sha256", "request_envelope_object_uri", "provider_body_sha256", "provider_body_object_uri", "fetch_observed_sse_object_uri", "fetch_observed_sse_bytes_sha256", "fetch_observed_sse_byte_length", "sse_derivation_object_uri", "sse_derivation_record_sha256", "sse_parser_version", "assistant_content_object_uri", "assistant_content_bytes_sha256", "assistant_content_byte_length", "canonical_response_object_uri", "canonical_response_bytes_sha256", "canonical_response_commitment_sha256", "submitted_visuals", "model", "transport", "temperature", "max_input_tokens", "max_output_tokens", "timeout_ms", "seed", "cache_retention", "tools_policy", "outcome", "provider_response_received", "stop_reason", "error_code", "error_message", "usage", "pricing_table_sha256", "cost_microunits", "automatic_retry_allowed"];
   if (!exactKeys(input, keys)) issue("$", "字段集合无效");
-  if (input.schema_version !== "oracle-gate-request-attempt-audit-v1") issue("schema_version", "版本无效");
-  for (const field of ["attempt_sha256", "run_sha256", "idempotency_key", "intent_sha256", "request_sha256"] as const) if (!isSha(input[field])) issue(field, "必须是 SHA-256");
+  if (input.schema_version !== "oracle-gate-request-attempt-audit-v2") issue("schema_version", "版本无效");
+  for (const field of ["attempt_sha256", "run_sha256", "idempotency_key", "intent_sha256", "request_envelope_sha256", "provider_body_sha256"] as const) if (!isSha(input[field])) issue(field, "必须是 SHA-256");
   if (!isId(input.request_id) || !isNonEmpty(input.provider_id) || !isNonEmpty(input.model)) issue("identity", "request/provider/model 格式无效");
   if (!isPositiveSafeInteger(input.attempt_ordinal)) issue("attempt_ordinal", "必须是正安全整数");
   if (!isCanonicalTime(input.started_at) || !isCanonicalTime(input.finished_at) || (isCanonicalTime(input.started_at) && isCanonicalTime(input.finished_at) && Date.parse(input.finished_at) < Date.parse(input.started_at))) issue("time", "时间必须 canonical 且 finished_at 不早于 started_at");
   if (!isNonNegativeSafeInteger(input.latency_ms)) issue("latency_ms", "必须是非负安全整数");
-  if (input.provider_request_id !== null && !isNonEmpty(input.provider_request_id)) issue("provider_request_id", "必须为 null 或非空字符串");
-  if (!isSafeUri(input.request_object_uri)) issue("request_object_uri", "必须是受控相对路径");
-  if (input.response_object_uri !== null && !isSafeUri(input.response_object_uri)) issue("response_object_uri", "必须为 null 或受控相对路径");
-  if (input.parsed_response_object_uri !== null && !isSafeUri(input.parsed_response_object_uri)) issue("parsed_response_object_uri", "必须为 null 或受控相对路径");
-  for (const field of ["response_bytes_sha256", "parsed_response_sha256", "pricing_table_sha256"] as const) if (input[field] !== null && !isSha(input[field])) issue(field, "必须为 null 或 SHA-256");
+  for (const field of ["provider_http_request_id", "completion_id"] as const) if (input[field] !== null && !isNonEmpty(input[field])) issue(field, "必须为 null 或非空字符串");
+  for (const field of ["request_envelope_object_uri", "provider_body_object_uri"] as const) if (!isSafeUri(input[field])) issue(field, "必须是受控相对路径");
+  const responseUriFields = ["fetch_observed_sse_object_uri", "sse_derivation_object_uri", "assistant_content_object_uri", "canonical_response_object_uri"] as const;
+  responseUriFields.forEach((field) => { if (input[field] !== null && !isSafeUri(input[field])) issue(field, "必须为 null 或受控相对路径"); });
+  const responseHashFields = ["fetch_observed_sse_bytes_sha256", "sse_derivation_record_sha256", "assistant_content_bytes_sha256", "canonical_response_bytes_sha256", "canonical_response_commitment_sha256"] as const;
+  [...responseHashFields, "pricing_table_sha256" as const].forEach((field) => { if (input[field] !== null && !isSha(input[field])) issue(field, "必须为 null 或 SHA-256"); });
+  for (const field of ["fetch_observed_sse_byte_length", "assistant_content_byte_length"] as const) if (input[field] !== null && !isPositiveSafeInteger(input[field])) issue(field, "必须为 null 或正安全整数");
+  if (input.sse_parser_version !== null && input.sse_parser_version !== FORMAL_ORACLE_PI_RESPONSE_STREAM_VERSION) issue("sse_parser_version", "版本无效");
   if (!isDenseArray(input.submitted_visuals)) issue("submitted_visuals", "必须是稠密数组且不得有额外属性");
   else input.submitted_visuals.forEach((visual, index) => validateVisual(visual, `submitted_visuals[${index}]`, issues));
   if (input.transport !== "pi" || input.temperature !== 0 || input.cache_retention !== "none" || input.tools_policy !== "none") issue("protocol", "必须冻结为 Pi、temperature=0、无缓存、无工具");
@@ -584,7 +606,7 @@ export function validateRequestAttemptAudit(input: unknown): OracleGateRunValida
   if (!isUint32(input.seed)) issue("seed", "必须是 0..2^32-1 安全整数");
   if (!["result_received", "not_sent", "no_result_confirmed", "unknown"].includes(String(input.outcome))) issue("outcome", "值无效");
   if (typeof input.provider_response_received !== "boolean") issue("provider_response_received", "必须是 boolean");
-  if (!["stop", "length", "error", null].includes(input.stop_reason as never)) issue("stop_reason", "值无效");
+  if (!["stop", null].includes(input.stop_reason as never)) issue("stop_reason", "v2 只允许 strict stop 或 null");
   if (input.error_code !== null && !isNonEmpty(input.error_code)) issue("error_code", "必须为 null 或非空字符串");
   if (input.error_message !== null && !isNonEmpty(input.error_message)) issue("error_message", "必须为 null 或非空字符串");
   if (input.usage !== null) validateUsage(input.usage, "usage", issues);
@@ -593,23 +615,27 @@ export function validateRequestAttemptAudit(input: unknown): OracleGateRunValida
   if (typeof input.automatic_retry_allowed !== "boolean") issue("automatic_retry_allowed", "必须是 boolean");
 
   if (input.outcome === "result_received") {
-    if (input.provider_response_received !== true || !isSafeUri(input.response_object_uri) || !isSha(input.response_bytes_sha256)
-      || !isSafeUri(input.parsed_response_object_uri) || !isSha(input.parsed_response_sha256) || input.usage === null) issue("outcome", "result_received 必须具有完整 raw/parsed 响应、hash 与 usage");
-    if (!isNonEmpty(input.provider_request_id) || !["stop", "length", "error"].includes(String(input.stop_reason))) issue("outcome", "result_received 必须具有 provider request ID 与明确 stop reason");
+    if (input.provider_response_received !== true || responseUriFields.some((field) => !isSafeUri(input[field]))
+      || responseHashFields.some((field) => !isSha(input[field])) || !isPositiveSafeInteger(input.fetch_observed_sse_byte_length)
+      || !isPositiveSafeInteger(input.assistant_content_byte_length) || input.sse_parser_version !== FORMAL_ORACLE_PI_RESPONSE_STREAM_VERSION
+      || input.usage === null) issue("outcome", "result_received 必须具有完整 A/B/C/D 响应链与 usage");
+    if (!isNonEmpty(input.provider_http_request_id) || !isNonEmpty(input.completion_id) || input.stop_reason !== "stop") issue("outcome", "result_received 必须具有分离的 HTTP/completion ID 与 strict stop");
     if (!isSha(input.pricing_table_sha256) || !isNonNegativeSafeInteger(input.cost_microunits)) issue("cost", "result_received 必须具有冻结 pricing table 与 cost");
-    if (isRecord(input.usage) && (input.usage.cache_read_tokens !== 0 || input.usage.cache_write_tokens !== 0)) issue("usage", "cache_retention=none 时 cache token 必须为 0");
+    if (isRecord(input.usage) && (input.usage.cache_read_tokens !== 0 || input.usage.cache_write_tokens !== 0 || input.usage.reasoning_tokens !== 0)) issue("usage", "formal cache/reasoning token 必须为 0");
     if (input.automatic_retry_allowed !== false || input.error_code !== null || input.error_message !== null) issue("automatic_retry_allowed", "已收到结果不得自动重试或携带 error");
   } else if (input.outcome === "not_sent" || input.outcome === "no_result_confirmed") {
-    if (input.provider_response_received !== false || input.response_object_uri !== null || input.response_bytes_sha256 !== null
-      || input.parsed_response_object_uri !== null || input.parsed_response_sha256 !== null || input.usage !== null || input.stop_reason !== null || input.pricing_table_sha256 !== null || input.cost_microunits !== null) issue("outcome", "确认无结果时不得声称存在响应、stop、usage 或 cost");
+    if (input.provider_response_received !== false || responseUriFields.some((field) => input[field] !== null) || responseHashFields.some((field) => input[field] !== null)
+      || input.fetch_observed_sse_byte_length !== null || input.assistant_content_byte_length !== null || input.sse_parser_version !== null || input.completion_id !== null
+      || input.usage !== null || input.stop_reason !== null || input.pricing_table_sha256 !== null || input.cost_microunits !== null) issue("outcome", "确认无结果时不得声称存在 A/B/C/D、completion、stop、usage 或 cost");
     if (typeof input.automatic_retry_allowed !== "boolean" || !isNonEmpty(input.error_code) || !isNonEmpty(input.error_message)) issue("automatic_retry_allowed", "确认无结果的失败必须记录错误；是否重试由 intent 预算决定");
-    if (input.outcome === "not_sent" && input.provider_request_id !== null) issue("provider_request_id", "not_sent 不得声称 provider request ID");
+    if (input.outcome === "not_sent" && input.provider_http_request_id !== null) issue("provider_http_request_id", "not_sent 不得声称 provider HTTP request ID");
   } else if (input.outcome === "unknown") {
-    if (input.provider_response_received !== false || input.response_object_uri !== null || input.response_bytes_sha256 !== null
-      || input.parsed_response_object_uri !== null || input.parsed_response_sha256 !== null || input.usage !== null || input.stop_reason !== null || input.pricing_table_sha256 !== null || input.cost_microunits !== null) issue("outcome", "unknown 不得声称存在可验证响应、stop、usage 或 cost");
+    if (input.provider_response_received !== false || responseUriFields.some((field) => input[field] !== null) || responseHashFields.some((field) => input[field] !== null)
+      || input.fetch_observed_sse_byte_length !== null || input.assistant_content_byte_length !== null || input.sse_parser_version !== null || input.completion_id !== null
+      || input.usage !== null || input.stop_reason !== null || input.pricing_table_sha256 !== null || input.cost_microunits !== null) issue("outcome", "unknown 不得声称存在可验证 A/B/C/D、completion、stop、usage 或 cost");
     if (input.automatic_retry_allowed !== false || !isNonEmpty(input.error_code) || !isNonEmpty(input.error_message)) issue("automatic_retry_allowed", "ambiguous/unknown 必须禁止自动重试并记录错误");
   }
-  addHashIssue(issues, input as unknown as RequestAttemptAuditV1, input.attempt_sha256, "attempt_sha256", hashRequestAttemptAudit);
+  addHashIssue(issues, input as unknown as RequestAttemptAuditV2, input.attempt_sha256, "attempt_sha256", hashRequestAttemptAudit);
   return report(issues);
 }
 
@@ -617,17 +643,17 @@ export function validateCommittedRequest(input: unknown): OracleGateRunValidatio
   const issues: OracleGateRunValidationIssue[] = [];
   const issue = (path: string, message: string): void => { issues.push({ path, message }); };
   if (!isRecord(input)) return report([{ path: "$", message: "必须是对象" }]);
-  const keys = ["schema_version", "committed_request_sha256", "run_sha256", "request_id", "idempotency_key", "intent_sha256", "attempt_sha256", "attempt_ordinal", "response_object_uri", "response_sha256", "validator_version", "transport_and_schema_verified_at", "transport_and_schema_verified", "semantic_review_status", "provider_stop_confirmed"];
+  const keys = ["schema_version", "committed_request_sha256", "run_sha256", "request_id", "idempotency_key", "intent_sha256", "attempt_sha256", "attempt_ordinal", "canonical_response_object_uri", "canonical_response_bytes_sha256", "canonical_response_commitment_sha256", "validator_version", "transport_and_schema_verified_at", "transport_and_schema_verified", "semantic_review_status", "provider_stop_confirmed"];
   if (!exactKeys(input, keys)) issue("$", "字段集合无效");
-  if (input.schema_version !== "oracle-gate-committed-request-v1") issue("schema_version", "版本无效");
-  for (const field of ["committed_request_sha256", "run_sha256", "idempotency_key", "intent_sha256", "attempt_sha256", "response_sha256"] as const) if (!isSha(input[field])) issue(field, "必须是 SHA-256");
+  if (input.schema_version !== "oracle-gate-committed-request-v2") issue("schema_version", "版本无效");
+  for (const field of ["committed_request_sha256", "run_sha256", "idempotency_key", "intent_sha256", "attempt_sha256", "canonical_response_bytes_sha256", "canonical_response_commitment_sha256"] as const) if (!isSha(input[field])) issue(field, "必须是 SHA-256");
   if (!isId(input.request_id) || !isNonEmpty(input.validator_version)) issue("identity", "request_id/validator_version 格式无效");
   if (!isPositiveSafeInteger(input.attempt_ordinal)) issue("attempt_ordinal", "必须是正安全整数");
-  if (!isSafeUri(input.response_object_uri)) issue("response_object_uri", "必须是受控相对路径");
+  if (!isSafeUri(input.canonical_response_object_uri)) issue("canonical_response_object_uri", "必须是受控相对路径");
   if (!isCanonicalTime(input.transport_and_schema_verified_at)) issue("transport_and_schema_verified_at", "必须是 canonical ISO 时间");
   if (input.transport_and_schema_verified !== true || input.provider_stop_confirmed !== true) issue("transport_and_schema_verified", "committed request 必须完成 transport/schema 验证且 provider stop 已确认");
   if (input.semantic_review_status !== "pending_external_blind_review") issue("semantic_review_status", "语义结论必须留给 external blind review");
-  addHashIssue(issues, input as unknown as CommittedRequestV1, input.committed_request_sha256, "committed_request_sha256", hashCommittedRequest);
+  addHashIssue(issues, input as unknown as CommittedRequestV2, input.committed_request_sha256, "committed_request_sha256", hashCommittedRequest);
   return report(issues);
 }
 
@@ -877,10 +903,12 @@ export function validateRequestAttemptAgainstIntent(intent: unknown, audit: unkn
   auditReport.issues.forEach((item) => issues.push({ path: `audit.${item.path}`, message: item.message }));
   if (!intentReport.valid || !auditReport.valid) return report(issues);
   const expected = intent as RequestIntentV1;
-  const actual = audit as RequestAttemptAuditV1;
-  const equalFields: Array<keyof RequestIntentV1 & keyof RequestAttemptAuditV1> = ["run_sha256", "request_id", "idempotency_key", "attempt_ordinal", "model", "transport", "temperature", "max_input_tokens", "max_output_tokens", "timeout_ms", "seed", "cache_retention", "tools_policy"];
+  const actual = audit as RequestAttemptAuditV2;
+  const equalFields: Array<keyof RequestIntentV1 & keyof RequestAttemptAuditV2> = ["run_sha256", "request_id", "idempotency_key", "attempt_ordinal", "model", "transport", "temperature", "max_input_tokens", "max_output_tokens", "timeout_ms", "seed", "cache_retention", "tools_policy"];
   for (const field of equalFields) if (expected[field] !== actual[field]) issues.push({ path: `audit.${field}`, message: "与 request intent 不一致" });
-  if (actual.intent_sha256 !== expected.intent_sha256 || actual.request_sha256 !== expected.provider_body_sha256 || actual.request_object_uri !== expected.provider_body_object_uri) issues.push({ path: "audit.request", message: "intent/provider body 内容绑定不一致" });
+  if (actual.intent_sha256 !== expected.intent_sha256 || actual.request_envelope_sha256 !== expected.request_envelope_sha256
+    || actual.request_envelope_object_uri !== expected.request_envelope_object_uri || actual.provider_body_sha256 !== expected.provider_body_sha256
+    || actual.provider_body_object_uri !== expected.provider_body_object_uri) issues.push({ path: "audit.request", message: "intent envelope/provider body 双根绑定不一致" });
   if (stableJson(actual.submitted_visuals) !== stableJson(expected.visuals)) issues.push({ path: "audit.submitted_visuals", message: "与 request intent 不一致" });
   if (isRecord(actual.usage) && (Number(actual.usage.input_tokens) > expected.max_input_tokens || Number(actual.usage.output_tokens) > expected.max_output_tokens)) issues.push({ path: "audit.usage", message: "token usage 超过 request intent 冻结预算" });
   if ((actual.outcome === "not_sent" || actual.outcome === "no_result_confirmed")
@@ -902,13 +930,15 @@ export function validateCommittedRequestAgainstAttempt(
   committedReport.issues.forEach((item) => issues.push({ path: `committed.${item.path}`, message: item.message }));
   if (issues.length) return report(issues);
   const request = intent as RequestIntentV1;
-  const attempt = audit as RequestAttemptAuditV1;
-  const record = committed as CommittedRequestV1;
+  const attempt = audit as RequestAttemptAuditV2;
+  const record = committed as CommittedRequestV2;
   if (attempt.outcome !== "result_received" || attempt.stop_reason !== "stop") issues.push({ path: "audit", message: "只有 stop 完成的 result_received 才能 commit" });
   if (record.run_sha256 !== request.run_sha256 || record.request_id !== request.request_id || record.idempotency_key !== request.idempotency_key || record.intent_sha256 !== request.intent_sha256) issues.push({ path: "committed.identity", message: "与 intent 不一致" });
   if (record.attempt_sha256 !== attempt.attempt_sha256 || record.attempt_ordinal !== attempt.attempt_ordinal
-    || record.response_object_uri !== attempt.parsed_response_object_uri || record.response_sha256 !== attempt.parsed_response_sha256) {
-    issues.push({ path: "committed.response", message: "与 attempt parsed response receipt 不一致" });
+    || record.canonical_response_object_uri !== attempt.canonical_response_object_uri
+    || record.canonical_response_bytes_sha256 !== attempt.canonical_response_bytes_sha256
+    || record.canonical_response_commitment_sha256 !== attempt.canonical_response_commitment_sha256) {
+    issues.push({ path: "committed.response", message: "与 attempt canonical response receipt 不一致" });
   }
   if (Date.parse(record.transport_and_schema_verified_at) < Date.parse(attempt.finished_at)) issues.push({ path: "committed.transport_and_schema_verified_at", message: "不得早于 attempt finished_at" });
   return report(issues);
@@ -972,8 +1002,8 @@ export function validateCompletedFormalRunArtifactChain(input: {
 
   const run = input.run as FormalRunContractV1;
   const intents = input.intents as RequestIntentV1[];
-  const attempts = input.attempts as RequestAttemptAuditV1[];
-  const committed = input.committed_requests as CommittedRequestV1[];
+  const attempts = input.attempts as RequestAttemptAuditV2[];
+  const committed = input.committed_requests as CommittedRequestV2[];
   const checkpoints = input.checkpoints as RunCheckpointV1[];
   const checkpoint = checkpoints.at(-1)!;
   const answerKey = input.private_answer_key as PrivateAnswerKeyV1;
@@ -1155,7 +1185,8 @@ export function validateCompletedFormalRunArtifactChain(input: {
       issues.push({ path: `checkpoint.entries.${requestId}`, message: "未精确绑定最终 intent/audit/commit" });
     }
     if (!keyEntry || keyEntry.idempotency_key !== latestIntent.idempotency_key || keyEntry.case_id !== latestIntent.case_id
-      || keyEntry.arm !== latestIntent.arm || keyEntry.seed !== latestIntent.seed || keyEntry.response_sha256 !== record.response_sha256) {
+      || keyEntry.arm !== latestIntent.arm || keyEntry.seed !== latestIntent.seed
+      || keyEntry.response_sha256 !== record.canonical_response_commitment_sha256) {
       issues.push({ path: `answer_key.${requestId}`, message: "未精确绑定最终请求与响应" });
     }
   }

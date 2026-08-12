@@ -2,6 +2,7 @@ import { sha256Hex } from "./sha256.js";
 import { parseOracleGateResponseBytes } from "./oracle-gate-response.js";
 
 export const FORMAL_ORACLE_PI_RESPONSE_STREAM_VERSION = "formal-oracle-pi-response-stream-v1" as const;
+export const FORMAL_ORACLE_PI_RESPONSE_STREAM_PROOF_DOMAIN = "skyclass/formal-oracle/pi-response-stream-proof/v1\0";
 export const FORMAL_ORACLE_PI_RESPONSE_STREAM_MAX_BYTES = 8 * 1024 * 1024;
 export const FORMAL_ORACLE_PI_RESPONSE_STREAM_MAX_CONTENT_EVENTS = 1024;
 
@@ -24,6 +25,7 @@ export interface FormalOraclePiNormalizedUsageV1 {
 
 export interface FormalOraclePiResponseStreamProofV1 {
   schema_version: typeof FORMAL_ORACLE_PI_RESPONSE_STREAM_VERSION;
+  proof_sha256: string;
   request_envelope_sha256: string;
   provider_body_sha256: string;
   raw_sse_sha256: string;
@@ -42,7 +44,7 @@ export interface FormalOraclePiResponseStreamProofV1 {
   raw_usage: FormalOraclePiRawUsageV1;
   normalized_usage: FormalOraclePiNormalizedUsageV1;
   provider_response_scope: "untrusted_sse_entity_strict_derivation_only";
-  store_integration_status: "pending_raw_sse_store_contract";
+  store_integration_status: "formal_run_store_v2_abcd_integrated";
   external_provider_response_status: "pending_endpoint_account_exactly_once_and_capture";
   api_execution_allowed: false;
 }
@@ -64,6 +66,27 @@ const artifactInputs = new WeakMap<object, {
 }>();
 
 type JsonRecord = Record<string, unknown>;
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value === "boolean" || typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) throw new Error("Pi SSE proof 仅允许安全整数");
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (isRecord(value)) return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+  throw new Error("Pi SSE proof 含非 JSON 值");
+}
+
+export function canonicalFormalOraclePiResponseStreamProofPayloadV1(
+  proof: FormalOraclePiResponseStreamProofV1,
+): string {
+  return stableJson(Object.fromEntries(Object.entries(proof).filter(([key]) => key !== "proof_sha256")));
+}
+
+export function hashFormalOraclePiResponseStreamProofV1(proof: FormalOraclePiResponseStreamProofV1): string {
+  return sha256Hex(`${FORMAL_ORACLE_PI_RESPONSE_STREAM_PROOF_DOMAIN}${canonicalFormalOraclePiResponseStreamProofPayloadV1(proof)}`);
+}
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -224,8 +247,9 @@ function parseStream(input: {
   const contentBytes = new TextEncoder().encode(chunks.join(""));
   if (contentBytes.byteLength === 0 || contentBytes.byteLength > FORMAL_ORACLE_PI_RESPONSE_STREAM_MAX_BYTES) throw new Error("Pi SSE assistant content 长度无效或超限");
 
-  const proof = Object.freeze({
+  const proofDraft: FormalOraclePiResponseStreamProofV1 = {
     schema_version: FORMAL_ORACLE_PI_RESPONSE_STREAM_VERSION,
+    proof_sha256: "0".repeat(64),
     request_envelope_sha256: input.request_envelope_sha256,
     provider_body_sha256: input.provider_body_sha256,
     raw_sse_sha256: sha256Hex(input.raw_sse_bytes),
@@ -251,10 +275,12 @@ function parseStream(input: {
       reasoning_tokens: 0,
     }),
     provider_response_scope: "untrusted_sse_entity_strict_derivation_only",
-    store_integration_status: "pending_raw_sse_store_contract",
+    store_integration_status: "formal_run_store_v2_abcd_integrated",
     external_provider_response_status: "pending_endpoint_account_exactly_once_and_capture",
     api_execution_allowed: false,
-  });
+  };
+  proofDraft.proof_sha256 = hashFormalOraclePiResponseStreamProofV1(proofDraft);
+  const proof = Object.freeze(proofDraft);
   return { proof, assistant_content_bytes: contentBytes };
 }
 

@@ -19,12 +19,12 @@ import {
   validateRequestIntent,
   validateRunCheckpoint,
   validateRunCheckpointTransition,
-  type CommittedRequestV1,
+  type CommittedRequestV2,
   type FormalRunContractV1,
   type OracleGateCheckpointEntryV1,
   type PrivateAnswerKeyV1,
   type PublicBlindPackageV1,
-  type RequestAttemptAuditV1,
+  type RequestAttemptAuditV2,
   type RequestIntentV1,
   type RunCheckpointV1,
 } from "./oracle-gate-run.js";
@@ -105,9 +105,9 @@ function intent(run = formalRun()): RequestIntentV1 {
   return value;
 }
 
-function attempt(request = intent()): RequestAttemptAuditV1 {
-  const value: RequestAttemptAuditV1 = {
-    schema_version: "oracle-gate-request-attempt-audit-v1",
+function attempt(request = intent()): RequestAttemptAuditV2 {
+  const value: RequestAttemptAuditV2 = {
+    schema_version: "oracle-gate-request-attempt-audit-v2",
     attempt_sha256: HASH,
     run_sha256: request.run_sha256,
     request_id: request.request_id,
@@ -118,13 +118,24 @@ function attempt(request = intent()): RequestAttemptAuditV1 {
     finished_at: "2026-08-12T00:00:02.000Z",
     latency_ms: 1000,
     provider_id: "fixture-provider",
-    provider_request_id: "provider-request-1",
-    request_sha256: request.provider_body_sha256,
-    request_object_uri: request.provider_body_object_uri,
-    response_object_uri: "objects/responses/response-001.json",
-    response_bytes_sha256: "3".repeat(64),
-    parsed_response_object_uri: "objects/parsed-responses/response-001.json",
-    parsed_response_sha256: hashPublicBlindResponse({ schema_version: "fixture-v1", score: 1 }),
+    provider_http_request_id: "provider-http-request-1",
+    completion_id: "chatcmpl-fixture-1",
+    request_envelope_sha256: request.request_envelope_sha256,
+    request_envelope_object_uri: request.request_envelope_object_uri,
+    provider_body_sha256: request.provider_body_sha256,
+    provider_body_object_uri: request.provider_body_object_uri,
+    fetch_observed_sse_object_uri: `objects/fetch-observed-sse/${"3".repeat(64)}/response.sse`,
+    fetch_observed_sse_bytes_sha256: "3".repeat(64),
+    fetch_observed_sse_byte_length: 100,
+    sse_derivation_object_uri: `objects/sse-derivations/${"4".repeat(64)}/derivation.json`,
+    sse_derivation_record_sha256: "4".repeat(64),
+    sse_parser_version: "formal-oracle-pi-response-stream-v1",
+    assistant_content_object_uri: `objects/assistant-content/${"5".repeat(64)}/assistant-content.json`,
+    assistant_content_bytes_sha256: "5".repeat(64),
+    assistant_content_byte_length: 50,
+    canonical_response_object_uri: `objects/canonical-responses/${"6".repeat(64)}/canonical-response.json`,
+    canonical_response_bytes_sha256: "6".repeat(64),
+    canonical_response_commitment_sha256: hashPublicBlindResponse({ schema_version: "fixture-v1", score: 1 }),
     submitted_visuals: request.visuals,
     model: request.model,
     transport: request.transport,
@@ -140,7 +151,7 @@ function attempt(request = intent()): RequestAttemptAuditV1 {
     stop_reason: "stop",
     error_code: null,
     error_message: null,
-    usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120, cache_read_tokens: 0, cache_write_tokens: 0 },
+    usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120, cache_read_tokens: 0, cache_write_tokens: 0, reasoning_tokens: 0 },
     pricing_table_sha256: "4".repeat(64),
     cost_microunits: 123,
     automatic_retry_allowed: false,
@@ -149,9 +160,9 @@ function attempt(request = intent()): RequestAttemptAuditV1 {
   return value;
 }
 
-function committed(request = intent(), receipt = attempt(request)): CommittedRequestV1 {
-  const value: CommittedRequestV1 = {
-    schema_version: "oracle-gate-committed-request-v1",
+function committed(request = intent(), receipt = attempt(request)): CommittedRequestV2 {
+  const value: CommittedRequestV2 = {
+    schema_version: "oracle-gate-committed-request-v2",
     committed_request_sha256: HASH,
     run_sha256: request.run_sha256,
     request_id: request.request_id,
@@ -159,8 +170,9 @@ function committed(request = intent(), receipt = attempt(request)): CommittedReq
     intent_sha256: request.intent_sha256,
     attempt_sha256: receipt.attempt_sha256,
     attempt_ordinal: receipt.attempt_ordinal,
-    response_object_uri: String(receipt.parsed_response_object_uri),
-    response_sha256: String(receipt.parsed_response_sha256),
+    canonical_response_object_uri: String(receipt.canonical_response_object_uri),
+    canonical_response_bytes_sha256: String(receipt.canonical_response_bytes_sha256),
+    canonical_response_commitment_sha256: String(receipt.canonical_response_commitment_sha256),
     validator_version: "oracle-gate-response-structural-validator-v1",
     transport_and_schema_verified_at: "2026-08-12T00:00:03.000Z",
     transport_and_schema_verified: true,
@@ -169,6 +181,22 @@ function committed(request = intent(), receipt = attempt(request)): CommittedReq
   };
   value.committed_request_sha256 = hashCommittedRequest(value);
   return value;
+}
+
+function clearResponseChain(receipt: RequestAttemptAuditV2): void {
+  receipt.completion_id = null;
+  receipt.fetch_observed_sse_object_uri = null;
+  receipt.fetch_observed_sse_bytes_sha256 = null;
+  receipt.fetch_observed_sse_byte_length = null;
+  receipt.sse_derivation_object_uri = null;
+  receipt.sse_derivation_record_sha256 = null;
+  receipt.sse_parser_version = null;
+  receipt.assistant_content_object_uri = null;
+  receipt.assistant_content_bytes_sha256 = null;
+  receipt.assistant_content_byte_length = null;
+  receipt.canonical_response_object_uri = null;
+  receipt.canonical_response_bytes_sha256 = null;
+  receipt.canonical_response_commitment_sha256 = null;
 }
 
 function entry(state: OracleGateCheckpointEntryV1["state"], request = intent(), receipt = attempt(request), record = committed(request, receipt)): OracleGateCheckpointEntryV1 {
@@ -351,10 +379,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     const unknown = attempt(request);
     unknown.outcome = "unknown";
     unknown.provider_response_received = false;
-    unknown.response_object_uri = null;
-    unknown.response_bytes_sha256 = null;
-    unknown.parsed_response_object_uri = null;
-    unknown.parsed_response_sha256 = null;
+    clearResponseChain(unknown);
     unknown.stop_reason = null;
     unknown.error_code = "transport_outcome_unknown";
     unknown.error_message = "request may have reached provider";
@@ -400,11 +425,8 @@ describe("Formal Oracle content-addressed run contracts", () => {
     const failed = attempt(lastIntent);
     failed.outcome = "no_result_confirmed";
     failed.provider_response_received = false;
-    failed.provider_request_id = null;
-    failed.response_object_uri = null;
-    failed.response_bytes_sha256 = null;
-    failed.parsed_response_object_uri = null;
-    failed.parsed_response_sha256 = null;
+    failed.provider_http_request_id = null;
+    clearResponseChain(failed);
     failed.stop_reason = null;
     failed.error_code = "not-sent";
     failed.error_message = "provider confirmed no request";
@@ -416,7 +438,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     expect(validateRequestAttemptAgainstIntent(lastIntent, failed).issues.some((item) => item.path === "audit.automatic_retry_allowed")).toBe(true);
 
     const overBudget = attempt();
-    overBudget.usage = { input_tokens: 9000, output_tokens: 3000, total_tokens: 12_000, cache_read_tokens: 1, cache_write_tokens: 0 };
+    overBudget.usage = { input_tokens: 9000, output_tokens: 3000, total_tokens: 12_000, cache_read_tokens: 1, cache_write_tokens: 0, reasoning_tokens: 0 };
     overBudget.pricing_table_sha256 = null;
     overBudget.cost_microunits = null;
     overBudget.attempt_sha256 = hashRequestAttemptAudit(overBudget);
@@ -472,10 +494,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     const firstAttempt = attempt(firstIntent);
     firstAttempt.outcome = "unknown";
     firstAttempt.provider_response_received = false;
-    firstAttempt.response_object_uri = null;
-    firstAttempt.response_bytes_sha256 = null;
-    firstAttempt.parsed_response_object_uri = null;
-    firstAttempt.parsed_response_sha256 = null;
+    clearResponseChain(firstAttempt);
     firstAttempt.stop_reason = null;
     firstAttempt.error_code = "transport_outcome_unknown";
     firstAttempt.error_message = "request may have reached provider";
@@ -576,11 +595,8 @@ describe("Formal Oracle content-addressed run contracts", () => {
     const firstAttempt = attempt(firstIntent);
     firstAttempt.outcome = "no_result_confirmed";
     firstAttempt.provider_response_received = false;
-    firstAttempt.provider_request_id = null;
-    firstAttempt.response_object_uri = null;
-    firstAttempt.response_bytes_sha256 = null;
-    firstAttempt.parsed_response_object_uri = null;
-    firstAttempt.parsed_response_sha256 = null;
+    firstAttempt.provider_http_request_id = null;
+    clearResponseChain(firstAttempt);
     firstAttempt.stop_reason = null;
     firstAttempt.error_code = "provider-confirmed-no-result";
     firstAttempt.error_message = "provider confirmed no stored result";
@@ -595,7 +611,7 @@ describe("Formal Oracle content-addressed run contracts", () => {
     secondIntent.prepared_at = "2026-08-12T00:00:04.000Z";
     secondIntent.intent_sha256 = hashRequestIntent(secondIntent);
     const secondAttempt = attempt(secondIntent);
-    secondAttempt.provider_request_id = "provider-request-2";
+    secondAttempt.provider_http_request_id = "provider-request-2";
     secondAttempt.started_at = "2026-08-12T00:00:04.000Z";
     secondAttempt.finished_at = "2026-08-12T00:00:05.000Z";
     secondAttempt.attempt_sha256 = hashRequestAttemptAudit(secondAttempt);
