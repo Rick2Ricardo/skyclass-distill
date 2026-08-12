@@ -23,6 +23,12 @@ import type {
   RunCheckpointV1,
 } from "../../contracts/src/oracle-gate-run.js";
 import {
+  assertFormalOraclePiRequestArtifact,
+  parseFormalOraclePiRequestEnvelopeBytes,
+  type FormalOraclePiRequestArtifact,
+  type FormalOraclePiRequestEnvelopeV1,
+} from "../../contracts/src/oracle-gate-request.js";
+import {
   hashFormalRunContract,
   hashCommittedRequest,
   hashPublicBlindResponse,
@@ -120,7 +126,7 @@ export interface CommitDispatchIntentInput {
   expected_head: FormalOracleHeadPinV1;
   expected_checkpoint_sha256: string;
   intent: RequestIntentV1;
-  request_payload: Uint8Array;
+  request_payload: FormalOraclePiRequestArtifact;
   created_at: string;
 }
 
@@ -498,6 +504,33 @@ function assertIntentMatchesExecutionPlan(intent: RequestIntentV1, expected: For
   }
 }
 
+function assertEnvelopeMatchesExecutionPlan(
+  envelope: FormalOraclePiRequestEnvelopeV1,
+  expected: FormalOracleExecutionPlanItemV1,
+  spec: OracleGateFormalSpec,
+): void {
+  if (envelope.request_id !== expected.request_id || envelope.schedule_index !== expected.schedule_index
+    || envelope.case_id !== expected.case_id || envelope.arm !== expected.arm || envelope.model !== expected.model
+    || envelope.system_prompt_sha256 !== expected.system_prompt_sha256
+    || envelope.rendered_user_prompt_sha256 !== expected.user_prompt_sha256
+    || envelope.user_template_sha256 !== spec.prompt.user_template_sha256
+    || envelope.output_schema_sha256 !== expected.output_schema_sha256
+    || envelope.seed !== expected.seed || envelope.temperature !== expected.temperature
+    || envelope.max_input_tokens !== expected.max_input_tokens || envelope.max_output_tokens !== expected.max_output_tokens
+    || envelope.timeout_ms !== expected.timeout_ms || envelope.max_attempts !== expected.max_attempts
+    || envelope.transport !== expected.transport || envelope.cache_retention !== expected.cache_retention
+    || envelope.tools_policy !== expected.tools_policy || envelope.inner_provider_retries !== 0
+    || envelope.outer_retry_owner !== "formal_run_store" || envelope.provider_binding_status !== "pending_external_runtime_binding"
+    || envelope.visuals.length !== expected.visuals.length
+    || envelope.visuals.some((visual, index) => {
+      const planned = expected.visuals[index];
+      return !planned || visual.label !== planned.label || visual.mime_type !== planned.mime_type
+        || visual.sha256 !== planned.sha256 || visual.byte_length !== planned.byte_length;
+    })) {
+    throw new Error("Formal request envelope 未逐字段绑定 execution plan/formal spec");
+  }
+}
+
 function terminalDetailHash(audit: RequestAttemptAuditV1): string {
   return digest(Buffer.from(privateCanonicalJsonBytes({
     attempt_sha256: audit.attempt_sha256,
@@ -742,7 +775,11 @@ export class FormalOracleRunStore {
         || Date.parse(snapshot.checkpoint.created_at) > Date.parse(input.created_at)) {
         throw new Error("Dispatch checkpoint 时间不得早于 intent 或上一 checkpoint");
       }
-      const payload = Buffer.from(input.request_payload);
+      assertFormalOraclePiRequestArtifact(input.request_payload);
+      const parsedPayload = parseFormalOraclePiRequestEnvelopeBytes(input.request_payload.bytes);
+      if (parsedPayload.payload_sha256 !== input.request_payload.payload_sha256) throw new Error("Formal request branded artifact hash 漂移");
+      assertEnvelopeMatchesExecutionPlan(parsedPayload.envelope, snapshot.execution_plan.items[entryIndex], snapshot.formal_spec);
+      const payload = Buffer.from(parsedPayload.bytes);
       const payloadSha256 = digest(payload);
       if (payloadSha256 !== snapshot.execution_plan.items[entryIndex].request_payload_sha256
         || payloadSha256 !== input.intent.request_payload_sha256) {
@@ -816,7 +853,7 @@ export class FormalOracleRunStore {
       if (entry.state !== "DISPATCH_INTENT_COMMITTED" || !entry.active_intent_sha256) {
         throw new Error("Attempt audit 只能从 durable DISPATCH_INTENT_COMMITTED 提交");
       }
-      const intent = await this.loadIntentUnlocked(snapshot.run, snapshot.execution_plan, entryIndex, entry.active_intent_sha256);
+      const intent = await this.loadIntentUnlocked(snapshot.run, snapshot.formal_spec, snapshot.execution_plan, entryIndex, entry.active_intent_sha256);
       validationError("Attempt audit against intent", validateRequestAttemptAgainstIntent(intent, input.audit));
       if (input.audit.attempt_sha256 !== hashRequestAttemptAudit(input.audit)
         || input.audit.attempt_ordinal !== entry.attempts_used + 1
@@ -902,7 +939,7 @@ export class FormalOracleRunStore {
       if (entry.state !== "RECEIPT_COMMITTED" || !entry.latest_attempt_audit_sha256) {
         throw new Error("markRetryReady 只允许 RECEIPT_COMMITTED");
       }
-      const audit = await this.loadAttemptUnlocked(snapshot.run, snapshot.execution_plan, entryIndex, entry.latest_attempt_audit_sha256);
+      const audit = await this.loadAttemptUnlocked(snapshot.run, snapshot.formal_spec, snapshot.execution_plan, entryIndex, entry.latest_attempt_audit_sha256);
       if (audit.outcome !== "not_sent" && audit.outcome !== "no_result_confirmed") {
         throw new Error("只有明确 not_sent/no_result_confirmed 才能评估 retry");
       }
@@ -943,8 +980,8 @@ export class FormalOracleRunStore {
       if (entry.state !== "RECEIPT_COMMITTED" || !entry.active_intent_sha256 || !entry.latest_attempt_audit_sha256) {
         throw new Error("commitSchemaValidatedRequest 只允许 RECEIPT_COMMITTED");
       }
-      const intent = await this.loadIntentUnlocked(snapshot.run, snapshot.execution_plan, entryIndex, entry.active_intent_sha256);
-      const audit = await this.loadAttemptUnlocked(snapshot.run, snapshot.execution_plan, entryIndex, entry.latest_attempt_audit_sha256);
+      const intent = await this.loadIntentUnlocked(snapshot.run, snapshot.formal_spec, snapshot.execution_plan, entryIndex, entry.active_intent_sha256);
+      const audit = await this.loadAttemptUnlocked(snapshot.run, snapshot.formal_spec, snapshot.execution_plan, entryIndex, entry.latest_attempt_audit_sha256);
       validationError("Committed request against attempt", validateCommittedRequestAgainstAttempt(intent, audit, input.committed_request));
       if (input.committed_request.committed_request_sha256 !== hashCommittedRequest(input.committed_request)
         || Date.parse(input.committed_request.transport_and_schema_verified_at) > Date.parse(input.created_at)
@@ -987,7 +1024,7 @@ export class FormalOracleRunStore {
       if (entry.state !== "RECEIPT_COMMITTED" || !entry.latest_attempt_audit_sha256) {
         throw new Error("failRunRequest 只允许具有 durable receipt 的 request");
       }
-      const audit = await this.loadAttemptUnlocked(snapshot.run, snapshot.execution_plan, entryIndex, entry.latest_attempt_audit_sha256);
+      const audit = await this.loadAttemptUnlocked(snapshot.run, snapshot.formal_spec, snapshot.execution_plan, entryIndex, entry.latest_attempt_audit_sha256);
       let reasonCode: FormalOracleTerminalReasonCode;
       if (audit.outcome === "result_received" && audit.stop_reason === "length") reasonCode = "provider_length";
       else if (audit.outcome === "result_received" && audit.stop_reason === "error") reasonCode = "provider_error";
@@ -1092,6 +1129,7 @@ export class FormalOracleRunStore {
 
   private async loadIntentUnlocked(
     run: FormalRunContractV1,
+    formalSpec: OracleGateFormalSpec,
     executionPlan: FormalOracleExecutionPlanV1,
     entryIndex: number,
     intentSha256: string,
@@ -1107,11 +1145,15 @@ export class FormalOracleRunStore {
     const request = await this.privateFs.readFile(intent.request_object_uri);
     if (intent.request_object_uri !== this.requestObjectUri(run.run_sha256, intent.request_payload_sha256)
       || digest(request) !== intent.request_payload_sha256) throw new Error("Request intent 未绑定 durable request bytes");
+    const parsed = parseFormalOraclePiRequestEnvelopeBytes(request);
+    if (parsed.payload_sha256 !== intent.request_payload_sha256) throw new Error("Durable request envelope content address 无效");
+    assertEnvelopeMatchesExecutionPlan(parsed.envelope, executionPlan.items[entryIndex], formalSpec);
     return intent;
   }
 
   private async loadAttemptUnlocked(
     run: FormalRunContractV1,
+    formalSpec: OracleGateFormalSpec,
     executionPlan: FormalOracleExecutionPlanV1,
     entryIndex: number,
     attemptSha256: string,
@@ -1121,7 +1163,7 @@ export class FormalOracleRunStore {
     if (audit.attempt_sha256 !== attemptSha256 || hashRequestAttemptAudit(audit) !== attemptSha256) {
       throw new Error("Attempt audit 内容地址无效");
     }
-    const intent = await this.loadIntentUnlocked(run, executionPlan, entryIndex, audit.intent_sha256);
+    const intent = await this.loadIntentUnlocked(run, formalSpec, executionPlan, entryIndex, audit.intent_sha256);
     validationError("Attempt audit against intent", validateRequestAttemptAgainstIntent(intent, audit));
     if (audit.outcome === "result_received") await this.verifyResponseObjects(run.run_sha256, audit);
     return audit;
@@ -1129,6 +1171,7 @@ export class FormalOracleRunStore {
 
   private async loadCommittedRequestUnlocked(
     run: FormalRunContractV1,
+    formalSpec: OracleGateFormalSpec,
     executionPlan: FormalOracleExecutionPlanV1,
     entryIndex: number,
     committedSha256: string,
@@ -1138,8 +1181,8 @@ export class FormalOracleRunStore {
     if (committed.committed_request_sha256 !== committedSha256 || hashCommittedRequest(committed) !== committedSha256) {
       throw new Error("Committed request 内容地址无效");
     }
-    const intent = await this.loadIntentUnlocked(run, executionPlan, entryIndex, committed.intent_sha256);
-    const audit = await this.loadAttemptUnlocked(run, executionPlan, entryIndex, committed.attempt_sha256);
+    const intent = await this.loadIntentUnlocked(run, formalSpec, executionPlan, entryIndex, committed.intent_sha256);
+    const audit = await this.loadAttemptUnlocked(run, formalSpec, executionPlan, entryIndex, committed.attempt_sha256);
     validationError("Committed request against attempt", validateCommittedRequestAgainstAttempt(intent, audit, committed));
     if (executionPlan.items[entryIndex].output_schema_sha256 !== ORACLE_GATE_RESPONSE_SCHEMA_SHA256
       || committed.validator_version !== ORACLE_GATE_RESPONSE_VALIDATOR_VERSION) {
@@ -1236,7 +1279,7 @@ export class FormalOracleRunStore {
     }
     assertGenesisMatchesPlans(checkpoints[0], structuralSchedule, executionPlan);
     for (const [index, checkpoint] of checkpoints.entries()) {
-      await this.validateCheckpointReferences(run, executionPlan, checkpoint, index > 0 ? checkpoints[index - 1] : null);
+      await this.validateCheckpointReferences(run, formalSpec, executionPlan, checkpoint, index > 0 ? checkpoints[index - 1] : null);
     }
     return {
       run,
@@ -1253,20 +1296,21 @@ export class FormalOracleRunStore {
 
   private async validateCheckpointReferences(
     run: FormalRunContractV1,
+    formalSpec: OracleGateFormalSpec,
     executionPlan: FormalOracleExecutionPlanV1,
     checkpoint: RunCheckpointV1,
     previous: RunCheckpointV1 | null,
   ): Promise<void> {
     for (const [entryIndex, entry] of checkpoint.entries.entries()) {
       const activeIntent = entry.active_intent_sha256
-        ? await this.loadIntentUnlocked(run, executionPlan, entryIndex, entry.active_intent_sha256)
+        ? await this.loadIntentUnlocked(run, formalSpec, executionPlan, entryIndex, entry.active_intent_sha256)
         : null;
       if (activeIntent && (activeIntent.request_id !== entry.request_id || activeIntent.idempotency_key !== entry.idempotency_key
         || activeIntent.max_attempts !== entry.max_attempts || Date.parse(activeIntent.prepared_at) > Date.parse(checkpoint.created_at))) {
         throw new Error("Checkpoint active intent 未绑定 request/idempotency/time");
       }
       const audit = entry.latest_attempt_audit_sha256
-        ? await this.loadAttemptUnlocked(run, executionPlan, entryIndex, entry.latest_attempt_audit_sha256)
+        ? await this.loadAttemptUnlocked(run, formalSpec, executionPlan, entryIndex, entry.latest_attempt_audit_sha256)
         : null;
       if (audit && (audit.request_id !== entry.request_id || audit.idempotency_key !== entry.idempotency_key
         || audit.attempt_ordinal !== entry.attempts_used || Date.parse(audit.finished_at) > Date.parse(checkpoint.created_at))) {
@@ -1303,7 +1347,7 @@ export class FormalOracleRunStore {
         throw new Error("BLOCKED_AMBIGUOUS 未绑定 unknown audit");
       }
       if (entry.committed_request_sha256) {
-        const committed = await this.loadCommittedRequestUnlocked(run, executionPlan, entryIndex, entry.committed_request_sha256);
+        const committed = await this.loadCommittedRequestUnlocked(run, formalSpec, executionPlan, entryIndex, entry.committed_request_sha256);
         if (entry.state !== "SCHEMA_VALIDATED_COMMITTED" || committed.request_id !== entry.request_id
           || committed.attempt_sha256 !== audit?.attempt_sha256 || committed.intent_sha256 !== activeIntent?.intent_sha256
           || Date.parse(committed.transport_and_schema_verified_at) > Date.parse(checkpoint.created_at)) {
@@ -1323,6 +1367,7 @@ export class FormalOracleRunStore {
       }
       const audit = await this.loadAttemptUnlocked(
         run,
+        formalSpec,
         executionPlan,
         checkpoint.entries.findIndex((item) => item.request_id === reason.request_id),
         reason.source_attempt_sha256,

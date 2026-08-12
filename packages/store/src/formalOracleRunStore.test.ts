@@ -12,6 +12,10 @@ import {
   ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
   ORACLE_GATE_RESPONSE_VALIDATOR_VERSION,
 } from "../../contracts/src/oracle-gate-response.js";
+import {
+  buildFormalOraclePiRequestEnvelope,
+  type FormalOraclePiRequestArtifact,
+} from "../../contracts/src/oracle-gate-request.js";
 import type {
   CommittedRequestV1,
   FormalRunContractV1,
@@ -40,6 +44,8 @@ import { privateCanonicalJsonBytes, PrivateContentAddressedFs } from "./privateC
 
 const RUN_STORE_URI = "board2skill/formal-oracle/run-store";
 const created: string[] = [];
+const SYSTEM_PROMPT_BYTES = Buffer.from("frozen formal system prompt\n", "utf8");
+const USER_TEMPLATE_BYTES = Buffer.from("frozen formal user template {{case}}\n", "utf8");
 
 afterEach(async () => {
   await Promise.all(created.splice(0).map((path) => rm(path, { recursive: true, force: true })));
@@ -68,8 +74,8 @@ function formalSpec(): OracleGateFormalSpec {
     seeds: [17, 23, 41],
     prompt: {
       version: "formal-prompt-v1",
-      system_sha256: "e".repeat(64),
-      user_template_sha256: "a".repeat(64),
+      system_sha256: sha(SYSTEM_PROMPT_BYTES),
+      user_template_sha256: sha(USER_TEMPLATE_BYTES),
       output_schema_sha256: ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
     },
     budget: {
@@ -96,8 +102,31 @@ function formalSpec(): OracleGateFormalSpec {
   return spec;
 }
 
-function requestPayload(index: number): Buffer {
-  return Buffer.from(`frozen-request-${index}\n`, "utf8");
+function renderedUserPrompt(index: number): Buffer {
+  return Buffer.from(`rendered-user-prompt-${index}`, "utf8");
+}
+
+function visualBytes(arm: string, seed: number): Buffer {
+  return Buffer.from(`canonical-visual-${arm}-${seed}`, "utf8");
+}
+
+function requestPayload(index: number, drift: { model?: string; seed?: number; max_output_tokens?: number } = {}): FormalOraclePiRequestArtifact {
+  const spec = formalSpec();
+  const scheduled = structuralSchedule(spec)[index];
+  const rendered = renderedUserPrompt(index);
+  const visual = scheduled.arm === "transcript_only" ? undefined : visualBytes(scheduled.arm, scheduled.seed);
+  return buildFormalOraclePiRequestEnvelope({
+    request_id: scheduled.request_id, schedule_index: index, case_id: scheduled.case_id, arm: scheduled.arm,
+    model: drift.model ?? spec.model, system_prompt_bytes: SYSTEM_PROMPT_BYTES, expected_system_prompt_sha256: spec.prompt.system_sha256,
+    rendered_user_prompt_bytes: rendered, expected_rendered_user_prompt_sha256: sha(rendered),
+    user_template_bytes: USER_TEMPLATE_BYTES, expected_user_template_sha256: spec.prompt.user_template_sha256,
+    output_schema_sha256: spec.prompt.output_schema_sha256,
+    visuals: visual ? [{ label: "visual-1", mime_type: "image/jpeg", bytes: visual, expected_sha256: sha(visual), expected_byte_length: visual.byteLength }] : [],
+    seed: drift.seed ?? scheduled.seed, temperature: spec.temperature, max_input_tokens: spec.budget.max_input_tokens,
+    max_output_tokens: drift.max_output_tokens ?? spec.budget.max_output_tokens, timeout_ms: spec.budget.timeout_ms,
+    max_attempts: spec.budget.max_attempts, transport: spec.transport, cache_retention: spec.cache_retention,
+    tools_policy: spec.tools_policy,
+  });
 }
 
 function structuralSchedule(spec: OracleGateFormalSpec): FormalOracleStructuralScheduleV1 {
@@ -129,19 +158,19 @@ function executionPlan(spec: OracleGateFormalSpec, schedule: FormalOracleStructu
       arm: item.arm,
       seed: item.seed,
       model: spec.model,
-      request_payload_sha256: sha(requestPayload(index)),
+      request_payload_sha256: requestPayload(index).payload_sha256,
       system_prompt_sha256: spec.prompt.system_sha256,
       // Rendered request prompt is intentionally different from the template hash.
-      user_prompt_sha256: sha(`rendered-user-prompt-${index}`),
+      user_prompt_sha256: sha(renderedUserPrompt(index)),
       output_schema_sha256: spec.prompt.output_schema_sha256,
       visuals: item.arm === "transcript_only" ? [] : [{
         label: "visual-1",
         object_uri: `frozen-assets/${item.arm}-${item.seed}.jpg`,
-        sha256: sha(`visual-${item.arm}-${item.seed}`),
+        sha256: sha(visualBytes(item.arm, item.seed)),
         mime_type: "image/jpeg",
         width: 1920,
         height: 360,
-        byte_length: 1234 + index,
+        byte_length: visualBytes(item.arm, item.seed).byteLength,
       }],
       transport: spec.transport,
       temperature: spec.temperature,
@@ -238,7 +267,7 @@ function sealedInput(): CreateSealedRunInput {
 
 function requestIntent(
   input: CreateSealedRunInput,
-  payload: Buffer,
+  payload: FormalOraclePiRequestArtifact,
   store: FormalOracleRunStore,
   index = 1,
   attemptOrdinal = 1,
@@ -258,8 +287,8 @@ function requestIntent(
     arm: expected.arm,
     seed: expected.seed,
     model: expected.model,
-    request_payload_sha256: sha(payload),
-    request_object_uri: store.requestObjectUri(input.run.run_sha256, sha(payload)),
+    request_payload_sha256: payload.payload_sha256,
+    request_object_uri: store.requestObjectUri(input.run.run_sha256, payload.payload_sha256),
     system_prompt_sha256: expected.system_prompt_sha256,
     user_prompt_sha256: expected.user_prompt_sha256,
     output_schema_sha256: expected.output_schema_sha256,
@@ -494,10 +523,24 @@ describe("FormalOracleRunStore", () => {
       expected_head: sealed.head_pin,
       expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256,
       intent: base,
-      request_payload: Buffer.from("wrong bytes", "utf8"),
+      request_payload: {
+        envelope: payload.envelope,
+        bytes: Buffer.from("wrong bytes", "utf8"),
+        payload_sha256: sha("wrong bytes"),
+      } as FormalOraclePiRequestArtifact,
       created_at: "2026-08-12T00:00:02.000Z",
-    })).rejects.toThrow("三方不匹配");
-    const selfConsistentWrongPayload = Buffer.from("self-consistent but unplanned", "utf8");
+    })).rejects.toThrow("伪造");
+    const mutatedBrandedPayload = requestPayload(1);
+    mutatedBrandedPayload.bytes[0] ^= 1;
+    await expect(store.commitDispatchIntent({
+      run_sha256: input.run.run_sha256,
+      expected_head: sealed.head_pin,
+      expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256,
+      intent: base,
+      request_payload: mutatedBrandedPayload,
+      created_at: "2026-08-12T00:00:02.000Z",
+    })).rejects.toThrow();
+    const selfConsistentWrongPayload = requestPayload(0);
     await expect(store.commitDispatchIntent({
       run_sha256: input.run.run_sha256,
       expected_head: sealed.head_pin,
@@ -505,7 +548,21 @@ describe("FormalOracleRunStore", () => {
       intent: requestIntent(input, selfConsistentWrongPayload, store),
       request_payload: selfConsistentWrongPayload,
       created_at: "2026-08-12T00:00:02.000Z",
-    })).rejects.toThrow("execution plan");
+    })).rejects.toThrow(/execution plan|envelope/);
+    for (const envelopeDrift of [
+      requestPayload(1, { model: "other-model" }),
+      requestPayload(1, { seed: 99 }),
+      requestPayload(1, { max_output_tokens: input.formal_spec.budget.max_output_tokens + 1 }),
+    ]) {
+      await expect(store.commitDispatchIntent({
+        run_sha256: input.run.run_sha256,
+        expected_head: sealed.head_pin,
+        expected_checkpoint_sha256: sealed.head_pin.checkpoint_sha256,
+        intent: base,
+        request_payload: envelopeDrift,
+        created_at: "2026-08-12T00:00:02.000Z",
+      })).rejects.toThrow(/execution plan|envelope/);
+    }
     const committed = await store.commitDispatchIntent({
       run_sha256: input.run.run_sha256,
       expected_head: sealed.head_pin,
@@ -959,7 +1016,7 @@ describe("FormalOracleRunStore", () => {
     await store.privateFs.publishImmutableObject(
       `runs/${input.run.run_sha256}/objects/request-payloads/${intent.request_payload_sha256}`,
       "request.bin",
-      payload,
+      payload.bytes,
     );
     await store.privateFs.publishImmutableObject(
       `runs/${input.run.run_sha256}/objects/request-intents/${intent.intent_sha256}`,

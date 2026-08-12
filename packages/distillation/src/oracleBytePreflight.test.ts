@@ -15,6 +15,7 @@ import {
   hashRunCheckpoint,
   oracleGateByteInventorySha256Preimage,
   ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
+  buildFormalOraclePiRequestEnvelope,
   type GoldReviewDecisionRecord,
   type GoldReviewEvent,
   type OracleGateByteInventory,
@@ -527,14 +528,15 @@ describe("Formal Oracle source-frame derivation preflight", () => {
 async function buildCompositionFixture(): Promise<ComposeFormalOracleRunGenesisInput> {
   const fixture = await buildFixture();
   const systemPromptBytes = Buffer.from("frozen formal system prompt\n", "utf8");
+  const userTemplateBytes = Buffer.from("frozen formal user template {{case}}\n", "utf8");
   fixture.spec.prompt.system_sha256 = sha(systemPromptBytes);
+  fixture.spec.prompt.user_template_sha256 = sha(userTemplateBytes);
   fixture.spec.prompt.output_schema_sha256 = ORACLE_GATE_RESPONSE_SCHEMA_SHA256;
   fixture.spec.spec_sha256 = sha(canonicalOracleGateFormalSpecPayload(fixture.spec));
   const structural = prepareOracleGateFormalStructuralPreflight(fixture);
   const frame = await prepareOracleGateFrameDerivationPreflight({ ...fixture, frame_deriver: fixture.video_probe });
   const artifacts = await Promise.all(structural.schedule.map(async (item, index) => {
     const user = Buffer.from(`rendered-user-${index}\n`, "utf8");
-    const request = Buffer.from(`request-payload-${index}\n`, "utf8");
     const byteCase = fixture.inventory.cases.find((candidate) => candidate.case_id === item.case_id)!;
     const sourceUri = item.arm === "static_final_board" ? byteCase.static_final.asset_uri
       : item.arm === "uniform_frame" ? byteCase.uniform_frame.asset_uri
@@ -543,14 +545,14 @@ async function buildCompositionFixture(): Promise<ComposeFormalOracleRunGenesisI
       await readFile(join(fixture.root, sourceUri)),
       item.arm,
     ).bytes];
-    return { request_id: item.request_id, request_payload_bytes: request, rendered_user_prompt_bytes: user, visual_bytes: visual };
+    return { request_id: item.request_id, rendered_user_prompt_bytes: user, visual_bytes: visual };
   }));
   const executionPlan: FormalOracleExecutionPlanV1 = {
     schema_version: "formal-oracle-execution-plan-v1",
     execution_plan_sha256: "0".repeat(64),
     items: structural.schedule.map((item, index) => {
       const visualBytes = artifacts[index].visual_bytes[0];
-      return {
+      const planItem = {
         request_id: item.request_id,
         idempotency_key: item.idempotency_key,
         schedule_index: index,
@@ -558,7 +560,7 @@ async function buildCompositionFixture(): Promise<ComposeFormalOracleRunGenesisI
         arm: item.arm,
         seed: item.seed,
         model: fixture.spec.model,
-        request_payload_sha256: sha(artifacts[index].request_payload_bytes),
+        request_payload_sha256: "0".repeat(64),
         system_prompt_sha256: fixture.spec.prompt.system_sha256,
         user_prompt_sha256: sha(artifacts[index].rendered_user_prompt_bytes),
         output_schema_sha256: fixture.spec.prompt.output_schema_sha256,
@@ -580,6 +582,22 @@ async function buildCompositionFixture(): Promise<ComposeFormalOracleRunGenesisI
         cache_retention: fixture.spec.cache_retention,
         tools_policy: fixture.spec.tools_policy,
       };
+      planItem.request_payload_sha256 = buildFormalOraclePiRequestEnvelope({
+        request_id: planItem.request_id, schedule_index: planItem.schedule_index, case_id: planItem.case_id, arm: planItem.arm,
+        model: planItem.model, system_prompt_bytes: systemPromptBytes, expected_system_prompt_sha256: planItem.system_prompt_sha256,
+        rendered_user_prompt_bytes: artifacts[index].rendered_user_prompt_bytes,
+        expected_rendered_user_prompt_sha256: planItem.user_prompt_sha256,
+        user_template_bytes: userTemplateBytes, expected_user_template_sha256: fixture.spec.prompt.user_template_sha256,
+        output_schema_sha256: planItem.output_schema_sha256,
+        visuals: planItem.visuals.map((visual, visualIndex) => ({
+          label: visual.label, mime_type: visual.mime_type, bytes: artifacts[index].visual_bytes[visualIndex],
+          expected_sha256: visual.sha256, expected_byte_length: visual.byte_length,
+        })),
+        seed: planItem.seed, temperature: planItem.temperature, max_input_tokens: planItem.max_input_tokens,
+        max_output_tokens: planItem.max_output_tokens, timeout_ms: planItem.timeout_ms, max_attempts: planItem.max_attempts,
+        transport: planItem.transport, cache_retention: planItem.cache_retention, tools_policy: planItem.tools_policy,
+      }).payload_sha256;
+      return planItem;
     }),
   };
   executionPlan.execution_plan_sha256 = hashFormalOracleExecutionPlan(executionPlan);
@@ -698,6 +716,7 @@ async function buildCompositionFixture(): Promise<ComposeFormalOracleRunGenesisI
     run,
     execution_plan: executionPlan,
     system_prompt_bytes: systemPromptBytes,
+    user_template_bytes: userTemplateBytes,
     execution_artifacts: artifacts,
     expected_genesis_head: expectedHead,
     initial_checkpoint: initialCheckpoint,
@@ -718,7 +737,11 @@ describe("Formal Oracle externally-pinned composition gate", () => {
         expect(capability).toMatchObject({
           stage: "composition_attested_only",
           rights_registry_status: "pending_external_authoritative_head",
-          request_payload_rendering_status: "pending_strict_canonical_builder",
+          request_envelope_serialization_status: "completed",
+          user_prompt_derivation_status: "pending_strict_template_renderer",
+          input_token_budget_status: "pending_model_specific_tokenizer",
+          provider_wire_binding_status: "pending_prepared_transport_adapter",
+          provider_account_endpoint_status: "pending_external_runtime_binding",
           toolchain_capsule_status: "pending_external_immutable_capsule",
           composition_record_authenticity_status: "pending_external_trusted_signature_or_worm",
           external_head_pin_status: "pending_external_monotonic_worm",
@@ -751,7 +774,7 @@ describe("Formal Oracle externally-pinned composition gate", () => {
     await expect(withComposedFormalOracleRunGenesis({ ...registry, callback: async () => "bad" })).rejects.toThrow(/registry|expected_head|checkpoint/i);
 
     const payload = await buildCompositionFixture();
-    payload.execution_artifacts[0].request_payload_bytes = Buffer.from("drift");
+    payload.execution_artifacts[0].rendered_user_prompt_bytes = Buffer.from("drift");
     await expect(withComposedFormalOracleRunGenesis({ ...payload, callback: async () => "bad" })).rejects.toThrow("Execution artifact bytes");
 
     const pin = await buildCompositionFixture();
@@ -775,7 +798,7 @@ describe("Formal Oracle externally-pinned composition gate", () => {
     await started;
     input.manifest.cases[0].source_video_id = "caller-mutated";
     input.system_prompt_bytes.fill(0);
-    input.execution_artifacts[0].request_payload_bytes.fill(0);
+    input.execution_artifacts[0].rendered_user_prompt_bytes.fill(0);
     (input.trusted_speech_reviewer_keys as Map<string, KeyLike>).clear();
     release();
     await expect(pending).resolves.toBe(input.run.run_sha256);

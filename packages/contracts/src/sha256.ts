@@ -14,8 +14,8 @@ function rotateRight(value: number, amount: number): number {
 }
 
 /** Browser-safe synchronous SHA-256 used by shared runtime contracts. */
-export function sha256Hex(value: string): string {
-  const bytes = new TextEncoder().encode(value);
+export function sha256Hex(value: string | Uint8Array): string {
+  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : Uint8Array.from(value);
   const paddedLength = Math.ceil((bytes.length + 9) / 64) * 64;
   const padded = new Uint8Array(paddedLength);
   padded.set(bytes);

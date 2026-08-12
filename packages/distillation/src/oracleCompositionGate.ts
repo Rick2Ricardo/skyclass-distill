@@ -12,6 +12,10 @@ import {
   validateFormalOracleCompositionAttestation,
   validateOracleGateFrameDerivationPreflight,
 } from "../../contracts/src/index.js";
+import {
+  buildFormalOraclePiRequestEnvelope,
+  type FormalOraclePiRequestArtifact,
+} from "../../contracts/src/oracle-gate-request.js";
 import { canonicalizeOracleGateCanvas } from "../../media/src/oracleGateCanvas.js";
 import type { OracleGateFrameDeriver } from "../../media/src/videoEvidence.js";
 import { FrozenOracleRegistryStore } from "../../store/src/frozenOracleRegistryStore.js";
@@ -33,7 +37,6 @@ import type { FormalRunContractV1, RunCheckpointV1 } from "../../contracts/src/o
 
 export interface FormalOracleExecutionArtifactV1 {
   request_id: string;
-  request_payload_bytes: Uint8Array;
   rendered_user_prompt_bytes: Uint8Array;
   visual_bytes: Uint8Array[];
 }
@@ -54,6 +57,7 @@ export interface ComposeFormalOracleRunGenesisInput {
   run: FormalRunContractV1;
   execution_plan: FormalOracleExecutionPlanV1;
   system_prompt_bytes: Uint8Array;
+  user_template_bytes: Uint8Array;
   execution_artifacts: FormalOracleExecutionArtifactV1[];
   expected_genesis_head: FormalOracleHeadPinV1;
   initial_checkpoint: RunCheckpointV1;
@@ -65,7 +69,11 @@ export interface FormalOracleCompositionCapability {
   readonly attestation: Readonly<FormalOracleCompositionAttestationV1>;
   readonly head_pin: Readonly<FormalOracleHeadPinV1>;
   readonly rights_registry_status: "pending_external_authoritative_head";
-  readonly request_payload_rendering_status: "pending_strict_canonical_builder";
+  readonly request_envelope_serialization_status: "completed";
+  readonly user_prompt_derivation_status: "pending_strict_template_renderer";
+  readonly input_token_budget_status: "pending_model_specific_tokenizer";
+  readonly provider_wire_binding_status: "pending_prepared_transport_adapter";
+  readonly provider_account_endpoint_status: "pending_external_runtime_binding";
   readonly toolchain_capsule_status: "pending_external_immutable_capsule";
   readonly composition_record_authenticity_status: "pending_external_trusted_signature_or_worm";
   readonly external_head_pin_status: "pending_external_monotonic_worm";
@@ -79,7 +87,11 @@ const activeCompositionCapabilities = new WeakSet<object>();
 class CompositionCapability implements FormalOracleCompositionCapability {
   readonly stage = "composition_attested_only" as const;
   readonly rights_registry_status = "pending_external_authoritative_head" as const;
-  readonly request_payload_rendering_status = "pending_strict_canonical_builder" as const;
+  readonly request_envelope_serialization_status = "completed" as const;
+  readonly user_prompt_derivation_status = "pending_strict_template_renderer" as const;
+  readonly input_token_budget_status = "pending_model_specific_tokenizer" as const;
+  readonly provider_wire_binding_status = "pending_prepared_transport_adapter" as const;
+  readonly provider_account_endpoint_status = "pending_external_runtime_binding" as const;
   readonly toolchain_capsule_status = "pending_external_immutable_capsule" as const;
   readonly composition_record_authenticity_status = "pending_external_trusted_signature_or_worm" as const;
   readonly external_head_pin_status = "pending_external_monotonic_worm" as const;
@@ -144,7 +156,6 @@ function cloneExecutionArtifacts(values: FormalOracleExecutionArtifactV1[]): For
   if (!Array.isArray(values) || Object.keys(values).length !== values.length) throw new Error("execution_artifacts 必须是稠密数组");
   return values.map((item) => Object.freeze({
     request_id: item.request_id,
-    request_payload_bytes: cloneBytes(item.request_payload_bytes),
     rendered_user_prompt_bytes: cloneBytes(item.rendered_user_prompt_bytes),
     visual_bytes: Object.freeze(item.visual_bytes.map(cloneBytes)),
   })) as FormalOracleExecutionArtifactV1[];
@@ -186,6 +197,7 @@ function snapshotCompositionInput(input: ComposeFormalOracleRunGenesisInput): Co
     expected_genesis_head: cloneCanonical(input.expected_genesis_head, "expected_genesis_head"),
     initial_checkpoint: cloneCanonical(input.initial_checkpoint, "initial_checkpoint"),
     system_prompt_bytes: cloneBytes(input.system_prompt_bytes),
+    user_template_bytes: cloneBytes(input.user_template_bytes),
     execution_artifacts: cloneExecutionArtifacts(input.execution_artifacts),
     frame_deriver: snapshotFrameDeriver(input.frame_deriver),
   };
@@ -315,19 +327,22 @@ function assertExecutionArtifacts(input: {
   system_prompt_bytes: Uint8Array;
   spec: OracleGateFormalSpec;
   byte_preflight: OracleGateBytePreflight;
-}): void {
+  user_template_bytes: Uint8Array;
+}): FormalOraclePiRequestArtifact[] {
   if (digest(input.system_prompt_bytes) !== input.spec.prompt.system_sha256) {
     throw new Error("System prompt bytes 未绑定 formal spec hash");
+  }
+  if (digest(input.user_template_bytes) !== input.spec.prompt.user_template_sha256) {
+    throw new Error("User template bytes 未绑定 formal spec hash");
   }
   if (!Array.isArray(input.artifacts) || Object.keys(input.artifacts).length !== input.artifacts.length
     || input.artifacts.length !== input.plan.items.length) {
     throw new Error("Execution artifacts 必须稠密且精确覆盖 execution plan");
   }
   const verifiedByCase = new Map(input.byte_preflight.cases.map((item) => [item.case_id, item]));
-  input.plan.items.forEach((planItem, index) => {
+  return input.plan.items.map((planItem, index) => {
     const artifact = input.artifacts[index];
     if (!artifact || artifact.request_id !== planItem.request_id
-      || digest(artifact.request_payload_bytes) !== planItem.request_payload_sha256
       || digest(artifact.rendered_user_prompt_bytes) !== planItem.user_prompt_sha256
       || planItem.system_prompt_sha256 !== input.spec.prompt.system_sha256) {
       throw new Error(`Execution artifact bytes/hash/request ID 漂移：${planItem.request_id}`);
@@ -336,21 +351,38 @@ function assertExecutionArtifacts(input: {
       || artifact.visual_bytes.length !== planItem.visuals.length) {
       throw new Error(`Execution visual artifact 数量漂移：${planItem.request_id}`);
     }
-    if (planItem.arm === "transcript_only") return;
-    const verified = verifiedByCase.get(planItem.case_id);
-    if (!verified) throw new Error(`Execution plan case 不在 verified media 中：${planItem.case_id}`);
-    const sourceBytes = planItem.arm === "static_final_board" ? verified.static_final.bytes
-      : planItem.arm === "uniform_frame" ? verified.uniform_frame.bytes
-        : verified.oracle_comparison.bytes;
-    const expectedCanvas = canonicalizeOracleGateCanvas(sourceBytes, planItem.arm);
-    const actualBytes = Buffer.from(artifact.visual_bytes[0]);
-    const visual = planItem.visuals[0];
-    if (!visual || !actualBytes.equals(expectedCanvas.bytes) || digest(actualBytes) !== visual.sha256
-      || visual.sha256 !== expectedCanvas.sha256 || visual.byte_length !== expectedCanvas.bytes.byteLength
-      || visual.mime_type !== expectedCanvas.mime_type || visual.width !== expectedCanvas.width
-      || visual.height !== expectedCanvas.height) {
-      throw new Error(`Execution visual bytes 未绑定 verified case/arm/canonical canvas：${planItem.request_id}`);
+    if (planItem.arm !== "transcript_only") {
+      const verified = verifiedByCase.get(planItem.case_id);
+      if (!verified) throw new Error(`Execution plan case 不在 verified media 中：${planItem.case_id}`);
+      const sourceBytes = planItem.arm === "static_final_board" ? verified.static_final.bytes
+        : planItem.arm === "uniform_frame" ? verified.uniform_frame.bytes
+          : verified.oracle_comparison.bytes;
+      const expectedCanvas = canonicalizeOracleGateCanvas(sourceBytes, planItem.arm);
+      const actualBytes = Buffer.from(artifact.visual_bytes[0]);
+      const visual = planItem.visuals[0];
+      if (!visual || !actualBytes.equals(expectedCanvas.bytes) || digest(actualBytes) !== visual.sha256
+        || visual.sha256 !== expectedCanvas.sha256 || visual.byte_length !== expectedCanvas.bytes.byteLength
+        || visual.mime_type !== expectedCanvas.mime_type || visual.width !== expectedCanvas.width
+        || visual.height !== expectedCanvas.height) {
+        throw new Error(`Execution visual bytes 未绑定 verified case/arm/canonical canvas：${planItem.request_id}`);
+      }
     }
+    const built = buildFormalOraclePiRequestEnvelope({
+      request_id: planItem.request_id, schedule_index: planItem.schedule_index, case_id: planItem.case_id, arm: planItem.arm,
+      model: planItem.model, system_prompt_bytes: input.system_prompt_bytes, expected_system_prompt_sha256: planItem.system_prompt_sha256,
+      rendered_user_prompt_bytes: artifact.rendered_user_prompt_bytes, expected_rendered_user_prompt_sha256: planItem.user_prompt_sha256,
+      user_template_bytes: input.user_template_bytes, expected_user_template_sha256: input.spec.prompt.user_template_sha256,
+      output_schema_sha256: planItem.output_schema_sha256,
+      visuals: planItem.visuals.map((visual, visualIndex) => ({
+        label: visual.label, mime_type: visual.mime_type, bytes: artifact.visual_bytes[visualIndex],
+        expected_sha256: visual.sha256, expected_byte_length: visual.byte_length,
+      })),
+      seed: planItem.seed, temperature: planItem.temperature, max_input_tokens: planItem.max_input_tokens,
+      max_output_tokens: planItem.max_output_tokens, timeout_ms: planItem.timeout_ms, max_attempts: planItem.max_attempts,
+      transport: planItem.transport, cache_retention: planItem.cache_retention, tools_policy: planItem.tools_policy,
+    });
+    if (built.payload_sha256 !== planItem.request_payload_sha256) throw new Error(`Built request envelope hash 未绑定 execution plan：${planItem.request_id}`);
+    return built;
   });
 }
 
@@ -360,9 +392,11 @@ function assertExecutionArtifacts(input: {
  * genesis HEAD. It never imports or invokes an LLM/API client and never returns
  * an execution token. The returned genesis pin still must be durably retained
  * by a separate monotonic/WORM authority before any future execution gate.
- * The current execution plan binds request bytes by hash only; a strict request
- * payload schema/builder has not yet proved their model/prompt/visual/budget
- * semantics, so request_payload_rendering_status remains explicitly pending.
+ * The execution plan binds a strict canonical future-adapter envelope covering
+ * model/prompt/visual/seed/budget/retry policy. The rendered user prompt is
+ * still an externally supplied frozen byte artifact: deterministic derivation
+ * from a versioned template grammar and verified case bytes remains pending.
+ * This envelope is not provider wire bytes; adapter/account/endpoint are pending.
  */
 export async function withComposedFormalOracleRunGenesis<T>(
   rawInput: ComposeFormalOracleRunGenesisInput & {
@@ -415,6 +449,7 @@ export async function withComposedFormalOracleRunGenesis<T>(
         plan: input.execution_plan,
         artifacts: input.execution_artifacts,
         system_prompt_bytes: input.system_prompt_bytes,
+        user_template_bytes: input.user_template_bytes,
         spec: input.spec,
         byte_preflight: bytePreflight,
       });
@@ -457,7 +492,11 @@ export async function withComposedFormalOracleRunGenesis<T>(
         },
         run_store_uri: input.run.run_store_uri,
         rights_registry_status: "pending_external_authoritative_head",
-        request_payload_rendering_status: "pending_strict_canonical_builder",
+        request_envelope_serialization_status: "completed",
+        user_prompt_derivation_status: "pending_strict_template_renderer",
+        input_token_budget_status: "pending_model_specific_tokenizer",
+        provider_wire_binding_status: "pending_prepared_transport_adapter",
+        provider_account_endpoint_status: "pending_external_runtime_binding",
         toolchain_capsule_status: "pending_external_immutable_capsule",
         composition_record_authenticity_status: "pending_external_trusted_signature_or_worm",
         external_head_pin_status: "pending_external_monotonic_worm",
