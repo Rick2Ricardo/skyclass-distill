@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import Fastify from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 import { GoldReviewStore } from "./goldReviewStore.js";
 
@@ -42,6 +43,56 @@ async function fixture(): Promise<{ root: string; data: string; store: GoldRevie
 }
 
 describe("GoldReviewStore", () => {
+  it("keeps multibyte Gold labels byte-stable across sequential and concurrent queue reads", async () => {
+    const { store, intakePath } = await fixture();
+    const intake = JSON.parse(await readFile(intakePath, "utf8"));
+    const expected = "第一幅图下方问题文字续写";
+    intake.items[0].a_side.events[0].semantic_label = expected;
+    intake.items[0].b_side.events[0].semantic_label = expected;
+    intake.items[0].proposal.candidate_events[0].semantic_label = expected;
+    await writeFile(intakePath, JSON.stringify(intake));
+
+    const encode = (value: unknown): Buffer => Buffer.from(JSON.stringify(value), "utf8");
+    const assertExact = (bytes: Buffer, baseline: Buffer): void => {
+      expect(bytes).toEqual(baseline);
+      const parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+      expect(parsed.groups[0].candidates[0].semantic_label).toBe(expected);
+    };
+    const baseline = encode(await store.queue());
+    for (let index = 0; index < 20; index += 1) assertExact(encode(await store.queue()), baseline);
+    const concurrent = await Promise.all(Array.from({ length: 40 }, () => store.queue()));
+    concurrent.forEach((queue) => assertExact(encode(queue), baseline));
+  });
+
+  it("keeps Fastify Gold API raw payload byte-stable before one complete UTF-8 decode", async () => {
+    const { store, intakePath } = await fixture();
+    const intake = JSON.parse(await readFile(intakePath, "utf8"));
+    const expected = "第一幅图下方问题文字续写";
+    intake.items[0].proposal.candidate_events[0].semantic_label = expected;
+    await writeFile(intakePath, JSON.stringify(intake));
+    const app = Fastify({ logger: false });
+    app.get("/api/gold-review", async () => store.queue());
+    await app.ready();
+    try {
+      const readRaw = async (): Promise<Buffer> => {
+        const response = await app.inject({ method: "GET", url: "/api/gold-review" });
+        expect(response.statusCode).toBe(200);
+        expect(response.headers["content-type"]).toContain("application/json");
+        return response.rawPayload;
+      };
+      const baseline = await readRaw();
+      const assertExact = (bytes: Buffer): void => {
+        expect(bytes).toEqual(baseline);
+        const parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+        expect(parsed.groups[0].candidates[0].semantic_label).toBe(expected);
+      };
+      for (let index = 0; index < 20; index += 1) assertExact(await readRaw());
+      (await Promise.all(Array.from({ length: 40 }, readRaw))).forEach(assertExact);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("normalizes intakes and keeps review revisions append-only", async () => {
     const { store } = await fixture();
     const queue = await store.queue();
