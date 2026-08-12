@@ -19,12 +19,12 @@ import {
   validateRequestIntent,
   validateRunCheckpoint,
   validateRunCheckpointTransition,
-  type CommittedRequestV2,
+  type CommittedRequestV3,
   type FormalRunContractV1,
   type OracleGateCheckpointEntryV1,
   type PrivateAnswerKeyV1,
   type PublicBlindPackageV1,
-  type RequestAttemptAuditV2,
+  type RequestAttemptAuditV3,
   type RequestIntentV1,
   type RunCheckpointV1,
 } from "./oracle-gate-run.js";
@@ -105,9 +105,9 @@ function intent(run = formalRun()): RequestIntentV1 {
   return value;
 }
 
-function attempt(request = intent()): RequestAttemptAuditV2 {
-  const value: RequestAttemptAuditV2 = {
-    schema_version: "oracle-gate-request-attempt-audit-v2",
+function attempt(request = intent()): RequestAttemptAuditV3 {
+  const value: RequestAttemptAuditV3 = {
+    schema_version: "oracle-gate-request-attempt-audit-v3",
     attempt_sha256: HASH,
     run_sha256: request.run_sha256,
     request_id: request.request_id,
@@ -130,12 +130,15 @@ function attempt(request = intent()): RequestAttemptAuditV2 {
     sse_derivation_object_uri: `objects/sse-derivations/${"4".repeat(64)}/derivation.json`,
     sse_derivation_record_sha256: "4".repeat(64),
     sse_parser_version: "formal-oracle-pi-response-stream-v1",
-    assistant_content_object_uri: `objects/assistant-content/${"5".repeat(64)}/assistant-content.json`,
+    assistant_content_object_uri: `objects/assistant-content/${"5".repeat(64)}/assistant-content.utf8`,
     assistant_content_bytes_sha256: "5".repeat(64),
     assistant_content_byte_length: 50,
     canonical_response_object_uri: `objects/canonical-responses/${"6".repeat(64)}/canonical-response.json`,
     canonical_response_bytes_sha256: "6".repeat(64),
     canonical_response_commitment_sha256: hashPublicBlindResponse({ schema_version: "fixture-v1", score: 1 }),
+    invalid_response_record_object_uri: null,
+    invalid_response_record_sha256: null,
+    invalid_response_record_version: null,
     submitted_visuals: request.visuals,
     model: request.model,
     transport: request.transport,
@@ -160,9 +163,9 @@ function attempt(request = intent()): RequestAttemptAuditV2 {
   return value;
 }
 
-function committed(request = intent(), receipt = attempt(request)): CommittedRequestV2 {
-  const value: CommittedRequestV2 = {
-    schema_version: "oracle-gate-committed-request-v2",
+function committed(request = intent(), receipt = attempt(request)): CommittedRequestV3 {
+  const value: CommittedRequestV3 = {
+    schema_version: "oracle-gate-committed-request-v3",
     committed_request_sha256: HASH,
     run_sha256: request.run_sha256,
     request_id: request.request_id,
@@ -183,7 +186,7 @@ function committed(request = intent(), receipt = attempt(request)): CommittedReq
   return value;
 }
 
-function clearResponseChain(receipt: RequestAttemptAuditV2): void {
+function clearResponseChain(receipt: RequestAttemptAuditV3): void {
   receipt.completion_id = null;
   receipt.fetch_observed_sse_object_uri = null;
   receipt.fetch_observed_sse_bytes_sha256 = null;
@@ -316,6 +319,43 @@ describe("Formal Oracle content-addressed run contracts", () => {
     const changedDomain = structuredClone(request);
     changedDomain.request_envelope_sha256 = "9".repeat(64);
     expect(hashRequestIntent(changedDomain)).not.toBe(request.intent_sha256);
+  });
+
+  it("accepts only V3 invalid-response receipts and forbids partial B/C or old V2 domains", () => {
+    const request = intent();
+    const invalid = attempt(request);
+    clearResponseChain(invalid);
+    invalid.fetch_observed_sse_object_uri = `objects/fetch-observed-sse/${"3".repeat(64)}/response.sse`;
+    invalid.fetch_observed_sse_bytes_sha256 = "3".repeat(64);
+    invalid.fetch_observed_sse_byte_length = 17;
+    invalid.invalid_response_record_object_uri = `objects/invalid-responses/${"7".repeat(64)}/invalid-response.json`;
+    invalid.invalid_response_record_sha256 = "7".repeat(64);
+    invalid.invalid_response_record_version = "formal-oracle-invalid-response-v1";
+    invalid.outcome = "invalid_response_received";
+    invalid.provider_response_received = true;
+    invalid.stop_reason = null;
+    invalid.error_code = "invalid_response_received";
+    invalid.error_message = null;
+    invalid.usage = null;
+    invalid.pricing_table_sha256 = null;
+    invalid.cost_microunits = null;
+    invalid.automatic_retry_allowed = false;
+    invalid.attempt_sha256 = hashRequestAttemptAudit(invalid);
+    expect(validateRequestAttemptAudit(invalid)).toEqual({ valid: true, issues: [] });
+
+    const partial = structuredClone(invalid);
+    partial.sse_derivation_object_uri = `objects/sse-derivations/${"4".repeat(64)}/derivation.json`;
+    partial.sse_derivation_record_sha256 = "4".repeat(64);
+    partial.sse_parser_version = "formal-oracle-pi-response-stream-v1";
+    partial.attempt_sha256 = hashRequestAttemptAudit(partial);
+    expect(validateRequestAttemptAudit(partial).issues.some((item) => item.message.includes("B/C"))).toBe(true);
+
+    const oldAttempt = { ...invalid, schema_version: "oracle-gate-request-attempt-audit-v2" } as unknown as RequestAttemptAuditV3;
+    oldAttempt.attempt_sha256 = hashRequestAttemptAudit(oldAttempt);
+    expect(validateRequestAttemptAudit(oldAttempt).issues.some((item) => item.path === "schema_version")).toBe(true);
+    const oldCommit = { ...committed(request, attempt(request)), schema_version: "oracle-gate-committed-request-v2" } as unknown as CommittedRequestV3;
+    oldCommit.committed_request_sha256 = hashCommittedRequest(oldCommit);
+    expect(validateCommittedRequestAgainstAttempt(request, attempt(request), oldCommit).issues.some((item) => item.path.includes("schema_version"))).toBe(true);
   });
 
   it("binds a completed checkpoint and blind artifacts back to one root run", () => {

@@ -19,6 +19,10 @@ import {
   type FormalOraclePiResponseStreamArtifactV1,
 } from "../../contracts/src/oracle-gate-pi-response-stream.js";
 import {
+  createFormalOracleInvalidResponseArtifactV1,
+  type FormalOracleInvalidResponseArtifactV1,
+} from "../../contracts/src/oracle-gate-invalid-response.js";
+import {
   buildFormalOraclePiRequestEnvelope,
   type FormalOraclePiRequestArtifact,
 } from "../../contracts/src/oracle-gate-request.js";
@@ -36,10 +40,11 @@ import {
   renderFormalOracleUserPrompt,
 } from "../../contracts/src/oracle-gate-user-prompt.js";
 import type {
-  CommittedRequestV2,
+  CommittedRequestV3,
   FormalRunContractV1,
+  OracleGateRunArm,
   OracleGateAttemptOutcome,
-  RequestAttemptAuditV2,
+  RequestAttemptAuditV3,
   RequestIntentV1,
   RunCheckpointV1,
 } from "../../contracts/src/oracle-gate-run.js";
@@ -372,7 +377,7 @@ function attemptAudit(
     response_bytes?: Buffer;
     parsed_response?: Record<string, unknown>;
   } = {},
-): { audit: RequestAttemptAuditV2; response_artifact?: FormalOraclePiResponseStreamArtifactV1; parsed_response?: Record<string, unknown> } {
+): { audit: RequestAttemptAuditV3; response_artifact?: FormalOraclePiResponseStreamArtifactV1; parsed_response?: Record<string, unknown> } {
   const startedAt = options.started_at ?? "2026-08-12T00:00:03.000Z";
   const finishedAt = options.finished_at ?? "2026-08-12T00:00:04.000Z";
   const parsedResponse = outcome === "result_received" ? (options.parsed_response ?? oracleResponse()) : undefined;
@@ -394,8 +399,8 @@ function attemptAudit(
     expected_max_input_tokens: intent.max_input_tokens, expected_max_output_tokens: intent.max_output_tokens,
   }) : undefined;
   const proof = responseArtifact?.proof;
-  const audit: RequestAttemptAuditV2 = {
-    schema_version: "oracle-gate-request-attempt-audit-v2",
+  const audit: RequestAttemptAuditV3 = {
+    schema_version: "oracle-gate-request-attempt-audit-v3",
     attempt_sha256: "0".repeat(64),
     run_sha256: intent.run_sha256,
     request_id: intent.request_id,
@@ -424,6 +429,9 @@ function attemptAudit(
     canonical_response_object_uri: result ? store.canonicalResponseObjectUri(intent.run_sha256, sha(canonicalResponseBytes!)) : null,
     canonical_response_bytes_sha256: result ? sha(canonicalResponseBytes!) : null,
     canonical_response_commitment_sha256: result ? hashPublicBlindResponse(parsedResponse!) : null,
+    invalid_response_record_object_uri: null,
+    invalid_response_record_sha256: null,
+    invalid_response_record_version: null,
     submitted_visuals: structuredClone(intent.visuals),
     model: intent.model,
     transport: intent.transport,
@@ -449,9 +457,9 @@ function attemptAudit(
   return { audit, response_artifact: responseArtifact, parsed_response: parsedResponse };
 }
 
-function committedRequest(intent: RequestIntentV1, audit: RequestAttemptAuditV2, schemaValidatedAt: string): CommittedRequestV2 {
-  const committed: CommittedRequestV2 = {
-    schema_version: "oracle-gate-committed-request-v2",
+function committedRequest(intent: RequestIntentV1, audit: RequestAttemptAuditV3, schemaValidatedAt: string): CommittedRequestV3 {
+  const committed: CommittedRequestV3 = {
+    schema_version: "oracle-gate-committed-request-v3",
     committed_request_sha256: "0".repeat(64),
     run_sha256: intent.run_sha256,
     request_id: intent.request_id,
@@ -470,6 +478,50 @@ function committedRequest(intent: RequestIntentV1, audit: RequestAttemptAuditV2,
   };
   committed.committed_request_sha256 = hashCommittedRequest(committed);
   return committed;
+}
+
+function invalidAttemptAudit(
+  intent: RequestIntentV1,
+  store: FormalOracleRunStore,
+  raw: Uint8Array,
+  arm: OracleGateRunArm,
+  startedAt = "2026-08-12T00:00:03.000Z",
+  finishedAt = "2026-08-12T00:00:04.000Z",
+): { audit: RequestAttemptAuditV3; invalid_response_artifact: FormalOracleInvalidResponseArtifactV1 } {
+  const artifact = createFormalOracleInvalidResponseArtifactV1({
+    raw_sse_bytes: raw, expected_model: intent.model, expected_arm: arm,
+    request_envelope_sha256: intent.request_envelope_sha256, provider_body_sha256: intent.provider_body_sha256,
+    expected_max_input_tokens: intent.max_input_tokens, expected_max_output_tokens: intent.max_output_tokens,
+  });
+  const record = artifact.record;
+  const audit: RequestAttemptAuditV3 = {
+    schema_version: "oracle-gate-request-attempt-audit-v3", attempt_sha256: "0".repeat(64),
+    run_sha256: intent.run_sha256, request_id: intent.request_id, idempotency_key: intent.idempotency_key,
+    intent_sha256: intent.intent_sha256, attempt_ordinal: intent.attempt_ordinal,
+    started_at: startedAt, finished_at: finishedAt, latency_ms: Date.parse(finishedAt) - Date.parse(startedAt),
+    provider_id: "fixture-provider", provider_http_request_id: `provider-http-${intent.attempt_ordinal}`, completion_id: null,
+    request_envelope_sha256: intent.request_envelope_sha256, request_envelope_object_uri: intent.request_envelope_object_uri,
+    provider_body_sha256: intent.provider_body_sha256, provider_body_object_uri: intent.provider_body_object_uri,
+    fetch_observed_sse_object_uri: store.fetchObservedSseObjectUri(intent.run_sha256, record.fetch_observed_sse_bytes_sha256),
+    fetch_observed_sse_bytes_sha256: record.fetch_observed_sse_bytes_sha256,
+    fetch_observed_sse_byte_length: record.fetch_observed_sse_byte_length,
+    sse_derivation_object_uri: record.sse_derivation_record_sha256 ? store.sseDerivationObjectUri(intent.run_sha256, record.sse_derivation_record_sha256) : null,
+    sse_derivation_record_sha256: record.sse_derivation_record_sha256,
+    sse_parser_version: record.sse_derivation_record_sha256 ? "formal-oracle-pi-response-stream-v1" : null,
+    assistant_content_object_uri: record.assistant_content_bytes_sha256 ? store.assistantContentObjectUri(intent.run_sha256, record.assistant_content_bytes_sha256) : null,
+    assistant_content_bytes_sha256: record.assistant_content_bytes_sha256,
+    assistant_content_byte_length: record.assistant_content_byte_length,
+    canonical_response_object_uri: null, canonical_response_bytes_sha256: null, canonical_response_commitment_sha256: null,
+    invalid_response_record_object_uri: store.invalidResponseRecordObjectUri(intent.run_sha256, record.invalid_response_record_sha256),
+    invalid_response_record_sha256: record.invalid_response_record_sha256, invalid_response_record_version: record.schema_version,
+    submitted_visuals: structuredClone(intent.visuals), model: intent.model, transport: "pi", temperature: 0,
+    max_input_tokens: intent.max_input_tokens, max_output_tokens: intent.max_output_tokens, timeout_ms: intent.timeout_ms,
+    seed: intent.seed, cache_retention: "none", tools_policy: "none", outcome: "invalid_response_received",
+    provider_response_received: true, stop_reason: null, error_code: "invalid_response_received", error_message: null,
+    usage: null, pricing_table_sha256: null, cost_microunits: null, automatic_retry_allowed: false,
+  };
+  audit.attempt_sha256 = hashRequestAttemptAudit(audit);
+  return { audit, invalid_response_artifact: artifact };
 }
 
 function oracleResponse(note?: string): Record<string, unknown> {
@@ -724,7 +776,7 @@ describe("FormalOracleRunStore", () => {
     await expect(wrongSchema.store.createSealedRun(wrongSchema.input)).rejects.toThrow(/response schema|shared deterministic renderer/);
   });
 
-  it("persists raw and parsed response objects before structurally validating a successful request", async () => {
+  it("persists raw SSE, derived assistant bytes, and canonical response before structural validation", async () => {
     const { dataDir, store, input } = await fixture();
     let snapshot = await store.createSealedRun(input);
     const payload = requestPayload(1);
@@ -875,11 +927,11 @@ describe("FormalOracleRunStore", () => {
       });
       const invalidAudit = structuredClone(receipt.audit) as unknown as Record<string, unknown>;
       invalidAudit.stop_reason = stopReason;
-      invalidAudit.attempt_sha256 = hashRequestAttemptAudit(invalidAudit as unknown as RequestAttemptAuditV2);
+      invalidAudit.attempt_sha256 = hashRequestAttemptAudit(invalidAudit as unknown as RequestAttemptAuditV3);
       await expect(current.store.commitAttemptAudit({
         run_sha256: current.input.run.run_sha256, expected_head: snapshot.head_pin,
         expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
-        audit: invalidAudit as unknown as RequestAttemptAuditV2, response_artifact: receipt.response_artifact,
+        audit: invalidAudit as unknown as RequestAttemptAuditV3, response_artifact: receipt.response_artifact,
         parsed_response: receipt.parsed_response, created_at: time(5),
       })).rejects.toThrow("strict stop");
       expect((await current.store.inspectRun(current.input.run.run_sha256, snapshot.head_pin)).checkpoint.entries[1].state)
@@ -923,7 +975,129 @@ describe("FormalOracleRunStore", () => {
     expect(snapshot.checkpoint.entries[1]).toMatchObject({ state: "FAILED_CLOSED", attempts_used: 2 });
   });
 
-  it("rejects forged raw/parsed bytes, duplicate keys, invalid UTF-8, URI, usage, model, ordinal and time", async () => {
+  it("persists a complete invalid response as an immediate non-retry terminal receipt", async () => {
+    for (const raw of [
+      new TextEncoder().encode("data: {}\n\n"),
+      Uint8Array.from([0xff]),
+      buildFormalOraclePiResponseStreamFixtureV1({
+        response_id: "chatcmpl-invalid-json", model: "model-v1", created: 1,
+        content_chunks: ['{"x":1,"x":2}'],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2, prompt_tokens_details: { cached_tokens: 0 }, completion_tokens_details: { reasoning_tokens: 0 } },
+      }),
+      buildFormalOraclePiResponseStreamFixtureV1({
+        response_id: "chatcmpl-invalid-schema", model: "model-v1", created: 1,
+        content_chunks: ['{"schema_version":"nonsense"}'],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2, prompt_tokens_details: { cached_tokens: 0 }, completion_tokens_details: { reasoning_tokens: 0 } },
+      }),
+    ]) {
+      const { dataDir, store, input } = await fixture();
+      let snapshot = await store.createSealedRun(input);
+      const payload = requestPayload(1);
+      const intent = requestIntent(input, payload, store, 1, 1, time(1));
+      snapshot = await store.commitDispatchIntent({
+        run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
+        expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
+        intent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(2),
+      });
+      const invalid = invalidAttemptAudit(intent, store, raw, input.execution_plan.items[1].arm, time(3), time(4));
+      snapshot = await store.commitAttemptAudit({
+        run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
+        expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
+        audit: invalid.audit, invalid_response_artifact: invalid.invalid_response_artifact, created_at: time(5),
+      });
+      expect(snapshot.checkpoint).toMatchObject({ run_state: "FAILED_CLOSED", terminal_reason_sha256: expect.any(String) });
+      expect(snapshot.checkpoint.entries[1]).toMatchObject({ state: "FAILED_CLOSED", resume_action: "block_failed", attempts_used: 1 });
+      expect((await new FormalOracleRunStore(dataDir).inspectRun(input.run.run_sha256, snapshot.head_pin)).head_pin).toEqual(snapshot.head_pin);
+      await expect(store.markRetryReady({
+        run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
+        expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256, request_id: intent.request_id, created_at: time(6),
+      })).rejects.toThrow("RECEIPT_COMMITTED");
+    }
+  });
+
+  it("rejects valid SSE as invalid and rejects forged/mixed invalid records before HEAD publication", async () => {
+    const { store, input } = await fixture();
+    let snapshot = await store.createSealedRun(input);
+    const payload = requestPayload(1);
+    const intent = requestIntent(input, payload, store, 1, 1, time(1));
+    snapshot = await store.commitDispatchIntent({
+      run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
+      expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
+      intent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(2),
+    });
+    const invalid = invalidAttemptAudit(intent, store, new TextEncoder().encode("data: {}\n\n"), input.execution_plan.items[1].arm, time(3), time(4));
+    const mixedAudit = structuredClone(invalid.audit);
+    mixedAudit.invalid_response_record_sha256 = "f".repeat(64);
+    mixedAudit.invalid_response_record_object_uri = store.invalidResponseRecordObjectUri(input.run.run_sha256, mixedAudit.invalid_response_record_sha256);
+    mixedAudit.attempt_sha256 = hashRequestAttemptAudit(mixedAudit);
+    await expect(store.commitAttemptAudit({
+      run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
+      expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
+      audit: mixedAudit, invalid_response_artifact: invalid.invalid_response_artifact, created_at: time(5),
+    })).rejects.toThrow("精确闭合");
+    await expect(store.commitAttemptAudit({
+      run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
+      expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
+      audit: invalid.audit, invalid_response_artifact: structuredClone(invalid.invalid_response_artifact), created_at: time(5),
+    })).rejects.toThrow("伪造");
+    for (const mutate of [
+      (audit: RequestAttemptAuditV3) => { audit.fetch_observed_sse_object_uri = "objects/fetch-observed-sse/forged/response.sse"; },
+      (audit: RequestAttemptAuditV3) => { audit.sse_derivation_object_uri = "objects/sse-derivations/forged/derivation.json"; },
+      (audit: RequestAttemptAuditV3) => { audit.assistant_content_object_uri = "objects/assistant-content/forged/assistant-content.utf8"; },
+    ]) {
+      const forged = structuredClone(invalid.audit);
+      mutate(forged);
+      forged.attempt_sha256 = hashRequestAttemptAudit(forged);
+      await expect(store.commitAttemptAudit({
+        run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
+        expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
+        audit: forged, invalid_response_artifact: invalid.invalid_response_artifact, created_at: time(5),
+      })).rejects.toThrow();
+    }
+    expect((await store.inspectRun(input.run.run_sha256, snapshot.head_pin)).head_pin).toEqual(snapshot.head_pin);
+  });
+
+  it("re-derives durable invalid A/B/C/record layers and rejects every substituted object", async () => {
+    for (const layer of ["A", "B", "C", "record"] as const) {
+      const { dataDir, store, input } = await fixture();
+      let snapshot = await store.createSealedRun(input);
+      const payload = requestPayload(1);
+      const intent = requestIntent(input, payload, store, 1, 1, time(1));
+      snapshot = await store.commitDispatchIntent({
+        run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
+        expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
+        intent, request_envelope: payload, prepared_provider_request: preparedPayload(payload), created_at: time(2),
+      });
+      const first = invalidAttemptAudit(intent, store, buildFormalOraclePiResponseStreamFixtureV1({
+        response_id: "chatcmpl-invalid-first", model: intent.model, created: 1,
+        content_chunks: ['{"schema_version":"nonsense-one"}'],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2, prompt_tokens_details: { cached_tokens: 0 }, completion_tokens_details: { reasoning_tokens: 0 } },
+      }), input.execution_plan.items[1].arm, time(3), time(4));
+      snapshot = await store.commitAttemptAudit({
+        run_sha256: input.run.run_sha256, expected_head: snapshot.head_pin,
+        expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
+        audit: first.audit, invalid_response_artifact: first.invalid_response_artifact, created_at: time(5),
+      });
+      const second = invalidAttemptAudit(intent, store, buildFormalOraclePiResponseStreamFixtureV1({
+        response_id: "chatcmpl-invalid-second", model: intent.model, created: 2,
+        content_chunks: ['{"schema_version":"nonsense-two"}'],
+        usage: { prompt_tokens: 2, completion_tokens: 2, total_tokens: 4, prompt_tokens_details: { cached_tokens: 0 }, completion_tokens_details: { reasoning_tokens: 0 } },
+      }), input.execution_plan.items[1].arm, time(3), time(4));
+      const replacement = layer === "A" ? second.invalid_response_artifact.raw_sse_bytes
+        : layer === "B" ? privateCanonicalJsonBytes(second.invalid_response_artifact.sse_derivation)
+          : layer === "C" ? second.invalid_response_artifact.assistant_content_bytes!
+            : privateCanonicalJsonBytes(second.invalid_response_artifact.record);
+      const uri = layer === "A" ? first.audit.fetch_observed_sse_object_uri
+        : layer === "B" ? first.audit.sse_derivation_object_uri
+          : layer === "C" ? first.audit.assistant_content_object_uri
+            : first.audit.invalid_response_record_object_uri;
+      await writeFile(join(dataDir, RUN_STORE_URI, String(uri)), replacement);
+      await expect(new FormalOracleRunStore(dataDir).inspectRun(input.run.run_sha256, snapshot.head_pin))
+        .rejects.toThrow(/invalid response|Invalid response|内容地址|hash|重派生/);
+    }
+  });
+
+  it("rejects forged raw SSE/assistant/canonical bytes, duplicate keys, invalid UTF-8, URI, usage, model, ordinal and time", async () => {
     const { store, input } = await fixture();
     let snapshot = await store.createSealedRun(input);
     const payload = requestPayload(1);
@@ -944,7 +1118,7 @@ describe("FormalOracleRunStore", () => {
       expected_checkpoint_sha256: snapshot.head_pin.checkpoint_sha256,
       audit: base.audit, response_artifact: base.response_artifact, parsed_response: { score: 999 }, created_at: time(5),
     })).rejects.toThrow("Canonical response");
-    const mutators: Array<(audit: RequestAttemptAuditV2) => void> = [
+    const mutators: Array<(audit: RequestAttemptAuditV3) => void> = [
       (audit) => { audit.fetch_observed_sse_object_uri = "objects/forged-response.bin"; },
       (audit) => { audit.sse_derivation_record_sha256 = "f".repeat(64); },
       (audit) => { audit.assistant_content_bytes_sha256 = "e".repeat(64); },
@@ -1071,8 +1245,8 @@ describe("FormalOracleRunStore", () => {
     })).rejects.toThrow("frozen shared response schema/validator");
 
     for (const mutate of [
-      (record: CommittedRequestV2): void => { record.canonical_response_object_uri = String(wrongValidator.audit.assistant_content_object_uri); },
-      (record: CommittedRequestV2): void => { record.canonical_response_bytes_sha256 = "f".repeat(64); },
+      (record: CommittedRequestV3): void => { record.canonical_response_object_uri = String(wrongValidator.audit.assistant_content_object_uri); },
+      (record: CommittedRequestV3): void => { record.canonical_response_bytes_sha256 = "f".repeat(64); },
     ]) {
       const record = committedRequest(wrongValidator.intent, wrongValidator.audit, time(6));
       mutate(record);

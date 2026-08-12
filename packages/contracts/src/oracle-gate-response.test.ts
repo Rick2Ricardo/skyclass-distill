@@ -74,6 +74,9 @@ describe("shared Oracle Gate response contract", () => {
     expect(() => parseOracleGateResponseBytes(new TextEncoder().encode('{"schema_version":"a","schema_version":"b"}'))).toThrow("duplicate key");
     expect(() => parseOracleGateResponseBytes(new TextEncoder().encode('{"outer":{"claim":1,"cl\\u0061im":2}}'))).toThrow("duplicate key");
     expect(() => parseOracleGateResponseBytes(Uint8Array.from([0x7b, 0x22, 0x78, 0x22, 0x3a, 0xff, 0x7d]))).toThrow("有效 UTF-8");
+    expect(() => parseOracleGateResponseBytes(Uint8Array.from([0xef, 0xbb, 0xbf, 0x7b, 0x7d]))).toThrow("BOM");
+    expect(() => parseOracleGateResponseBytes(new TextEncoder().encode('{"outer":{"key":"\\ud800"}}'))).toThrow("surrogate");
+    expect(() => parseOracleGateResponseBytes(new TextEncoder().encode('{"outer":{"\\udfff":true}}'))).toThrow("surrogate");
   });
 
   it("enforces structural arm evidence without filtering semantic failure samples", () => {

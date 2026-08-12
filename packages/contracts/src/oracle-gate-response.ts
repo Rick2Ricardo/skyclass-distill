@@ -88,6 +88,28 @@ function exactKeys(value: Record<string, unknown>, expected: readonly string[], 
   if (JSON.stringify(actual) !== JSON.stringify(wanted)) throw new Error(`${label} 字段集合无效`);
 }
 
+function assertUnicodeScalars(value: string, label: string): void {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) throw new Error(`${label} 含 unpaired surrogate`);
+      index += 1;
+    } else if (code >= 0xdc00 && code <= 0xdfff) throw new Error(`${label} 含 unpaired surrogate`);
+  }
+}
+
+function assertJsonUnicodeScalars(value: unknown, label = "Oracle Gate response"): void {
+  if (typeof value === "string") { assertUnicodeScalars(value, label); return; }
+  if (Array.isArray(value)) { value.forEach((item, index) => assertJsonUnicodeScalars(item, `${label}[${index}]`)); return; }
+  if (isRecord(value)) {
+    for (const [key, nested] of Object.entries(value)) {
+      assertUnicodeScalars(key, `${label} key`);
+      assertJsonUnicodeScalars(nested, `${label}.${key}`);
+    }
+  }
+}
+
 /** Browser-safe canonical JSON for the frozen response/schema bytes. */
 export function canonicalOracleGateJson(value: unknown, seen = new Set<object>()): string {
   if (value === null || typeof value === "boolean" || typeof value === "string") return JSON.stringify(value);
@@ -219,16 +241,20 @@ class DuplicateAwareJsonScanner {
 }
 
 /**
- * Parses the provider's original JSON UTF-8 bytes. Fatal UTF-8 decoding and a
- * duplicate-aware grammar scan happen before JSON.parse, including nested keys.
+ * Parses derived assistant-content JSON UTF-8 bytes. Fatal UTF-8 decoding and
+ * a duplicate-aware grammar scan happen before JSON.parse, including nested keys.
  */
 export function parseOracleGateResponseBytes(bytes: Uint8Array): Record<string, unknown> {
+  if (bytes.byteLength >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    throw new Error("Oracle Gate response_bytes 禁止 UTF-8 BOM");
+  }
   let source: string;
   try { source = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
   catch { throw new Error("Oracle Gate response_bytes 不是有效 UTF-8"); }
   new DuplicateAwareJsonScanner(source).scan();
   const value = JSON.parse(source) as unknown;
   if (!isRecord(value)) throw new Error("Oracle Gate response_bytes 顶层必须是 JSON object");
+  assertJsonUnicodeScalars(value);
   canonicalOracleGateJson(value);
   return value;
 }

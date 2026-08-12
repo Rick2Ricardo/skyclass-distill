@@ -13,12 +13,12 @@ import {
 } from "../../contracts/src/oracle-gate-response.js";
 import type {
   FormalRunContractV1,
-  CommittedRequestV2,
+  CommittedRequestV3,
   OracleGateCheckpointCountsV1,
   OracleGateCheckpointEntryV1,
   OracleGateRunArm,
   OracleGateRunVisualV1,
-  RequestAttemptAuditV2,
+  RequestAttemptAuditV3,
   RequestIntentV1,
   RunCheckpointV1,
 } from "../../contracts/src/oracle-gate-run.js";
@@ -45,6 +45,16 @@ import {
   type FormalOraclePiResponseStreamArtifactV1,
   type FormalOraclePiResponseStreamProofV1,
 } from "../../contracts/src/oracle-gate-pi-response-stream.js";
+import {
+  FORMAL_ORACLE_INVALID_RESPONSE_VERSION,
+  assertFormalOracleInvalidResponseRecordV1,
+  assertFormalOracleInvalidResponseArtifactV1,
+  createFormalOracleInvalidResponseArtifactV1,
+  hashFormalOracleInvalidResponseRecordV1,
+  revalidateFormalOracleInvalidResponseArtifactV1,
+  type FormalOracleInvalidResponseArtifactV1,
+  type FormalOracleInvalidResponseRecordV1,
+} from "../../contracts/src/oracle-gate-invalid-response.js";
 import {
   FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
   FORMAL_ORACLE_USER_PROMPT_VERSION,
@@ -162,8 +172,9 @@ export interface CommitAttemptAuditInput {
   run_sha256: string;
   expected_head: FormalOracleHeadPinV1;
   expected_checkpoint_sha256: string;
-  audit: RequestAttemptAuditV2;
+  audit: RequestAttemptAuditV3;
   response_artifact?: FormalOraclePiResponseStreamArtifactV1;
+  invalid_response_artifact?: FormalOracleInvalidResponseArtifactV1;
   parsed_response?: Record<string, unknown>;
   created_at: string;
 }
@@ -180,7 +191,7 @@ export interface CommitSchemaValidatedRequestInput {
   run_sha256: string;
   expected_head: FormalOracleHeadPinV1;
   expected_checkpoint_sha256: string;
-  committed_request: CommittedRequestV2;
+  committed_request: CommittedRequestV3;
   created_at: string;
 }
 
@@ -201,6 +212,7 @@ export interface CompleteRunInput {
 
 export type FormalOracleTerminalReasonCode =
   | "ambiguous_unknown_attempt"
+  | "invalid_response_received"
   | "attempt_budget_exhausted";
 
 export interface FormalOracleTerminalReasonV1 {
@@ -573,7 +585,7 @@ function assertEnvelopeMatchesExecutionPlan(
   }
 }
 
-function terminalDetailHash(audit: RequestAttemptAuditV2): string {
+function terminalDetailHash(audit: RequestAttemptAuditV3): string {
   return digest(Buffer.from(privateCanonicalJsonBytes({
     attempt_sha256: audit.attempt_sha256,
     error_code: audit.error_code,
@@ -586,7 +598,7 @@ function terminalDetailHash(audit: RequestAttemptAuditV2): string {
 function terminalReason(
   runSha256: string,
   requestId: string,
-  audit: RequestAttemptAuditV2,
+  audit: RequestAttemptAuditV3,
   reasonCode: FormalOracleTerminalReasonCode,
   createdAt: string,
 ): FormalOracleTerminalReasonV1 {
@@ -611,7 +623,7 @@ function assertTerminalReason(reason: FormalOracleTerminalReasonV1, runSha256: s
       "schema_version", "terminal_reason_sha256", "run_sha256", "request_id", "reason_code",
       "source_attempt_sha256", "detail_sha256", "created_at", "api_execution_allowed",
     ]) || reason.schema_version !== "formal-oracle-terminal-reason-v1" || reason.run_sha256 !== runSha256
-    || !isId(reason.request_id) || !["ambiguous_unknown_attempt", "attempt_budget_exhausted"].includes(reason.reason_code)
+    || !isId(reason.request_id) || !["ambiguous_unknown_attempt", "invalid_response_received", "attempt_budget_exhausted"].includes(reason.reason_code)
     || !/^[a-f0-9]{64}$/.test(reason.terminal_reason_sha256) || !/^[a-f0-9]{64}$/.test(reason.source_attempt_sha256)
     || !/^[a-f0-9]{64}$/.test(reason.detail_sha256) || reason.api_execution_allowed !== false) {
     throw new Error("Terminal reason schema 或根绑定无效");
@@ -627,7 +639,8 @@ function assertTerminalReason(reason: FormalOracleTerminalReasonV1, runSha256: s
  * coverage; those remain mandatory in the later pinned-ledger-registry
  * composition gate. No method in this class authorizes API execution.
  * SCHEMA_VALIDATED_COMMITTED proves only durable transport bytes, deterministic
- * raw-to-parsed equivalence, and the frozen structural schema/arm rules.
+ * raw-SSE-to-assistant-bytes derivation, canonical response equivalence, and
+ * the frozen structural schema/arm rules.
  * EXECUTION_COMPLETE means the entire frozen request matrix reached that state;
  * neither state asserts teaching correctness or teacher-only semantic quality.
  */
@@ -667,13 +680,19 @@ export class FormalOracleRunStore {
   assistantContentObjectUri(runSha256: string, contentBytesSha256: string): string {
     assertPrivateSha256(runSha256, "run_sha256");
     assertPrivateSha256(contentBytesSha256, "assistant_content_bytes_sha256");
-    return `runs/${runSha256}/objects/assistant-content/${contentBytesSha256}/assistant-content.json`;
+    return `runs/${runSha256}/objects/assistant-content/${contentBytesSha256}/assistant-content.utf8`;
   }
 
   canonicalResponseObjectUri(runSha256: string, responseBytesSha256: string): string {
     assertPrivateSha256(runSha256, "run_sha256");
     assertPrivateSha256(responseBytesSha256, "canonical_response_bytes_sha256");
     return `runs/${runSha256}/objects/canonical-responses/${responseBytesSha256}/canonical-response.json`;
+  }
+
+  invalidResponseRecordObjectUri(runSha256: string, recordSha256: string): string {
+    assertPrivateSha256(runSha256, "run_sha256");
+    assertPrivateSha256(recordSha256, "invalid_response_record_sha256");
+    return `runs/${runSha256}/objects/invalid-response-records/${recordSha256}/invalid-response.json`;
   }
 
   async createSealedRun(input: CreateSealedRunInput): Promise<FormalOracleRunSnapshot> {
@@ -978,12 +997,56 @@ export class FormalOracleRunStore {
           this.sseDerivationDirectory(input.run_sha256, proof.proof_sha256), "derivation.json", privateCanonicalJsonBytes(proof),
         );
         await this.privateFs.publishImmutableObject(
-          this.assistantContentDirectory(input.run_sha256, proof.assistant_content_sha256), "assistant-content.json", response.assistant_content_bytes,
+          this.assistantContentDirectory(input.run_sha256, proof.assistant_content_sha256), "assistant-content.utf8", response.assistant_content_bytes,
         );
         await this.privateFs.publishImmutableObject(
           this.canonicalResponseDirectory(input.run_sha256, input.audit.canonical_response_bytes_sha256!), "canonical-response.json", parsedBytes,
         );
-      } else if (input.response_artifact !== undefined || input.parsed_response !== undefined) {
+      } else if (input.audit.outcome === "invalid_response_received") {
+        if (input.invalid_response_artifact === undefined || input.response_artifact !== undefined || input.parsed_response !== undefined
+          || input.audit.invalid_response_record_object_uri !== this.invalidResponseRecordObjectUri(input.run_sha256, String(input.audit.invalid_response_record_sha256))) {
+          throw new Error("invalid_response_received 必须且只能携带 branded invalid artifact");
+        }
+        assertFormalOracleInvalidResponseArtifactV1(input.invalid_response_artifact);
+        const invalid = revalidateFormalOracleInvalidResponseArtifactV1(input.invalid_response_artifact);
+        const record = invalid.record;
+        const expected = snapshot.execution_plan.items[entryIndex];
+        const hasDerivedLayers = record.sse_derivation_record_sha256 !== null;
+        if (input.audit.fetch_observed_sse_object_uri !== this.fetchObservedSseObjectUri(input.run_sha256, record.fetch_observed_sse_bytes_sha256)
+          || (hasDerivedLayers && (input.audit.sse_derivation_object_uri !== this.sseDerivationObjectUri(input.run_sha256, record.sse_derivation_record_sha256!)
+            || input.audit.assistant_content_object_uri !== this.assistantContentObjectUri(input.run_sha256, record.assistant_content_bytes_sha256!)
+            || input.audit.sse_parser_version !== FORMAL_ORACLE_PI_RESPONSE_STREAM_VERSION))
+          || (!hasDerivedLayers && (input.audit.sse_derivation_object_uri !== null || input.audit.assistant_content_object_uri !== null
+            || input.audit.sse_parser_version !== null))) {
+          throw new Error("Invalid response A/B/C URI 与 failure stage/content address 不一致");
+        }
+        if (record.request_envelope_sha256 !== intent.request_envelope_sha256 || record.provider_body_sha256 !== intent.provider_body_sha256
+          || record.expected_model !== intent.model || record.expected_arm !== expected.arm
+          || record.expected_max_input_tokens !== intent.max_input_tokens || record.expected_max_output_tokens !== intent.max_output_tokens
+          || record.fetch_observed_sse_bytes_sha256 !== input.audit.fetch_observed_sse_bytes_sha256
+          || record.fetch_observed_sse_byte_length !== input.audit.fetch_observed_sse_byte_length
+          || record.invalid_response_record_sha256 !== input.audit.invalid_response_record_sha256
+          || hashFormalOracleInvalidResponseRecordV1(record) !== record.invalid_response_record_sha256
+          || record.sse_derivation_record_sha256 !== input.audit.sse_derivation_record_sha256
+          || record.assistant_content_bytes_sha256 !== input.audit.assistant_content_bytes_sha256
+          || record.assistant_content_byte_length !== input.audit.assistant_content_byte_length) {
+          throw new Error("Invalid response A/B/C/record 未与 audit/intent 精确闭合");
+        }
+        await this.privateFs.publishImmutableObject(
+          this.fetchObservedSseDirectory(input.run_sha256, record.fetch_observed_sse_bytes_sha256), "response.sse", invalid.raw_sse_bytes,
+        );
+        if (invalid.sse_derivation && invalid.assistant_content_bytes) {
+          await this.privateFs.publishImmutableObject(
+            this.sseDerivationDirectory(input.run_sha256, invalid.sse_derivation.proof_sha256), "derivation.json", privateCanonicalJsonBytes(invalid.sse_derivation),
+          );
+          await this.privateFs.publishImmutableObject(
+            this.assistantContentDirectory(input.run_sha256, invalid.sse_derivation.assistant_content_sha256), "assistant-content.utf8", invalid.assistant_content_bytes,
+          );
+        }
+        await this.privateFs.publishImmutableObject(
+          this.invalidResponseRecordDirectory(input.run_sha256, record.invalid_response_record_sha256), "invalid-response.json", privateCanonicalJsonBytes(record),
+        );
+      } else if (input.response_artifact !== undefined || input.invalid_response_artifact !== undefined || input.parsed_response !== undefined) {
         throw new Error("非 result_received attempt 不得携带 response objects");
       }
 
@@ -993,14 +1056,15 @@ export class FormalOracleRunStore {
         privateCanonicalJsonBytes(input.audit),
       );
       const unknown = input.audit.outcome === "unknown";
-      const reason = unknown
-        ? terminalReason(input.run_sha256, input.audit.request_id, input.audit, "ambiguous_unknown_attempt", input.created_at)
+      const invalid = input.audit.outcome === "invalid_response_received";
+      const reason = unknown || invalid
+        ? terminalReason(input.run_sha256, input.audit.request_id, input.audit, invalid ? "invalid_response_received" : "ambiguous_unknown_attempt", input.created_at)
         : null;
       if (reason) await this.persistTerminalReason(input.run_sha256, reason);
       const entries = snapshot.checkpoint.entries.map((prior, index): OracleGateCheckpointEntryV1 => index === entryIndex ? {
         ...prior,
-        state: unknown ? "BLOCKED_AMBIGUOUS" : "RECEIPT_COMMITTED",
-        resume_action: unknown ? "block_ambiguous" : "verify_receipt",
+        state: unknown ? "BLOCKED_AMBIGUOUS" : invalid ? "FAILED_CLOSED" : "RECEIPT_COMMITTED",
+        resume_action: unknown ? "block_ambiguous" : invalid ? "block_failed" : "verify_receipt",
         attempts_used: prior.attempts_used + 1,
         latest_attempt_audit_sha256: input.audit.attempt_sha256,
       } : { ...prior });
@@ -1008,7 +1072,7 @@ export class FormalOracleRunStore {
         snapshot,
         entries,
         input.created_at,
-        unknown ? "BLOCKED_AMBIGUOUS" : "RUNNING",
+        unknown ? "BLOCKED_AMBIGUOUS" : invalid ? "FAILED_CLOSED" : "RUNNING",
         reason?.terminal_reason_sha256 ?? null,
       );
       return this.commitCheckpointUnlocked(snapshot, next);
@@ -1249,15 +1313,16 @@ export class FormalOracleRunStore {
     executionPlan: FormalOracleExecutionPlanV1,
     entryIndex: number,
     attemptSha256: string,
-  ): Promise<RequestAttemptAuditV2> {
+  ): Promise<RequestAttemptAuditV3> {
     const bytes = await this.privateFs.readFile(this.attemptPath(run.run_sha256, attemptSha256));
-    const audit = parseCanonicalDocument<RequestAttemptAuditV2>(bytes, "Attempt audit");
+    const audit = parseCanonicalDocument<RequestAttemptAuditV3>(bytes, "Attempt audit");
     if (audit.attempt_sha256 !== attemptSha256 || hashRequestAttemptAudit(audit) !== attemptSha256) {
       throw new Error("Attempt audit 内容地址无效");
     }
     const intent = await this.loadIntentUnlocked(run, formalSpec, executionPlan, entryIndex, audit.intent_sha256);
     validationError("Attempt audit against intent", validateRequestAttemptAgainstIntent(intent, audit));
     if (audit.outcome === "result_received") await this.verifyResponseObjects(run.run_sha256, intent, audit);
+    if (audit.outcome === "invalid_response_received") await this.verifyInvalidResponseObjects(run.run_sha256, executionPlan.items[entryIndex], intent, audit);
     return audit;
   }
 
@@ -1267,9 +1332,9 @@ export class FormalOracleRunStore {
     executionPlan: FormalOracleExecutionPlanV1,
     entryIndex: number,
     committedSha256: string,
-  ): Promise<CommittedRequestV2> {
+  ): Promise<CommittedRequestV3> {
     const bytes = await this.privateFs.readFile(this.committedRequestPath(run.run_sha256, committedSha256));
-    const committed = parseCanonicalDocument<CommittedRequestV2>(bytes, "Committed request");
+    const committed = parseCanonicalDocument<CommittedRequestV3>(bytes, "Committed request");
     if (committed.committed_request_sha256 !== committedSha256 || hashCommittedRequest(committed) !== committedSha256) {
       throw new Error("Committed request 内容地址无效");
     }
@@ -1288,7 +1353,7 @@ export class FormalOracleRunStore {
   private async verifyResponseObjects(
     runSha256: string,
     intent: RequestIntentV1,
-    audit: RequestAttemptAuditV2,
+    audit: RequestAttemptAuditV3,
   ): Promise<Record<string, unknown>> {
     if (audit.outcome !== "result_received" || !audit.fetch_observed_sse_bytes_sha256 || !audit.sse_derivation_record_sha256
       || !audit.assistant_content_bytes_sha256 || !audit.canonical_response_bytes_sha256 || !audit.canonical_response_commitment_sha256
@@ -1330,6 +1395,50 @@ export class FormalOracleRunStore {
       throw new Error("Durable A/B/C/D response chain 无法从 raw SSE 重派生");
     }
     return parsed;
+  }
+
+  private async verifyInvalidResponseObjects(
+    runSha256: string,
+    expected: FormalOracleExecutionPlanItemV1,
+    intent: RequestIntentV1,
+    audit: RequestAttemptAuditV3,
+  ): Promise<void> {
+    if (audit.outcome !== "invalid_response_received" || !audit.fetch_observed_sse_object_uri
+      || !audit.fetch_observed_sse_bytes_sha256 || !audit.invalid_response_record_object_uri || !audit.invalid_response_record_sha256
+      || audit.fetch_observed_sse_object_uri !== this.fetchObservedSseObjectUri(runSha256, audit.fetch_observed_sse_bytes_sha256)
+      || audit.invalid_response_record_object_uri !== this.invalidResponseRecordObjectUri(runSha256, audit.invalid_response_record_sha256)) {
+      throw new Error("Invalid response audit refs 无效");
+    }
+    const raw = await this.privateFs.readFile(audit.fetch_observed_sse_object_uri);
+    const derived = createFormalOracleInvalidResponseArtifactV1({
+      raw_sse_bytes: raw, expected_model: intent.model, expected_arm: expected.arm,
+      request_envelope_sha256: intent.request_envelope_sha256, provider_body_sha256: intent.provider_body_sha256,
+      expected_max_input_tokens: intent.max_input_tokens, expected_max_output_tokens: intent.max_output_tokens,
+    });
+    const recordBytes = await this.privateFs.readFile(audit.invalid_response_record_object_uri);
+    const durableRecord = parseCanonicalDocument<FormalOracleInvalidResponseRecordV1>(recordBytes, "Invalid response record");
+    assertFormalOracleInvalidResponseRecordV1(durableRecord);
+    if (digest(raw) !== audit.fetch_observed_sse_bytes_sha256 || raw.byteLength !== audit.fetch_observed_sse_byte_length
+      || derived.record.invalid_response_record_sha256 !== audit.invalid_response_record_sha256
+      || hashFormalOracleInvalidResponseRecordV1(durableRecord) !== durableRecord.invalid_response_record_sha256
+      || !Buffer.from(privateCanonicalJsonBytes(derived.record)).equals(recordBytes)
+      || derived.record.sse_derivation_record_sha256 !== audit.sse_derivation_record_sha256
+      || derived.record.assistant_content_bytes_sha256 !== audit.assistant_content_bytes_sha256
+      || derived.record.assistant_content_byte_length !== audit.assistant_content_byte_length) {
+      throw new Error("Durable invalid response 无法从 raw SSE 重派生");
+    }
+    if (derived.sse_derivation && derived.assistant_content_bytes) {
+      if (!audit.sse_derivation_object_uri || !audit.assistant_content_object_uri
+        || audit.sse_derivation_object_uri !== this.sseDerivationObjectUri(runSha256, derived.sse_derivation.proof_sha256)
+        || audit.assistant_content_object_uri !== this.assistantContentObjectUri(runSha256, derived.sse_derivation.assistant_content_sha256)
+        || audit.sse_parser_version !== FORMAL_ORACLE_PI_RESPONSE_STREAM_VERSION) throw new Error("Invalid response B/C refs 缺失或 content address 无效");
+      const proof = await this.privateFs.readFile(audit.sse_derivation_object_uri);
+      const assistant = await this.privateFs.readFile(audit.assistant_content_object_uri);
+      if (!proof.equals(Buffer.from(privateCanonicalJsonBytes(derived.sse_derivation)))
+        || !assistant.equals(Buffer.from(derived.assistant_content_bytes))) throw new Error("Durable invalid response B/C 漂移");
+    } else if (audit.sse_derivation_object_uri !== null || audit.assistant_content_object_uri !== null) {
+      throw new Error("SSE protocol invalid 不得伪造 B/C");
+    }
   }
 
   private async persistTerminalReason(runSha256: string, reason: FormalOracleTerminalReasonV1): Promise<void> {
@@ -1399,8 +1508,8 @@ export class FormalOracleRunStore {
     assertGenesisMatchesPlans(checkpoints[0], structuralSchedule, executionPlan);
     const referenceCache = {
       intents: new Map<string, RequestIntentV1>(),
-      attempts: new Map<string, RequestAttemptAuditV2>(),
-      commits: new Map<string, CommittedRequestV2>(),
+      attempts: new Map<string, RequestAttemptAuditV3>(),
+      commits: new Map<string, CommittedRequestV3>(),
       terminalReasons: new Map<string, FormalOracleTerminalReasonV1>(),
     };
     for (const [index, checkpoint] of checkpoints.entries()) {
@@ -1427,8 +1536,8 @@ export class FormalOracleRunStore {
     previous: RunCheckpointV1 | null,
     cache: {
       intents: Map<string, RequestIntentV1>;
-      attempts: Map<string, RequestAttemptAuditV2>;
-      commits: Map<string, CommittedRequestV2>;
+      attempts: Map<string, RequestAttemptAuditV3>;
+      commits: Map<string, CommittedRequestV3>;
       terminalReasons: Map<string, FormalOracleTerminalReasonV1>;
     },
   ): Promise<void> {
@@ -1460,7 +1569,7 @@ export class FormalOracleRunStore {
         && Date.parse(activeIntent!.prepared_at) < Date.parse(previous!.created_at)) {
         throw new Error("Dispatch intent prepared_at 不得早于其前驱 checkpoint");
       }
-      if (["RECEIPT_COMMITTED", "RETRY_READY", "BLOCKED_AMBIGUOUS", "SCHEMA_VALIDATED_COMMITTED"].includes(entry.state)
+      if (["RECEIPT_COMMITTED", "RETRY_READY", "BLOCKED_AMBIGUOUS", "FAILED_CLOSED", "SCHEMA_VALIDATED_COMMITTED"].includes(entry.state)
         && (!activeIntent || !audit || activeIntent.intent_sha256 !== audit.intent_sha256
           || activeIntent.attempt_ordinal !== entry.attempts_used)) {
         throw new Error("Receipt-derived checkpoint 未绑定同序号 intent/audit");
@@ -1481,6 +1590,8 @@ export class FormalOracleRunStore {
       if (entry.state === "BLOCKED_AMBIGUOUS" && audit?.outcome !== "unknown") {
         throw new Error("BLOCKED_AMBIGUOUS 未绑定 unknown audit");
       }
+      if (entry.state === "FAILED_CLOSED" && audit?.outcome === "invalid_response_received"
+        && checkpoint.terminal_reason_sha256 === null) throw new Error("Invalid response FAILED_CLOSED 缺少 terminal reason");
       if (entry.committed_request_sha256) {
         const committed = cache.commits.get(entry.committed_request_sha256)
           ?? await this.loadCommittedRequestUnlocked(run, formalSpec, executionPlan, entryIndex, entry.committed_request_sha256);
@@ -1511,6 +1622,7 @@ export class FormalOracleRunStore {
       cache.attempts.set(audit.attempt_sha256, audit);
       if (terminalDetailHash(audit) !== reason.detail_sha256
         || (reason.reason_code === "ambiguous_unknown_attempt" && audit.outcome !== "unknown")
+        || (reason.reason_code === "invalid_response_received" && audit.outcome !== "invalid_response_received")
         || (reason.reason_code === "attempt_budget_exhausted"
           && !((audit.outcome === "not_sent" || audit.outcome === "no_result_confirmed")
             && entry.attempts_used >= entry.max_attempts))) {
@@ -1610,6 +1722,9 @@ export class FormalOracleRunStore {
   }
   private canonicalResponseDirectory(runSha256: string, responseSha256: string): string {
     return `${this.runPath(runSha256)}/objects/canonical-responses/${responseSha256}`;
+  }
+  private invalidResponseRecordDirectory(runSha256: string, recordSha256: string): string {
+    return `${this.runPath(runSha256)}/objects/invalid-response-records/${recordSha256}`;
   }
   private committedRequestDirectory(runSha256: string, committedSha256: string): string {
     return `${this.runPath(runSha256)}/objects/committed-requests/${committedSha256}`;
