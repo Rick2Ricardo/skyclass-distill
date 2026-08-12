@@ -10,6 +10,7 @@ export * from "./oracle-gate-frame-derivation.js";
 export * from "./oracle-gate-response.js";
 export * from "./oracle-gate-request.js";
 export * from "./oracle-gate-provider-request.js";
+export * from "./oracle-gate-pi-response-stream.js";
 export * from "./oracle-gate-user-prompt.js";
 export * from "./oracle-gate-run.js";
 export * from "./oracle-gate-trusted.js";

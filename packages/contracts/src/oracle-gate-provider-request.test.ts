@@ -58,6 +58,7 @@ describe("Formal Oracle Pi fetch-boundary provider body candidate", () => {
       adapter_version: FORMAL_ORACLE_PREPARED_ADAPTER_VERSION,
       token_field: FORMAL_ORACLE_PROVIDER_TOKEN_FIELD,
       request_envelope_sha256: source.payload_sha256,
+      max_input_tokens: 100,
       http_method: "POST", content_type: "application/json", redirect_policy_status: "not_bound_by_pi_sdk_fetch_boundary", hidden_provider_retries: 0,
       pi_sdk_fetch_boundary_equivalence_status: "pending_local_fake_fetch_proof",
       api_execution_allowed: false,

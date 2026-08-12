@@ -9,6 +9,13 @@ import {
   type FormalOraclePreparedProviderRequestArtifactV1,
 } from "../../contracts/src/oracle-gate-provider-request.js";
 import { sha256Hex } from "../../contracts/src/sha256.js";
+import {
+  buildFormalOraclePiResponseStreamFixtureV1,
+  createFormalOraclePiResponseStreamArtifactV1,
+  revalidateFormalOraclePiResponseStreamArtifactV1,
+  type FormalOraclePiResponseStreamArtifactV1,
+  type FormalOraclePiResponseStreamProofV1,
+} from "../../contracts/src/oracle-gate-pi-response-stream.js";
 
 export interface FormalOraclePiFetchBoundaryProofV1 {
   schema_version: "formal-oracle-pi-fetch-boundary-proof-v1";
@@ -27,10 +34,16 @@ export interface FormalOraclePiFetchBoundaryProofV1 {
   node_engine_status: "pending_incompatible_node_engine";
   runtime_toolchain_status: "pending_incompatible_node_engine_and_external_immutable_capsule";
   provider_endpoint_account_status: "pending_external_runtime_binding";
-  provider_response_capture_status: "pending_strict_sse_capture_contract";
+  local_fake_response_stream_proof: Readonly<FormalOraclePiResponseStreamProofV1>;
+  provider_response_capture_status: "local_memory_fake_sse_proved_external_provider_pending";
   external_toolchain_authenticity_status: "pending_external_immutable_capsule";
   proof_status: "local_fake_fetch_exact_body_proved_non_executable";
   api_execution_allowed: false;
+}
+
+export interface FormalOraclePiFetchBoundaryProofResultV1 {
+  readonly proof: Readonly<FormalOraclePiFetchBoundaryProofV1>;
+  readonly response_stream_artifact: FormalOraclePiResponseStreamArtifactV1;
 }
 
 const COMPAT = Object.freeze({
@@ -96,7 +109,7 @@ async function assertObservedLocalToolchain(): Promise<void> {
 export async function proveNonProductionFormalOraclePiFetchBoundary(input: {
   prepared: FormalOraclePreparedProviderRequestArtifactV1;
   signal?: AbortSignal;
-}): Promise<FormalOraclePiFetchBoundaryProofV1> {
+}): Promise<FormalOraclePiFetchBoundaryProofResultV1> {
   assertFormalOraclePreparedProviderRequestArtifact(input.prepared);
   if (process.version !== FORMAL_ORACLE_PI_OBSERVED_LOCAL_DEPENDENCY_HASHES.observed_node_version) throw new Error("Pi fetch-boundary Node observation 与冻结 local hashes 不一致");
   await assertObservedLocalToolchain();
@@ -138,6 +151,7 @@ export async function proveNonProductionFormalOraclePiFetchBoundary(input: {
   let fetchCount = 0;
   let onPayloadCount = 0;
   let capturedRetry = "";
+  let responseStreamArtifact: FormalOraclePiResponseStreamArtifactV1 | null = null;
   const guardedFetch: typeof globalThis.fetch = async (request, init) => {
     fetchCount += 1;
     if (fetchCount !== 1) throw new Error("Pi fetch-boundary proof 检测到 duplicate/hidden retry");
@@ -153,12 +167,30 @@ export async function proveNonProductionFormalOraclePiFetchBoundary(input: {
       throw new Error("Pi actual fetch init URL/header/body 未精确匹配 prepared artifact");
     }
     capturedRetry = headers.get("x-stainless-retry-count") ?? "";
-    const fixture = [
-      `data: ${JSON.stringify({ id: "chatcmpl-fixture", object: "chat.completion.chunk", created: 1, model: envelope.model, choices: [{ index: 0, delta: { role: "assistant", content: "{}" }, finish_reason: null }] })}\n\n`,
-      `data: ${JSON.stringify({ id: "chatcmpl-fixture", object: "chat.completion.chunk", created: 1, model: envelope.model, choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}\n\n`,
-      "data: [DONE]\n\n",
-    ].join("");
-    return new Response(fixture, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+    const fixture = buildFormalOraclePiResponseStreamFixtureV1({
+      response_id: "chatcmpl-formal-fixture",
+      model: envelope.model,
+      created: 1,
+      content_chunks: ["{\"schema_version\":", "\"teacher-evidence-response-v1\",", "\"observed_board_actions\":[],\"generalized_teaching_capability\":{\"name\":\"fixture\",\"mechanism\":\"fixture\",\"action_program\":[\"fixture\"]},\"evidence_claims\":[],\"uncertainties\":[]}"],
+      usage: {
+        prompt_tokens: 1,
+        completion_tokens: 1,
+        total_tokens: 2,
+        prompt_tokens_details: { cached_tokens: 0 },
+        completion_tokens_details: { reasoning_tokens: 0 },
+      },
+    });
+    responseStreamArtifact = createFormalOraclePiResponseStreamArtifactV1({
+      raw_sse_bytes: fixture,
+      expected_model: envelope.model,
+      request_envelope_sha256: prepared.request_envelope_sha256,
+      provider_body_sha256: prepared.provider_body_sha256,
+      expected_max_input_tokens: prepared.max_input_tokens,
+      expected_max_output_tokens: envelope.max_completion_tokens,
+    });
+    // Response snapshots this exact raw buffer; no equivalent string is built.
+    const responseBuffer = fixture.buffer.slice(fixture.byteOffset, fixture.byteOffset + fixture.byteLength) as ArrayBuffer;
+    return new Response(responseBuffer, { status: 200, headers: { "Content-Type": "text/event-stream" } });
   };
   const result = await models.complete(model, {
     systemPrompt: envelope.messages[0].content,
@@ -184,12 +216,29 @@ export async function proveNonProductionFormalOraclePiFetchBoundary(input: {
       return undefined;
     },
   });
-  // The fixture merely lets Pi drain the request path. Its parsed contents do
-  // not prove the future strict raw-SSE/usage/stop capture contract.
-  if (result.stopReason !== "stop" || fetchCount !== 1 || onPayloadCount !== 1 || capturedRetry !== "0") {
+  if (result.stopReason !== "stop" || fetchCount !== 1 || onPayloadCount !== 1 || capturedRetry !== "0" || !responseStreamArtifact) {
     throw new Error("Pi fetch-boundary request-path fixture/调用计数未闭合");
   }
-  return Object.freeze({
+  const revalidatedResponseStreamArtifact = revalidateFormalOraclePiResponseStreamArtifactV1(responseStreamArtifact);
+  const piText = result.content.filter((item): item is TextContent => item.type === "text").map((item) => item.text).join("");
+  const expectedPiText = new TextDecoder("utf-8", { fatal: true }).decode(revalidatedResponseStreamArtifact.assistant_content_bytes);
+  const expectedUsage = revalidatedResponseStreamArtifact.proof.normalized_usage;
+  if (result.content.some((item) => item.type !== "text") || piText !== expectedPiText || result.responseId !== revalidatedResponseStreamArtifact.proof.response_id
+    // Pi only populates responseModel when the provider chunk differs from the
+    // requested model; the strict raw parser already rejects such drift.
+    || result.responseModel !== undefined || result.rawStopReason !== "stop"
+    || result.usage.input !== expectedUsage.input_tokens || result.usage.output !== expectedUsage.output_tokens
+    || result.usage.cacheRead !== 0 || result.usage.cacheWrite !== 0 || result.usage.reasoning !== 0
+    || result.usage.totalTokens !== expectedUsage.total_tokens) {
+    throw new Error(`Pi decoded result 与 fetch-observed SSE artifact 不一致：${JSON.stringify({
+      content_types: result.content.map((item) => item.type), pi_text_sha256: sha256Hex(new TextEncoder().encode(piText)),
+      expected_text_sha256: revalidatedResponseStreamArtifact.proof.assistant_content_sha256,
+      response_id: result.responseId, expected_response_id: revalidatedResponseStreamArtifact.proof.response_id,
+      response_model: result.responseModel, expected_model: revalidatedResponseStreamArtifact.proof.model,
+      raw_stop_reason: result.rawStopReason, usage: result.usage,
+    })}`);
+  }
+  const proof: FormalOraclePiFetchBoundaryProofV1 = Object.freeze({
     schema_version: "formal-oracle-pi-fetch-boundary-proof-v1",
     request_envelope_sha256: prepared.request_envelope_sha256,
     provider_body_sha256: prepared.provider_body_sha256,
@@ -206,9 +255,11 @@ export async function proveNonProductionFormalOraclePiFetchBoundary(input: {
     node_engine_status: "pending_incompatible_node_engine",
     runtime_toolchain_status: "pending_incompatible_node_engine_and_external_immutable_capsule",
     provider_endpoint_account_status: "pending_external_runtime_binding",
-    provider_response_capture_status: "pending_strict_sse_capture_contract",
+    local_fake_response_stream_proof: revalidatedResponseStreamArtifact.proof,
+    provider_response_capture_status: "local_memory_fake_sse_proved_external_provider_pending",
     external_toolchain_authenticity_status: "pending_external_immutable_capsule",
     proof_status: "local_fake_fetch_exact_body_proved_non_executable",
     api_execution_allowed: false,
   });
+  return Object.freeze({ proof, response_stream_artifact: revalidatedResponseStreamArtifact });
 }

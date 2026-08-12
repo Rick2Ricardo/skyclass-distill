@@ -10,6 +10,7 @@ import {
 import { ORACLE_GATE_RESPONSE_SCHEMA_SHA256 } from "../../contracts/src/oracle-gate-response.js";
 import { sha256Hex } from "../../contracts/src/sha256.js";
 import { proveNonProductionFormalOraclePiFetchBoundary } from "./formalOraclePreparedTransport.js";
+import { revalidateFormalOraclePiResponseStreamArtifactV1 } from "../../contracts/src/oracle-gate-pi-response-stream.js";
 
 const text = (value: string): Uint8Array => new TextEncoder().encode(value);
 function prepared(maxOutputTokens = 2048, visual = false) {
@@ -37,7 +38,8 @@ function prepared(maxOutputTokens = 2048, visual = false) {
 describe("Formal Oracle non-production Pi fetch-boundary proof", () => {
   it("uses real Pi Models.complete and OpenAI SDK once with internally guarded no-network fetch", async () => {
     const artifact = prepared(2048);
-    const proof = await proveNonProductionFormalOraclePiFetchBoundary({ prepared: artifact });
+    const result = await proveNonProductionFormalOraclePiFetchBoundary({ prepared: artifact });
+    const proof = result.proof;
     expect(proof).toMatchObject({
       fetch_count: 1, on_payload_count: 1, on_payload_replacement: false,
       completion_method: "models.complete_non_simple", requested_max_tokens: 2048,
@@ -45,10 +47,25 @@ describe("Formal Oracle non-production Pi fetch-boundary proof", () => {
       redirect_policy_status: "pending_not_bound_by_pi_sdk_fetch_boundary",
       runtime_toolchain_status: "pending_incompatible_node_engine_and_external_immutable_capsule",
       proof_status: "local_fake_fetch_exact_body_proved_non_executable", api_execution_allowed: false,
-      provider_response_capture_status: "pending_strict_sse_capture_contract",
+      provider_response_capture_status: "local_memory_fake_sse_proved_external_provider_pending",
+      local_fake_response_stream_proof: {
+        schema_version: "formal-oracle-pi-response-stream-v1",
+        content_event_count: 3,
+        role_prelude_count: 1,
+        finish_reason: "stop",
+        done_count: 1,
+        provider_response_scope: "untrusted_sse_entity_strict_derivation_only",
+        store_integration_status: "pending_raw_sse_store_contract",
+        external_provider_response_status: "pending_endpoint_account_exactly_once_and_capture",
+        api_execution_allowed: false,
+      },
     });
     expect(artifact.provider_body_dispatch_status).toBe("pending_local_pi_fetch_boundary_proof_non_executable");
     expect(artifact.pi_sdk_fetch_boundary_equivalence_status).toBe("pending_local_fake_fetch_proof");
+    expect(JSON.stringify(proof)).not.toContain("raw_sse_bytes");
+    expect(JSON.stringify(proof)).not.toContain("assistant_content_bytes");
+    expect(revalidateFormalOraclePiResponseStreamArtifactV1(result.response_stream_artifact).proof)
+      .toEqual(proof.local_fake_response_stream_proof);
     expect(new TextDecoder().decode(artifact.body_bytes)).not.toContain("runtime-secret");
   });
 
@@ -59,7 +76,7 @@ describe("Formal Oracle non-production Pi fetch-boundary proof", () => {
       { type: "image_url", image_url: { url: "data:image/jpeg;base64,AQIDBA==" } },
     ]);
     await expect(proveNonProductionFormalOraclePiFetchBoundary({ prepared: artifact })).resolves.toMatchObject({
-      fetch_count: 1, provider_body_sha256: artifact.provider_body_sha256,
+      proof: { fetch_count: 1, provider_body_sha256: artifact.provider_body_sha256 },
     });
   });
 

@@ -50,6 +50,7 @@ export interface FormalOraclePreparedProviderRequestArtifactV1 {
   readonly token_field: typeof FORMAL_ORACLE_PROVIDER_TOKEN_FIELD;
   readonly request_envelope_sha256: string;
   readonly provider_body_sha256: string;
+  readonly max_input_tokens: number;
   readonly timeout_ms: number;
   readonly http_method: "POST";
   readonly content_type: "application/json";
@@ -220,6 +221,7 @@ function createArtifact(envelope: FormalOraclePiRequestArtifact, body: FormalOra
     token_field: FORMAL_ORACLE_PROVIDER_TOKEN_FIELD,
     request_envelope_sha256: envelope.payload_sha256,
     provider_body_sha256: sha256Hex(bytes),
+    max_input_tokens: envelope.envelope.max_input_tokens,
     timeout_ms: envelope.envelope.timeout_ms,
     http_method: "POST" as const,
     content_type: "application/json" as const,
@@ -287,6 +289,7 @@ export function revalidateFormalOraclePreparedProviderRequestArtifact(
     || value.provider_body_dispatch_status !== "pending_local_pi_fetch_boundary_proof_non_executable"
     || value.adapter_version !== FORMAL_ORACLE_PREPARED_ADAPTER_VERSION
     || value.token_field !== FORMAL_ORACLE_PROVIDER_TOKEN_FIELD || value.request_envelope_sha256 !== envelope.payload_sha256
+    || value.max_input_tokens !== envelope.envelope.max_input_tokens
     || value.http_method !== "POST" || value.content_type !== "application/json"
     || value.redirect_policy_status !== "not_bound_by_pi_sdk_fetch_boundary"
     || value.hidden_provider_retries !== 0

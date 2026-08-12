@@ -121,7 +121,7 @@ export interface RequestAttemptAuditV1 {
   provider_request_id: string | null;
   request_sha256: string;
   request_object_uri: string;
-  /** Immutable provider-original JSON UTF-8 bytes. */
+  /** Immutable assistant-content JSON UTF-8 bytes; raw provider SSE is not yet integrated here. */
   response_object_uri: string | null;
   response_bytes_sha256: string | null;
   /** Immutable canonical JSON object deterministically parsed from response_object_uri. */
