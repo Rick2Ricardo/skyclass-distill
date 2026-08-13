@@ -564,7 +564,7 @@ function assertStrictFormalSpec(spec: OracleGateFormalSpec, run: FormalRunContra
   }
 }
 
-function assertScheduleVisual(raw: OracleGateRunVisualV1, label: string, spec: OracleGateFormalSpec): void {
+function assertScheduleVisual(raw: OracleGateRunVisualV1, label: string, spec: Pick<OracleGateFormalSpec, "budget">): void {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)
     || !exactKeys(raw as unknown as Record<string, unknown>, ["label", "object_uri", "sha256", "mime_type", "width", "height", "byte_length"])
     || raw.label !== "visual-1" || !isSafeUri(raw.object_uri) || !/^[a-f0-9]{64}$/.test(raw.sha256)
@@ -574,10 +574,10 @@ function assertScheduleVisual(raw: OracleGateRunVisualV1, label: string, spec: O
   }
 }
 
-function assertStructuralSchedule(
+export function assertFormalOracleStructuralScheduleAgainstRun(
   schedule: FormalOracleStructuralScheduleV1,
-  spec: OracleGateFormalSpec,
-  run: FormalRunContractV1,
+  spec: Pick<OracleGateFormalSpec, "seeds">,
+  run: Pick<FormalRunContractV1, "request_count" | "schedule_sha256">,
 ): void {
   if (!isDenseArray(schedule) || schedule.length !== run.request_count) {
     throw new Error("Structural schedule 必须是与 run.request_count 一致的稠密数组");
@@ -625,11 +625,11 @@ function assertStructuralSchedule(
   }
 }
 
-function assertExecutionPlan(
+export function assertFormalOracleExecutionPlanAgainstRun(
   plan: FormalOracleExecutionPlanV1,
   schedule: FormalOracleStructuralScheduleV1,
-  spec: OracleGateFormalSpec,
-  run: FormalRunContractV1,
+  spec: Pick<OracleGateFormalSpec, "model" | "prompt" | "budget" | "transport" | "temperature" | "cache_retention" | "tools_policy">,
+  run: Pick<FormalRunContractV1, "execution_plan_sha256">,
 ): void {
   if (!plan || typeof plan !== "object" || Array.isArray(plan)
     || !exactKeys(plan as unknown as Record<string, unknown>, ["schema_version", "execution_plan_sha256", "items"])
@@ -670,7 +670,7 @@ function assertExecutionPlan(
   }
 }
 
-function assertGenesisMatchesPlans(
+export function assertFormalOracleGenesisMatchesPlans(
   checkpoint: RunCheckpointV1,
   schedule: FormalOracleStructuralScheduleV1,
   plan: FormalOracleExecutionPlanV1,
@@ -904,9 +904,9 @@ export class FormalOracleRunStore {
     validationError("Formal run contract", validateFormalRunContract(input.run));
     validationError("Initial checkpoint", validateRunCheckpoint(input.initial_checkpoint));
     assertStrictFormalSpec(input.formal_spec, input.run);
-    assertStructuralSchedule(input.structural_schedule, input.formal_spec, input.run);
-    assertExecutionPlan(input.execution_plan, input.structural_schedule, input.formal_spec, input.run);
-    assertGenesisMatchesPlans(input.initial_checkpoint, input.structural_schedule, input.execution_plan);
+    assertFormalOracleStructuralScheduleAgainstRun(input.structural_schedule, input.formal_spec, input.run);
+    assertFormalOracleExecutionPlanAgainstRun(input.execution_plan, input.structural_schedule, input.formal_spec, input.run);
+    assertFormalOracleGenesisMatchesPlans(input.initial_checkpoint, input.structural_schedule, input.execution_plan);
     if (input.run.run_store_uri !== this.runStoreUri) throw new Error("run_store_uri 与私有 store 根不一致");
     if (input.initial_checkpoint.generation !== 0 || input.initial_checkpoint.previous_checkpoint_sha256 !== null
       || input.initial_checkpoint.run_state !== "SEALED_READY") {
@@ -1856,10 +1856,10 @@ export class FormalOracleRunStore {
     assertStrictFormalSpec(formalSpec, run);
     const scheduleBytes = await this.privateFs.readFile(this.structuralSchedulePath(runSha256, run.schedule_sha256));
     const structuralSchedule = parseCanonicalDocument<FormalOracleStructuralScheduleV1>(scheduleBytes, "Structural schedule");
-    assertStructuralSchedule(structuralSchedule, formalSpec, run);
+    assertFormalOracleStructuralScheduleAgainstRun(structuralSchedule, formalSpec, run);
     const executionPlanBytes = await this.privateFs.readFile(this.executionPlanPath(runSha256, run.execution_plan_sha256));
     const executionPlan = parseCanonicalDocument<FormalOracleExecutionPlanV1>(executionPlanBytes, "Execution plan");
-    assertExecutionPlan(executionPlan, structuralSchedule, formalSpec, run);
+    assertFormalOracleExecutionPlanAgainstRun(executionPlan, structuralSchedule, formalSpec, run);
     const reversed: RunCheckpointV1[] = [];
     const seen = new Set<string>();
     let cursor: string | null = head.checkpoint_sha256;
@@ -1888,7 +1888,7 @@ export class FormalOracleRunStore {
     for (let index = 1; index < checkpoints.length; index += 1) {
       validationError("Checkpoint history", validateRunCheckpointTransition(checkpoints[index - 1], checkpoints[index]));
     }
-    assertGenesisMatchesPlans(checkpoints[0], structuralSchedule, executionPlan);
+    assertFormalOracleGenesisMatchesPlans(checkpoints[0], structuralSchedule, executionPlan);
     const referenceCache = {
       intents: new Map<string, RequestIntentV1>(),
       attempts: new Map<string, RequestAttemptAuditV3>(),

@@ -8,6 +8,7 @@ export * from "./oracle-gate-composition.js";
 export * from "./oracle-gate-input-token-count.js";
 export * from "./oracle-gate-blind-rating.js";
 export * from "./oracle-gate-public-evidence-v2.js";
+export * from "./oracle-gate-preregistration-v2.js";
 export * from "./oracle-gate-formal.js";
 export * from "./oracle-gate-frame-derivation.js";
 export * from "./oracle-gate-response.js";
