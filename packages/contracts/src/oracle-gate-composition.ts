@@ -8,9 +8,17 @@ import {
   validateFormalOracleInputTokenCountReceiptSetAgainstExecutionPlan,
   type FormalOracleInputTokenCountReceiptSetV1,
 } from "./oracle-gate-input-token-count.js";
+import {
+  validateFormalOraclePreregistrationBundleV2,
+  validateFormalRunContractV2AgainstPreregistrationBundle,
+  snapshotFormalOraclePreregistrationV2PlainData,
+  type FormalOraclePreregistrationBundleV2,
+  type FormalRunContractV2,
+} from "./oracle-gate-preregistration-v2.js";
 
 export const FORMAL_ORACLE_COMPOSITION_ATTESTATION_DOMAIN = "skyclass/formal-oracle/composition-attestation/v3\0";
 export const FORMAL_ORACLE_LOCAL_PI_PROOF_SET_DOMAIN = "skyclass/formal-oracle/local-pi-proof-set/v1\0";
+export const FORMAL_ORACLE_COMPOSITION_ATTESTATION_V4_DOMAIN = "skyclass/formal-oracle/composition-attestation/v4\0";
 
 export interface FormalOracleLocalPiProofBindingV1 {
   schedule_index: number;
@@ -98,6 +106,24 @@ export interface FormalOracleCompositionAttestationV3 {
   api_execution_allowed: false;
 }
 
+/**
+ * Breaking V4 composition record. It preserves every V3 media/request proof
+ * and additionally embeds the exact preregistration DAG used before genesis.
+ * This is still a non-authoritative, non-executable content-addressed record.
+ */
+export interface FormalOracleCompositionAttestationV4 extends Omit<FormalOracleCompositionAttestationV3,
+  "schema_version" | "composition_sha256"> {
+  schema_version: "formal-oracle-composition-attestation-v4";
+  composition_sha256: string;
+  preregistration_bundle_sha256: string;
+  public_evidence_derivation_policy_sha256: string;
+  statistics_plan_sha256: string;
+  rating_plan_sha256: string;
+  preregistration_bundle: FormalOraclePreregistrationBundleV2;
+  preregistration_store_status: "create_once_genesis_reloaded_non_executable";
+  execution_migration_status: "pending_formal_run_store_v2_execution_pipeline";
+}
+
 export interface FormalOracleCompositionValidationIssue {
   path: string;
   message: string;
@@ -175,6 +201,128 @@ export function hashFormalOracleCompositionAttestation(
   input: FormalOracleCompositionAttestationV3,
 ): string {
   return sha256Hex(`${FORMAL_ORACLE_COMPOSITION_ATTESTATION_DOMAIN}${canonicalFormalOracleCompositionAttestationPayload(input)}`);
+}
+
+export function canonicalFormalOracleCompositionAttestationV4Payload(
+  input: FormalOracleCompositionAttestationV4,
+): string {
+  const snapshot = snapshotFormalOraclePreregistrationV2PlainData(input);
+  const { composition_sha256: _hash, ...payload } = snapshot;
+  return stableJson(payload);
+}
+
+export function hashFormalOracleCompositionAttestationV4(
+  input: FormalOracleCompositionAttestationV4,
+): string {
+  return sha256Hex(`${FORMAL_ORACLE_COMPOSITION_ATTESTATION_V4_DOMAIN}${canonicalFormalOracleCompositionAttestationV4Payload(input)}`);
+}
+
+function v3Projection(input: FormalOracleCompositionAttestationV4): FormalOracleCompositionAttestationV3 {
+  const {
+    preregistration_bundle_sha256: _bundle,
+    public_evidence_derivation_policy_sha256: _policy,
+    statistics_plan_sha256: _statistics,
+    rating_plan_sha256: _rating,
+    preregistration_bundle: _bundleBody,
+    preregistration_store_status: _store,
+    execution_migration_status: _migration,
+    ...common
+  } = input;
+  const projection = {
+    ...common,
+    schema_version: "formal-oracle-composition-attestation-v3" as const,
+    composition_sha256: "0".repeat(64),
+  };
+  projection.composition_sha256 = hashFormalOracleCompositionAttestation(projection);
+  return projection;
+}
+
+export function validateFormalOracleCompositionAttestationV4(
+  input: unknown,
+): FormalOracleCompositionValidationReport {
+  const issues: FormalOracleCompositionValidationIssue[] = [];
+  const issue = (path: string, message: string): void => { issues.push({ path, message }); };
+  try { input = snapshotFormalOraclePreregistrationV2PlainData(input); }
+  catch { return { valid: false, issues: [{ path: "$", message: "必须是无 accessor/toJSON 的稠密 plain data" }] }; }
+  if (!isRecord(input)) return { valid: false, issues: [{ path: "$", message: "必须是对象" }] };
+  const extras = ["preregistration_bundle_sha256","public_evidence_derivation_policy_sha256","statistics_plan_sha256","rating_plan_sha256","preregistration_bundle","preregistration_store_status","execution_migration_status"];
+  const v3Keys = Object.keys(v3Projection({ ...input, schema_version: "formal-oracle-composition-attestation-v4" } as unknown as FormalOracleCompositionAttestationV4));
+  if (!exactKeys(input, [...v3Keys, ...extras])) issue("$", "字段集合无效");
+  if (input.schema_version !== "formal-oracle-composition-attestation-v4") issue("schema_version", "版本无效");
+  let projection: FormalOracleCompositionAttestationV3 | null = null;
+  try { projection = v3Projection(input as unknown as FormalOracleCompositionAttestationV4); }
+  catch { issue("$", "V3 公共证明投影不可规范化"); }
+  if (projection) {
+    const base = validateFormalOracleCompositionAttestation(projection);
+    issues.push(...base.issues.map((entry) => ({ path: `common.${entry.path}`, message: entry.message })));
+  }
+  const bundleReport = validateFormalOraclePreregistrationBundleV2(input.preregistration_bundle);
+  issues.push(...bundleReport.issues.map((entry) => ({ path: `preregistration_bundle.${entry.path}`, message: entry.message })));
+  for (const field of ["preregistration_bundle_sha256","public_evidence_derivation_policy_sha256","statistics_plan_sha256","rating_plan_sha256"] as const) {
+    if (!isSha(input[field])) issue(field, "必须是 SHA-256");
+  }
+  if (isRecord(input.preregistration_bundle)) {
+    const bundle = input.preregistration_bundle as unknown as FormalOraclePreregistrationBundleV2;
+    if (input.preregistration_bundle_sha256 !== bundle.preregistration_bundle_sha256
+      || input.public_evidence_derivation_policy_sha256 !== bundle.public_evidence_derivation_policy_sha256
+      || input.statistics_plan_sha256 !== bundle.statistics_plan_sha256
+      || input.rating_plan_sha256 !== bundle.rating_plan_sha256
+      || input.formal_spec_sha256 !== bundle.formal_spec_sha256) issue("preregistration_roots", "V4 顶层根未逐项绑定 embedded bundle");
+  }
+  if (input.preregistration_store_status !== "create_once_genesis_reloaded_non_executable"
+    || input.execution_migration_status !== "pending_formal_run_store_v2_execution_pipeline") issue("preregistration_status", "V2 store/execution migration 状态无效");
+  if (isSha(input.composition_sha256)) {
+    try {
+      if (hashFormalOracleCompositionAttestationV4(input as unknown as FormalOracleCompositionAttestationV4) !== input.composition_sha256) issue("composition_sha256", "V4 内容寻址哈希不匹配");
+    } catch { issue("composition_sha256", "V4 内容不可规范化"); }
+  } else issue("composition_sha256", "必须是 SHA-256");
+  return { valid: issues.length === 0, issues };
+}
+
+export function validateFormalOracleCompositionAttestationV4AgainstRunAndPlan(
+  input: unknown,
+  run: FormalRunContractV2,
+  plan: { execution_plan_sha256: string; items: readonly FormalOracleLocalPiExpectedPlanItemV1[] },
+): FormalOracleCompositionValidationReport {
+  const base = validateFormalOracleCompositionAttestationV4(input);
+  const issues = [...base.issues];
+  if (!base.valid) return { valid: false, issues };
+  let attestation: unknown, frozenRun: FormalRunContractV2, frozenPlan: typeof plan;
+  try {
+    attestation = snapshotFormalOraclePreregistrationV2PlainData(input);
+    frozenRun = snapshotFormalOraclePreregistrationV2PlainData(run);
+    frozenPlan = snapshotFormalOraclePreregistrationV2PlainData(plan);
+  } catch {
+    issues.push({ path: "$", message: "V4/run/plan 必须是无 accessor/toJSON 的稠密 plain data" });
+    return { valid: false, issues };
+  }
+  if (!isRecord(attestation) || !isRecord(attestation.preregistration_bundle)) return { valid: false, issues };
+  const runReport = validateFormalRunContractV2AgainstPreregistrationBundle(frozenRun, attestation.preregistration_bundle);
+  issues.push(...runReport.issues.map((entry) => ({ path: `run.${entry.path}`, message: entry.message })));
+  const planReport = validateFormalOracleCompositionAttestationAgainstExecutionPlan(v3Projection(attestation as unknown as FormalOracleCompositionAttestationV4), frozenPlan);
+  issues.push(...planReport.issues.map((entry) => ({ path: `plan.${entry.path}`, message: entry.message })));
+  if (attestation.run_sha256 !== frozenRun.run_sha256 || attestation.preregistration_bundle_sha256 !== frozenRun.preregistration_bundle_sha256
+    || attestation.public_evidence_derivation_policy_sha256 !== frozenRun.public_evidence_derivation_policy_sha256
+    || attestation.statistics_plan_sha256 !== frozenRun.statistics_plan_sha256 || attestation.rating_plan_sha256 !== frozenRun.rating_plan_sha256) {
+    issues.push({ path: "run", message: "V4 composition 未绑定同一 V2 run/preregistration roots" });
+  }
+  if (attestation.execution_plan_sha256 !== frozenRun.execution_plan_sha256
+    || attestation.execution_plan_sha256 !== frozenPlan.execution_plan_sha256
+    || attestation.schedule_sha256 !== frozenRun.schedule_sha256
+    || attestation.media_attestation_sha256 !== frozenRun.media_attestation_sha256
+    || attestation.speech_attestation_sha256 !== frozenRun.speech_attestation_sha256
+    || attestation.ledger_registry_sha256 !== frozenRun.ledger_registry_sha256
+    || attestation.signed_gold_dataset_sha256 !== frozenRun.signed_gold_dataset_sha256
+    || attestation.formal_input_manifest_sha256 !== frozenRun.formal_input_manifest_sha256
+    || attestation.formal_spec_sha256 !== frozenRun.formal_spec_sha256
+    || attestation.code_revision !== frozenRun.code_revision
+    || attestation.build_artifact_sha256 !== frozenRun.build_artifact_sha256
+    || attestation.run_store_uri !== frozenRun.run_store_uri
+    || attestation.request_count !== frozenRun.request_count
+    || frozenPlan.items.length !== frozenRun.request_count) {
+    issues.push({ path: "run_projection", message: "V4 composition/run/plan 的调度、媒体、registry、Gold、code/build、store 与请求数未逐项闭合" });
+  }
+  return { valid: issues.length === 0, issues };
 }
 
 export function hashFormalOracleLocalPiProofSet(

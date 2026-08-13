@@ -3,18 +3,23 @@ import type {
   OracleGateFormalCase,
   OracleGateFormalInputManifest,
   OracleGateFormalSpec,
+  OracleGateFormalSpecV2,
   SignedGoldDataset,
 } from "../../contracts/src/index.js";
 import {
   canonicalOracleGateFormalInputPayload,
   canonicalOracleGateFormalSpecPayload,
+  hashOracleGateFormalSpecV2,
   canonicalSignedGoldDatasetPayload,
   validateOracleGateFormalInput,
   validateOracleGateFormalSpec,
+  validateOracleGateFormalSpecV2,
   validateSignedGoldDataset,
   validateSignedGoldRecordSignatures,
 } from "../../contracts/src/index.js";
 import type { OraclePilotArm } from "./oraclePilot.js";
+
+type OracleGateExecutableFormalSpec = OracleGateFormalSpec | OracleGateFormalSpecV2;
 
 const ARMS: OraclePilotArm[] = [
   "transcript_only",
@@ -89,14 +94,16 @@ function assertDataset(dataset: SignedGoldDataset): void {
 function assertManifestAndSpec(
   dataset: SignedGoldDataset,
   manifest: OracleGateFormalInputManifest,
-  spec: OracleGateFormalSpec,
+  spec: OracleGateExecutableFormalSpec,
 ): void {
   const manifestReport = validateOracleGateFormalInput(manifest);
   if (!manifestReport.valid) throw new Error(`Formal Oracle Gate 输入清单无效：${manifestReport.issues.slice(0, 6).map((item) => `${item.path} ${item.message}`).join("；")}`);
-  const specReport = validateOracleGateFormalSpec(spec);
+  const specReport = spec.schema_version === "oracle-gate-formal-spec-v2"
+    ? validateOracleGateFormalSpecV2(spec) : validateOracleGateFormalSpec(spec);
   if (!specReport.valid) throw new Error(`Formal Oracle Gate 冻结协议无效：${specReport.issues.slice(0, 6).map((item) => `${item.path} ${item.message}`).join("；")}`);
   const manifestSha = digest(canonicalOracleGateFormalInputPayload(manifest));
-  const specSha = digest(canonicalOracleGateFormalSpecPayload(spec));
+  const specSha = spec.schema_version === "oracle-gate-formal-spec-v2"
+    ? hashOracleGateFormalSpecV2(spec) : digest(canonicalOracleGateFormalSpecPayload(spec));
   if (manifestSha !== manifest.manifest_sha256) throw new Error("Formal Oracle Gate 输入清单内容哈希不匹配");
   if (specSha !== spec.spec_sha256) throw new Error("Formal Oracle Gate 冻结协议内容哈希不匹配");
   if (manifest.signed_gold_dataset_sha256 !== dataset.dataset_sha256 || spec.signed_gold_dataset_sha256 !== dataset.dataset_sha256) throw new Error("Formal Oracle Gate 输入或协议未绑定当前 Signed Gold 数据集");
@@ -157,7 +164,7 @@ function assertCaseCoverage(
 function schedule(
   dataset: SignedGoldDataset,
   manifest: OracleGateFormalInputManifest,
-  spec: OracleGateFormalSpec,
+  spec: OracleGateExecutableFormalSpec,
 ): OracleGateFormalScheduleItem[] {
   const orderedCases = [...manifest.cases].sort((left, right) => left.case_id.localeCompare(right.case_id));
   const orderedSeeds = [...spec.seeds].sort((left, right) => left - right);
@@ -191,7 +198,7 @@ function schedule(
 export function prepareOracleGateFormalStructuralPreflight(input: {
   dataset: SignedGoldDataset;
   manifest: OracleGateFormalInputManifest;
-  spec: OracleGateFormalSpec;
+  spec: OracleGateExecutableFormalSpec;
 }): OracleGateFormalStructuralPreflight {
   assertDataset(input.dataset);
   assertManifestAndSpec(input.dataset, input.manifest, input.spec);

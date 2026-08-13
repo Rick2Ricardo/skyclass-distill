@@ -82,6 +82,19 @@ describe("FormalOraclePreregistrationStoreV2", () => {
     await expect(store.inspectPreregisteredGenesis(input.run.run_sha256,{...snapshot.head_pin,checkpoint_sha256:sha("old")})).rejects.toThrow(/pin/);
   });
 
+  it("keeps create, reload, expected pin, and callback inside one owner-nonce lock", async () => {
+    const root=await mkdtemp(join(tmpdir(),"oracle-prereg-v2-"));roots.push(root);const store=new FormalOraclePreregistrationStoreV2(root);const input=makeInput();
+    const pin={schema_version:"formal-oracle-head-pin-v1" as const,run_sha256:input.run.run_sha256,generation:0 as const,checkpoint_sha256:input.initial_checkpoint.checkpoint_sha256};
+    let release!:()=>void;const held=new Promise<void>((resolve)=>{release=resolve;});let entered=false;
+    const creating=store.createPreregisteredGenesisWithPinnedSnapshot(input,pin,async(snapshot)=>{entered=true;expect(snapshot.head_pin).toEqual(pin);expect(Object.isFrozen(snapshot)).toBe(true);await held;return snapshot.head_pin;});
+    while(!entered) await new Promise((resolve)=>setTimeout(resolve,5));
+    let inspected=false;const competing=new FormalOraclePreregistrationStoreV2(root).inspectPreregisteredGenesis(input.run.run_sha256,pin).then(()=>{inspected=true;});
+    await new Promise((resolve)=>setTimeout(resolve,40));expect(inspected).toBe(false);release();expect(await creating).toEqual(pin);await competing;expect(inspected).toBe(true);
+    const secondRoot=await mkdtemp(join(tmpdir(),"oracle-prereg-v2-"));roots.push(secondRoot);const secondStore=new FormalOraclePreregistrationStoreV2(secondRoot);
+    await expect(secondStore.createPreregisteredGenesisWithPinnedSnapshot(input,{...pin,checkpoint_sha256:sha("stale")},async()=>null)).rejects.toThrow(/pin/);
+    await expect(secondStore.inspectPreregisteredGenesis(input.run.run_sha256,pin)).rejects.toThrow();
+  });
+
   it("rejects a durable policy body replacement even when HEAD and bundle remain unchanged", async () => {
     const root=await mkdtemp(join(tmpdir(),"oracle-prereg-v2-"));roots.push(root);const store=new FormalOraclePreregistrationStoreV2(root);const input=makeInput();const snapshot=await store.createPreregisteredGenesis(input);
     const path=join(root,uri,"runs",input.run.run_sha256,"objects","evidence-policies",input.preregistration_bundle.public_evidence_derivation_policy_sha256,"policy.json");

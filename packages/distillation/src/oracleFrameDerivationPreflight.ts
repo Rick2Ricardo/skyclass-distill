@@ -3,6 +3,7 @@ import type {
   OracleGateByteInventory,
   OracleGateFormalInputManifest,
   OracleGateFormalSpec,
+  OracleGateFormalSpecV2,
   OracleGateFrameDerivationCaseV1,
   OracleGateFrameDerivationPreflightV1,
   OracleGateFrameDerivationProofV1,
@@ -100,7 +101,7 @@ export async function prepareOracleGateFrameDerivationPreflight(input: {
   root: string;
   dataset: SignedGoldDataset;
   manifest: OracleGateFormalInputManifest;
-  spec: OracleGateFormalSpec;
+  spec: OracleGateFormalSpec | OracleGateFormalSpecV2;
   inventory: OracleGateByteInventory;
   frame_deriver: OracleGateFrameDeriver;
   trusted_speech_reviewer_keys: ReadonlyMap<string, KeyLike>;

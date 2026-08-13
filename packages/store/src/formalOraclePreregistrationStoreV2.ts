@@ -171,26 +171,34 @@ export class FormalOraclePreregistrationStoreV2 {
   async createPreregisteredGenesis(input: CreateFormalOraclePreregisteredRunV2Input): Promise<FormalOraclePreregisteredRunV2Snapshot> {
     const frozenInput = deepFreezePlain(clonePlainData(input, "V2 preregistration input"));
     assertInput(frozenInput, this.runStoreUri);
-    return this.withLock(frozenInput.run.run_sha256, async () => {
-      if (await this.privateFs.readOptionalFile(this.headPath(frozenInput.run.run_sha256))) throw new Error("V2 preregistration HEAD 已存在；严格 create-once");
-      await this.publish(frozenInput);
-      const head: FormalOraclePreregisteredRunHeadV2 = {
-        schema_version: "formal-oracle-preregistered-run-head-v2",
-        run_sha256: frozenInput.run.run_sha256,
-        generation: 0,
-        checkpoint_sha256: frozenInput.initial_checkpoint.checkpoint_sha256,
-        updated_at: frozenInput.initial_checkpoint.created_at,
-        execution_migration_status: "pending_formal_run_store_v2_execution_pipeline",
-        api_execution_allowed: false,
-      };
-      await this.privateFs.replaceFileAtomic(this.headPath(frozenInput.run.run_sha256), privateCanonicalJsonBytes(head));
-      return this.load(frozenInput.run.run_sha256, {
-        schema_version: "formal-oracle-head-pin-v1",
-        run_sha256: frozenInput.run.run_sha256,
-        generation: 0,
-        checkpoint_sha256: frozenInput.initial_checkpoint.checkpoint_sha256,
-      });
+    return this.withLock(frozenInput.run.run_sha256, () => this.createUnlocked(frozenInput));
+  }
+
+  /**
+   * Create and reload genesis while retaining the same owner-nonce lock for
+   * the caller's callback. The callback receives only the exact externally
+   * expected generation-0 pin. Throwing from the callback never rewinds HEAD;
+   * it merely prevents any callback-scoped composition capability escaping.
+   */
+  async createPreregisteredGenesisWithPinnedSnapshot<T>(
+    input: CreateFormalOraclePreregisteredRunV2Input,
+    expectedHead: FormalOracleHeadPinV1,
+    callback: (snapshot: FormalOraclePreregisteredRunV2Snapshot) => Promise<T>,
+  ): Promise<T> {
+    if (typeof callback !== "function") throw new Error("V2 preregistration callback 必须是函数");
+    const frozenInput = deepFreezePlain(clonePlainData(input, "V2 preregistration input"));
+    const frozenExpectedHead = deepFreezePlain(clonePlainData(expectedHead, "V2 expected genesis HEAD"));
+    assertInput(frozenInput, this.runStoreUri);
+    exactPin(frozenExpectedHead, {
+      schema_version: "formal-oracle-preregistered-run-head-v2",
+      run_sha256: frozenInput.run.run_sha256,
+      generation: 0,
+      checkpoint_sha256: frozenInput.initial_checkpoint.checkpoint_sha256,
+      updated_at: frozenInput.initial_checkpoint.created_at,
+      execution_migration_status: "pending_formal_run_store_v2_execution_pipeline",
+      api_execution_allowed: false,
     });
+    return this.withLock(frozenInput.run.run_sha256, async () => callback(await this.createUnlocked(frozenInput)));
   }
 
   async inspectPreregisteredGenesis(runSha256: string, expectedHead: FormalOracleHeadPinV1): Promise<FormalOraclePreregisteredRunV2Snapshot> {
@@ -218,6 +226,27 @@ export class FormalOraclePreregistrationStoreV2 {
       [this.objectDirectory(run.run_sha256, "checkpoints", input.initial_checkpoint.checkpoint_sha256), "checkpoint.json", input.initial_checkpoint],
     ];
     for (const [directory, name, value] of objects) await this.privateFs.publishImmutableObject(directory, name, privateCanonicalJsonBytes(value));
+  }
+
+  private async createUnlocked(input: CreateFormalOraclePreregisteredRunV2Input): Promise<FormalOraclePreregisteredRunV2Snapshot> {
+    if (await this.privateFs.readOptionalFile(this.headPath(input.run.run_sha256))) throw new Error("V2 preregistration HEAD 已存在；严格 create-once");
+    await this.publish(input);
+    const head: FormalOraclePreregisteredRunHeadV2 = {
+      schema_version: "formal-oracle-preregistered-run-head-v2",
+      run_sha256: input.run.run_sha256,
+      generation: 0,
+      checkpoint_sha256: input.initial_checkpoint.checkpoint_sha256,
+      updated_at: input.initial_checkpoint.created_at,
+      execution_migration_status: "pending_formal_run_store_v2_execution_pipeline",
+      api_execution_allowed: false,
+    };
+    await this.privateFs.replaceFileAtomic(this.headPath(input.run.run_sha256), privateCanonicalJsonBytes(head));
+    return this.load(input.run.run_sha256, {
+      schema_version: "formal-oracle-head-pin-v1",
+      run_sha256: input.run.run_sha256,
+      generation: 0,
+      checkpoint_sha256: input.initial_checkpoint.checkpoint_sha256,
+    });
   }
 
   private async load(runSha256: string, expectedHead: FormalOracleHeadPinV1): Promise<FormalOraclePreregisteredRunV2Snapshot> {

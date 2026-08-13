@@ -1,18 +1,25 @@
 import { createHash, createPublicKey, KeyObject, type KeyLike } from "node:crypto";
 import type {
   FormalOracleCompositionAttestationV3,
+  FormalOracleCompositionAttestationV4,
+  FormalOraclePreregistrationBundleV2,
+  FormalRunContractV2,
   OracleGateByteInventory,
   OracleGateFormalInputManifest,
   OracleGateFormalSpec,
+  OracleGateFormalSpecV2,
   OracleGateFrameDerivationPreflightV1,
   FormalOracleLocalPiProofBindingV1,
   SignedGoldDataset,
 } from "../../contracts/src/index.js";
 import {
   hashFormalOracleCompositionAttestation,
+  hashFormalOracleCompositionAttestationV4,
   hashFormalOracleLocalPiProofSet,
   validateFormalOracleCompositionAttestation,
   validateFormalOracleCompositionAttestationAgainstExecutionPlan,
+  validateFormalOracleCompositionAttestationV4,
+  validateFormalOracleCompositionAttestationV4AgainstRunAndPlan,
   validateOracleGateFrameDerivationPreflight,
 } from "../../contracts/src/index.js";
 import {
@@ -29,12 +36,14 @@ import {
 } from "../../contracts/src/oracle-gate-user-prompt.js";
 import { canonicalizeOracleGateCanvas } from "../../media/src/oracleGateCanvas.js";
 import type { OracleGateFrameDeriver } from "../../media/src/videoEvidence.js";
+import type { OracleGateVideoToolchain } from "../../media/src/videoEvidence.js";
 import { FrozenOracleRegistryStore } from "../../store/src/frozenOracleRegistryStore.js";
 import {
   FormalOracleRunStore,
   type FormalOracleExecutionPlanV1,
   type FormalOracleHeadPinV1,
 } from "../../store/src/formalOracleRunStore.js";
+import { FormalOraclePreregistrationStoreV2 } from "../../store/src/formalOraclePreregistrationStoreV2.js";
 import { GoldLedgerAttestor } from "../../store/src/goldLedgerAttestor.js";
 import { prepareOracleGateBytePreflight, type OracleGateBytePreflight } from "./oracleBytePreflight.js";
 import { prepareOracleGateFormalStructuralPreflight } from "./oracleFormalPreflight.js";
@@ -103,6 +112,47 @@ export interface FormalOracleCompositionCapability {
   readonly api_execution_allowed: false;
 }
 
+export interface ComposeFormalOracleRunGenesisV2Input extends Omit<ComposeFormalOracleRunGenesisInput,
+  "spec" | "run_store" | "run"> {
+  preregistration_bundle: FormalOraclePreregistrationBundleV2;
+  run_store: FormalOraclePreregistrationStoreV2;
+  run: FormalRunContractV2;
+}
+
+export interface FormalOracleCompositionCapabilityV2 {
+  readonly stage: "preregistered_composition_attested_only";
+  readonly attestation: Readonly<FormalOracleCompositionAttestationV4>;
+  readonly head_pin: Readonly<FormalOracleHeadPinV1>;
+  readonly preregistration_store_status: "create_once_genesis_reloaded_non_executable";
+  readonly execution_migration_status: "pending_formal_run_store_v2_execution_pipeline";
+  readonly api_execution_allowed: false;
+}
+
+const activeCompositionV2Capabilities = new WeakSet<object>();
+
+class CompositionCapabilityV2 implements FormalOracleCompositionCapabilityV2 {
+  readonly stage = "preregistered_composition_attested_only" as const;
+  readonly preregistration_store_status = "create_once_genesis_reloaded_non_executable" as const;
+  readonly execution_migration_status = "pending_formal_run_store_v2_execution_pipeline" as const;
+  readonly api_execution_allowed = false as const;
+  constructor(readonly attestation: Readonly<FormalOracleCompositionAttestationV4>, readonly head_pin: Readonly<FormalOracleHeadPinV1>) { Object.freeze(this); }
+  toJSON(): never { throw new Error("Formal Oracle V2 composition capability 不得序列化或持久化"); }
+}
+
+export function assertActiveFormalOracleCompositionCapabilityV2(value: FormalOracleCompositionCapabilityV2): void {
+  if (!value || typeof value !== "object" || !activeCompositionV2Capabilities.has(value as object)) throw new Error("Formal Oracle V2 composition capability 无效、过期或伪造");
+}
+
+function ownDataProperty<T>(input: object, key: string, label: string, optional = false): T {
+  const descriptor = Object.getOwnPropertyDescriptor(input, key);
+  if (!descriptor) {
+    if (optional) return undefined as T;
+    throw new Error(`${label}.${key} 缺失`);
+  }
+  if (!("value" in descriptor) || descriptor.enumerable !== true) throw new Error(`${label}.${key} 必须是 enumerable data property`);
+  return descriptor.value as T;
+}
+
 const activeCompositionCapabilities = new WeakSet<object>();
 
 class CompositionCapability implements FormalOracleCompositionCapability {
@@ -160,8 +210,35 @@ function sameObject(actual: unknown, expected: unknown, label: string): void {
 }
 
 function cloneCanonical<T>(value: T, label: string): T {
+  const clonePlain = (input: unknown, path: string): unknown => {
+    if (input === null || typeof input === "string" || typeof input === "boolean") return input;
+    if (typeof input === "number") {
+      if (!Number.isFinite(input) || Math.abs(input) > Number.MAX_SAFE_INTEGER || Object.is(input, -0)) throw new Error(`${label}${path} 数值无效`);
+      return input;
+    }
+    if (!input || typeof input !== "object" || Object.getOwnPropertySymbols(input).length) throw new Error(`${label}${path} 不是 plain data`);
+    const descriptors = Object.getOwnPropertyDescriptors(input);
+    if (Array.isArray(input)) {
+      if (Object.getPrototypeOf(input) !== Array.prototype) throw new Error(`${label}${path} array prototype 无效`);
+      const keys = Object.keys(descriptors).filter((key) => key !== "length");
+      if (keys.length !== input.length || keys.some((key, index) => key !== String(index))) throw new Error(`${label}${path} 是稀疏/附加字段数组`);
+      return keys.map((key) => {
+        const descriptor = descriptors[key];
+        if (!descriptor || !("value" in descriptor) || descriptor.enumerable !== true) throw new Error(`${label}${path}[${key}] 含 accessor`);
+        return clonePlain(descriptor.value, `${path}[${key}]`);
+      });
+    }
+    if (Object.getPrototypeOf(input) !== Object.prototype || Object.hasOwn(input, "toJSON")) throw new Error(`${label}${path} prototype/toJSON 无效`);
+    const output: Record<string, unknown> = {};
+    for (const [key, descriptor] of Object.entries(descriptors)) {
+      if (!("value" in descriptor) || descriptor.enumerable !== true) throw new Error(`${label}${path}.${key} 含 accessor/隐藏字段`);
+      output[key] = clonePlain(descriptor.value, `${path}.${key}`);
+    }
+    return output;
+  };
+  const plain = clonePlain(value, "") as T;
   let bytes: string;
-  try { bytes = JSON.stringify(value); }
+  try { bytes = JSON.stringify(plain); }
   catch { throw new Error(`${label} 不能 canonical snapshot`); }
   if (bytes === undefined) throw new Error(`${label} 不能 canonical snapshot`);
   const cloned = JSON.parse(bytes) as T;
@@ -178,26 +255,51 @@ function deepFreeze<T>(value: T): T {
 }
 
 function cloneBytes(value: Uint8Array): Uint8Array {
-  return Uint8Array.from(value);
+  let cloned: unknown;
+  try { cloned = structuredClone(value); }
+  catch { throw new Error("byte input 必须是不可观察读取的 exact Uint8Array"); }
+  if (!(cloned instanceof Uint8Array) || Object.getPrototypeOf(cloned) !== Uint8Array.prototype
+    || Object.getOwnPropertySymbols(cloned).length || Object.keys(cloned).length !== cloned.byteLength) {
+    throw new Error("byte input 必须是 exact Uint8Array");
+  }
+  return cloned;
 }
 
 function cloneExecutionArtifacts(values: FormalOracleExecutionArtifactV1[]): FormalOracleExecutionArtifactV1[] {
-  if (!Array.isArray(values) || Object.keys(values).length !== values.length) throw new Error("execution_artifacts 必须是稠密数组");
-  return values.map((item, index) => {
+  if (!Array.isArray(values) || Object.getPrototypeOf(values) !== Array.prototype || Object.getOwnPropertySymbols(values).length) throw new Error("execution_artifacts 必须是稠密数组");
+  const arrayDescriptors = Object.getOwnPropertyDescriptors(values);
+  const arrayKeys = Object.keys(arrayDescriptors).filter((key) => key !== "length");
+  if (arrayKeys.length !== values.length || arrayKeys.some((key, index) => key !== String(index))) throw new Error("execution_artifacts 必须是稠密数组");
+  return arrayKeys.map((arrayKey, index) => {
+    const itemDescriptor = arrayDescriptors[arrayKey];
+    if (!itemDescriptor || !("value" in itemDescriptor) || itemDescriptor.enumerable !== true) throw new Error(`execution_artifacts[${index}] 含 accessor`);
+    const item = itemDescriptor.value as FormalOracleExecutionArtifactV1;
     if (!item || typeof item !== "object" || Array.isArray(item)
-      || JSON.stringify(Object.keys(item).sort()) !== JSON.stringify(["request_id", "visual_bytes"])
-      || typeof item.request_id !== "string" || !item.request_id
-      || !Array.isArray(item.visual_bytes) || Object.keys(item.visual_bytes).length !== item.visual_bytes.length) {
+      || Object.getPrototypeOf(item) !== Object.prototype || Object.getOwnPropertySymbols(item).length
+      || JSON.stringify(Object.keys(Object.getOwnPropertyDescriptors(item)).sort()) !== JSON.stringify(["request_id", "visual_bytes"])) {
       throw new Error(`execution_artifacts[${index}] 必须使用 strict 字段集合与稠密 visual bytes`);
     }
+    const requestId = ownDataProperty<unknown>(item, "request_id", `execution_artifacts[${index}]`);
+    const visualBytes = ownDataProperty<unknown>(item, "visual_bytes", `execution_artifacts[${index}]`);
+    if (typeof requestId !== "string" || !requestId || !Array.isArray(visualBytes) || Object.getPrototypeOf(visualBytes) !== Array.prototype || Object.getOwnPropertySymbols(visualBytes).length) throw new Error(`execution_artifacts[${index}] 内容无效`);
+    const visualDescriptors = Object.getOwnPropertyDescriptors(visualBytes);
+    const visualKeys = Object.keys(visualDescriptors).filter((key) => key !== "length");
+    if (visualKeys.length !== visualBytes.length || visualKeys.some((key, visualIndex) => key !== String(visualIndex))) throw new Error(`execution_artifacts[${index}].visual_bytes 必须稠密`);
     return Object.freeze({
-      request_id: item.request_id,
-      visual_bytes: Object.freeze(item.visual_bytes.map(cloneBytes)),
+      request_id: requestId,
+      visual_bytes: Object.freeze(visualKeys.map((key) => {
+        const descriptor = visualDescriptors[key];
+        if (!descriptor || !("value" in descriptor) || descriptor.enumerable !== true) throw new Error(`execution_artifacts[${index}].visual_bytes[${key}] 含 accessor`);
+        const value = descriptor.value;
+        if (!(value instanceof Uint8Array)) throw new Error(`execution_artifacts[${index}].visual_bytes 必须是 Uint8Array`);
+        return cloneBytes(value);
+      })),
     });
   }) as FormalOracleExecutionArtifactV1[];
 }
 
 function snapshotTrustedKeys(input: ReadonlyMap<string, KeyLike>, label: string): ReadonlyMap<string, KeyLike> {
+  if (!(input instanceof Map) || Object.getPrototypeOf(input) !== Map.prototype) throw new Error(`${label} 必须是标准 Map`);
   const entries = [...input.entries()];
   if (!entries.length) throw new Error(`${label} 不能为空`);
   const keys = new Set<string>();
@@ -241,16 +343,19 @@ function snapshotCompositionInput(input: ComposeFormalOracleRunGenesisInput): Co
 }
 
 function snapshotFrameDeriver(input: OracleGateFrameDeriver): OracleGateFrameDeriver {
-  if (!input || typeof input !== "object" || typeof input.probe !== "function"
-    || typeof input.verify_decodable !== "function" || typeof input.derive_frames !== "function") {
+  if (!input || typeof input !== "object" || Array.isArray(input) || Object.getOwnPropertySymbols(input).length) {
     throw new Error("frame_deriver policy 无效");
   }
-  const toolchain = cloneCanonical(input.toolchain, "frame_deriver.toolchain");
+  const probe = ownDataProperty<unknown>(input, "probe", "frame_deriver");
+  const verifyDecodable = ownDataProperty<unknown>(input, "verify_decodable", "frame_deriver");
+  const deriveFrames = ownDataProperty<unknown>(input, "derive_frames", "frame_deriver");
+  const toolchain = cloneCanonical(ownDataProperty<OracleGateVideoToolchain>(input, "toolchain", "frame_deriver"), "frame_deriver.toolchain");
+  if (typeof probe !== "function" || typeof verifyDecodable !== "function" || typeof deriveFrames !== "function") throw new Error("frame_deriver methods 无效");
   return Object.freeze({
     toolchain,
-    probe: input.probe.bind(input),
-    verify_decodable: input.verify_decodable.bind(input),
-    derive_frames: input.derive_frames.bind(input),
+    probe: probe.bind(input),
+    verify_decodable: verifyDecodable.bind(input),
+    derive_frames: deriveFrames.bind(input),
   });
 }
 
@@ -258,8 +363,8 @@ function assertCapabilityBindings(input: {
   capability: OracleLedgerAttestedCapability;
   structural: ReturnType<typeof prepareOracleGateFormalStructuralPreflight>;
   manifest: OracleGateFormalInputManifest;
-  spec: OracleGateFormalSpec;
-  run: FormalRunContractV1;
+  spec: OracleGateFormalSpec | OracleGateFormalSpecV2;
+  run: FormalRunContractV1 | FormalRunContractV2;
 }): void {
   assertActiveOracleLedgerCapability(input.capability);
   const { capability, structural, manifest, spec, run } = input;
@@ -302,7 +407,7 @@ function assertFrameBindings(input: {
   frame_preflight: OracleGateFrameDerivationPreflightV1;
   inventory: OracleGateByteInventory;
   manifest: OracleGateFormalInputManifest;
-  spec: OracleGateFormalSpec;
+  spec: OracleGateFormalSpec | OracleGateFormalSpecV2;
   schedule_sha256: string;
 }): void {
   const report = validateOracleGateFrameDerivationPreflight(input.frame_preflight);
@@ -362,7 +467,7 @@ function assertExecutionArtifacts(input: {
   plan: FormalOracleExecutionPlanV1;
   artifacts: FormalOracleExecutionArtifactV1[];
   system_prompt_bytes: Uint8Array;
-  spec: OracleGateFormalSpec;
+  spec: OracleGateFormalSpec | OracleGateFormalSpecV2;
   byte_preflight: OracleGateBytePreflight;
   user_template_bytes: Uint8Array;
 }): FormalOraclePreparedProviderRequestArtifactV1[] {
@@ -669,6 +774,103 @@ export async function withComposedFormalOracleRunGenesis<T>(
           activeCompositionCapabilities.delete(compositionCapability);
         }
       });
+    },
+  });
+}
+
+/**
+ * Breaking V2 preregistered composition. The full registry/Gold/media/frame/Pi
+ * proof path is intentionally shared with V1; the callback then atomically
+ * creates and reloads the exact V2 preregistration genesis. This is not a
+ * dispatch capability: the executable V2 RunStore migration remains pending.
+ */
+export async function withComposedFormalOraclePreregisteredRunGenesisV2<T>(
+  rawInput: ComposeFormalOracleRunGenesisV2Input & {
+    callback: (capability: FormalOracleCompositionCapabilityV2) => Promise<T>;
+  },
+): Promise<T> {
+  if (!rawInput || typeof rawInput !== "object" || Array.isArray(rawInput)
+    || Object.getPrototypeOf(rawInput) !== Object.prototype || Object.getOwnPropertySymbols(rawInput).length) {
+    throw new Error("V2 composition input 必须是 plain data envelope");
+  }
+  const requiredKeys = ["attestor","registry_store","pinned_registry_sha256","trusted_registry_public_keys","root","dataset","manifest","preregistration_bundle","inventory","frame_deriver","trusted_speech_reviewer_keys","run_store","run","execution_plan","system_prompt_bytes","user_template_bytes","execution_artifacts","expected_genesis_head","initial_checkpoint","composed_at","callback"];
+  const allowedKeys = new Set([...requiredKeys, "input_token_count_receipt_capability"]);
+  const descriptors = Object.getOwnPropertyDescriptors(rawInput);
+  if (requiredKeys.some((key) => !Object.hasOwn(descriptors, key)) || Object.keys(descriptors).some((key) => !allowedKeys.has(key))) {
+    throw new Error("V2 composition input 字段集合无效");
+  }
+  const callback = ownDataProperty<(capability: FormalOracleCompositionCapabilityV2) => Promise<T>>(rawInput, "callback", "V2 composition input");
+  if (typeof callback !== "function") throw new Error("V2 composition callback 必须是函数");
+  const bundle = cloneCanonical(ownDataProperty<FormalOraclePreregistrationBundleV2>(rawInput, "preregistration_bundle", "V2 composition input"), "preregistration_bundle");
+  const spec = bundle.formal_spec;
+  const run = cloneCanonical(ownDataProperty<FormalRunContractV2>(rawInput, "run", "V2 composition input"), "run_v2");
+  const runStore = ownDataProperty<FormalOraclePreregistrationStoreV2>(rawInput, "run_store", "V2 composition input");
+  if (!(runStore instanceof FormalOraclePreregistrationStoreV2)) throw new Error("V2 composition run_store 无效");
+  const input = snapshotCompositionInput({
+    attestor: ownDataProperty<GoldLedgerAttestor>(rawInput, "attestor", "V2 composition input"),
+    registry_store: ownDataProperty<FrozenOracleRegistryStore>(rawInput, "registry_store", "V2 composition input"),
+    pinned_registry_sha256: ownDataProperty<string>(rawInput, "pinned_registry_sha256", "V2 composition input"),
+    trusted_registry_public_keys: ownDataProperty<ReadonlyMap<string, KeyLike>>(rawInput, "trusted_registry_public_keys", "V2 composition input"),
+    root: ownDataProperty<string>(rawInput, "root", "V2 composition input"),
+    dataset: ownDataProperty<SignedGoldDataset>(rawInput, "dataset", "V2 composition input"),
+    manifest: ownDataProperty<OracleGateFormalInputManifest>(rawInput, "manifest", "V2 composition input"),
+    spec: spec as unknown as OracleGateFormalSpec,
+    inventory: ownDataProperty<OracleGateByteInventory>(rawInput, "inventory", "V2 composition input"),
+    frame_deriver: ownDataProperty<OracleGateFrameDeriver>(rawInput, "frame_deriver", "V2 composition input"),
+    trusted_speech_reviewer_keys: ownDataProperty<ReadonlyMap<string, KeyLike>>(rawInput, "trusted_speech_reviewer_keys", "V2 composition input"),
+    run: run as unknown as FormalRunContractV1,
+    run_store: runStore as unknown as FormalOracleRunStore,
+    execution_plan: ownDataProperty<FormalOracleExecutionPlanV1>(rawInput, "execution_plan", "V2 composition input"),
+    system_prompt_bytes: ownDataProperty<Uint8Array>(rawInput, "system_prompt_bytes", "V2 composition input"),
+    user_template_bytes: ownDataProperty<Uint8Array>(rawInput, "user_template_bytes", "V2 composition input"),
+    execution_artifacts: ownDataProperty<FormalOracleExecutionArtifactV1[]>(rawInput, "execution_artifacts", "V2 composition input"),
+    expected_genesis_head: ownDataProperty<FormalOracleHeadPinV1>(rawInput, "expected_genesis_head", "V2 composition input"),
+    initial_checkpoint: ownDataProperty<RunCheckpointV1>(rawInput, "initial_checkpoint", "V2 composition input"),
+    composed_at: ownDataProperty<string>(rawInput, "composed_at", "V2 composition input"),
+    input_token_count_receipt_capability: ownDataProperty<FormalOracleInputTokenCountReceiptCapabilityV1 | undefined>(rawInput, "input_token_count_receipt_capability", "V2 composition input", true),
+  });
+  canonicalTime(input.composed_at, "composed_at");
+  if (input.input_token_count_receipt_capability) assertActiveFormalOracleInputTokenCountReceiptCapability(input.input_token_count_receipt_capability);
+  return withLedgerAttestedOracleRegistry({
+    attestor: input.attestor,
+    registryStore: input.registry_store,
+    pinned_registry_sha256: input.pinned_registry_sha256,
+    trusted_public_keys: input.trusted_registry_public_keys,
+    callback: async (ledgerCapability) => {
+      const structural = prepareOracleGateFormalStructuralPreflight({ dataset: input.dataset, manifest: input.manifest, spec });
+      assertCapabilityBindings({ capability: ledgerCapability, structural, manifest: input.manifest, spec, run });
+      const bytePreflight = await prepareOracleGateBytePreflight({ root: input.root, dataset: input.dataset, manifest: input.manifest, spec, inventory: input.inventory, video_probe: input.frame_deriver, trusted_speech_reviewer_keys: input.trusted_speech_reviewer_keys });
+      const framePreflight = await prepareOracleGateFrameDerivationPreflight({ root: input.root, dataset: input.dataset, manifest: input.manifest, spec, inventory: input.inventory, frame_deriver: input.frame_deriver, trusted_speech_reviewer_keys: input.trusted_speech_reviewer_keys });
+      assertFrameBindings({ byte_preflight: bytePreflight, frame_preflight: framePreflight, inventory: input.inventory, manifest: input.manifest, spec, schedule_sha256: structural.schedule_sha256 });
+      const preparedRequests = assertExecutionArtifacts({ plan: input.execution_plan, artifacts: input.execution_artifacts, system_prompt_bytes: input.system_prompt_bytes, user_template_bytes: input.user_template_bytes, spec, byte_preflight: bytePreflight });
+      const localPiProofs = await provePreparedRequests(input.execution_plan, preparedRequests);
+      const dependencyRoot = localPiProofs[0]?.proof.local_dependency_manifest_sha256;
+      if (!dependencyRoot || localPiProofs.length !== run.request_count) throw new Error("V2 local Pi proof 未精确覆盖 run");
+      if (run.media_attestation_sha256 !== framePreflight.preflight_sha256 || run.speech_attestation_sha256 !== input.inventory.inventory_sha256
+        || run.execution_plan_sha256 !== input.execution_plan.execution_plan_sha256 || Date.parse(input.composed_at) < Date.parse(input.initial_checkpoint.created_at)) throw new Error("V2 run media/speech/plan/time 未闭合 composition");
+      const tokenReceiptSet = input.input_token_count_receipt_capability?.receipt_set ?? null;
+      const common: Omit<FormalOracleCompositionAttestationV3, "schema_version" | "composition_sha256"> = {
+        record_trust:"non_authoritative_composition_record",status:"composition_attested_only",composed_at:input.composed_at,ledger_registry_sha256:ledgerCapability.registry_sha256,ledger_snapshot_sha256:ledgerCapability.ledger_snapshot_sha256,signed_gold_dataset_sha256:ledgerCapability.dataset_sha256,formal_input_manifest_sha256:ledgerCapability.formal_input_manifest_sha256,formal_spec_sha256:ledgerCapability.formal_spec_sha256,resource_manifest_sha256:ledgerCapability.resource_manifest_sha256,schedule_sha256:ledgerCapability.schedule_sha256,code_revision:ledgerCapability.code_revision,build_artifact_sha256:ledgerCapability.build_artifact_sha256,byte_inventory_sha256:input.inventory.inventory_sha256,source_frame_preflight_sha256:framePreflight.preflight_sha256,source_frame_proof_set_sha256:framePreflight.proof_set_sha256,media_attestation_sha256:framePreflight.preflight_sha256,speech_attestation_sha256:input.inventory.inventory_sha256,run_sha256:run.run_sha256,execution_plan_sha256:input.execution_plan.execution_plan_sha256,request_count:run.request_count,genesis_checkpoint_sha256:input.initial_checkpoint.checkpoint_sha256,genesis_generation:0,
+        head_pin:{schema_version:"formal-oracle-head-pin-v1",run_sha256:input.expected_genesis_head.run_sha256,generation:0,checkpoint_sha256:input.expected_genesis_head.checkpoint_sha256},run_store_uri:run.run_store_uri,rights_registry_status:"pending_external_authoritative_head",request_envelope_serialization_status:"completed",provider_body_serialization_status:"completed_pi_body_serialization_candidate",provider_body_transport_compatibility_status:"completed_per_request_local_fake_fetch_proof_non_executable",local_pi_fetch_boundary_proof_count:localPiProofs.length,local_pi_fetch_boundary_proof_set_sha256:hashFormalOracleLocalPiProofSet(localPiProofs),local_pi_fetch_boundary_proofs:localPiProofs,local_pi_fetch_boundary_dependency_manifest_sha256:dependencyRoot,user_prompt_derivation_status:"completed",input_token_count_receipt_set_sha256:tokenReceiptSet?.receipt_set_sha256??null,input_token_count_receipt_count:tokenReceiptSet?.receipt_count??0,input_token_count_receipts_binding_status:tokenReceiptSet?"responses_exact_count_receipts_bound_transport_incompatible":"not_supplied",input_token_count_receipt_set:tokenReceiptSet,input_token_budget_status:"pending_exact_chat_completions_count_authority",provider_wire_binding_status:"pending_external_endpoint_account_validation",provider_account_endpoint_status:"pending_external_runtime_binding",provider_response_capture_status:"pending_strict_sse_capture_contract",provider_runtime_engine_status:"compatible_runtime_proved_external_capsule_pending",toolchain_capsule_status:"pending_external_immutable_capsule",composition_record_authenticity_status:"pending_external_trusted_signature_or_worm",external_head_pin_status:"pending_external_monotonic_worm",blind_package_status:"pending",statistics_status:"pending",api_execution_allowed:false,
+      };
+      const attestation: FormalOracleCompositionAttestationV4 = {
+        schema_version:"formal-oracle-composition-attestation-v4",composition_sha256:"0".repeat(64),...common,
+        preregistration_bundle_sha256:bundle.preregistration_bundle_sha256,public_evidence_derivation_policy_sha256:bundle.public_evidence_derivation_policy_sha256,statistics_plan_sha256:bundle.statistics_plan_sha256,rating_plan_sha256:bundle.rating_plan_sha256,preregistration_bundle:bundle,preregistration_store_status:"create_once_genesis_reloaded_non_executable",execution_migration_status:"pending_formal_run_store_v2_execution_pipeline",
+      };
+      attestation.composition_sha256 = hashFormalOracleCompositionAttestationV4(attestation);
+      const report = validateFormalOracleCompositionAttestationV4AgainstRunAndPlan(attestation, run, input.execution_plan);
+      if (!report.valid) throw new Error(`V2 composition 无效：${report.issues[0]?.path} ${report.issues[0]?.message}`);
+      return runStore.createPreregisteredGenesisWithPinnedSnapshot(
+        { run, preregistration_bundle:bundle, structural_schedule:structural.schedule, execution_plan:input.execution_plan, initial_checkpoint:input.initial_checkpoint },
+        input.expected_genesis_head,
+        async (snapshot) => {
+          if (input.input_token_count_receipt_capability) assertActiveFormalOracleInputTokenCountReceiptCapability(input.input_token_count_receipt_capability);
+          sameObject(snapshot.head_pin, attestation.head_pin, "V2 actual genesis HEAD pin");
+          const cap = new CompositionCapabilityV2(deepFreeze(attestation), snapshot.head_pin);
+          activeCompositionV2Capabilities.add(cap);
+          try { return await callback(cap); } finally { activeCompositionV2Capabilities.delete(cap); }
+        },
+      );
     },
   });
 }

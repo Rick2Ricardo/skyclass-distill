@@ -12,6 +12,15 @@ import {
   canonicalOracleGateFormalSpecPayload,
   canonicalSignedGoldDatasetPayload,
   hashFormalRunContract,
+  hashFormalRunContractV2,
+  hashFormalOracleCompositionAttestationV4,
+  hashFormalOraclePreregistrationBundleV2,
+  hashOracleGateFormalSpecV2,
+  hashOracleGatePublicEvidenceDerivationPolicyV2,
+  hashOracleGateRatingPlanV2,
+  hashOracleGateStatisticsPlanV2,
+  validateFormalOracleCompositionAttestationV4,
+  validateFormalOracleCompositionAttestationV4AgainstRunAndPlan,
   hashRunCheckpoint,
   oracleGateByteInventorySha256Preimage,
   ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
@@ -32,6 +41,13 @@ import {
   type OracleGateFormalSpec,
   type OracleGateLedgerRegistryV1,
   type FormalRunContractV1,
+  type FormalRunContractV2,
+  type FormalOraclePreregistrationBundleV2,
+  type FormalOracleCompositionAttestationV4,
+  type OracleGateFormalSpecV2,
+  type OracleGatePublicEvidenceDerivationPolicyV2,
+  type OracleGateRatingPlanV2,
+  type OracleGateStatisticsPlanV2,
   type GoldLedgerSnapshotV1,
   type RunCheckpointV1,
   type SignedGoldDataset,
@@ -59,8 +75,11 @@ import { prepareOracleGateBytePreflight } from "./oracleBytePreflight.js";
 import { prepareOracleGateFrameDerivationPreflight } from "./oracleFrameDerivationPreflight.js";
 import {
   assertActiveFormalOracleCompositionCapability,
+  assertActiveFormalOracleCompositionCapabilityV2,
   withComposedFormalOracleRunGenesis,
+  withComposedFormalOraclePreregisteredRunGenesisV2,
   type ComposeFormalOracleRunGenesisInput,
+  type ComposeFormalOracleRunGenesisV2Input,
   type FormalOracleCompositionCapability,
 } from "./oracleCompositionGate.js";
 import { assertActiveOracleLedgerCapability } from "./oracleTrustedPreflight.js";
@@ -68,6 +87,7 @@ import {
   withValidatedFormalOracleInputTokenCountReceiptSet,
 } from "./oracleInputTokenCountReceiptGate.js";
 import { FormalOracleRunStore, hashFormalOracleExecutionPlan } from "../../store/src/formalOracleRunStore.js";
+import { FormalOraclePreregistrationStoreV2 } from "../../store/src/formalOraclePreregistrationStoreV2.js";
 import type { FormalOracleExecutionPlanV1, FormalOracleHeadPinV1 } from "../../store/src/formalOracleRunStore.js";
 import type { FrozenOracleRegistryStore } from "../../store/src/frozenOracleRegistryStore.js";
 import type { GoldLedgerAttestor } from "../../store/src/goldLedgerAttestor.js";
@@ -764,7 +784,48 @@ async function buildCompositionFixture(): Promise<ComposeFormalOracleRunGenesisI
   };
 }
 
+async function buildCompositionFixtureV2(): Promise<ComposeFormalOracleRunGenesisV2Input> {
+  const v1 = await buildCompositionFixture();
+  const policy: OracleGatePublicEvidenceDerivationPolicyV2 = {
+    schema_version:"oracle-gate-public-evidence-derivation-policy-v2",public_evidence_derivation_policy_sha256:"0".repeat(64),claim_projection_version:"response-v1-fixed-json-pointer-assertion-slots-v1",claim_source_paths:["/observed_board_actions/*/operation","/observed_board_actions/*/content","/observed_board_actions/*/region","/generalized_teaching_capability/name","/generalized_teaching_capability/mechanism","/generalized_teaching_capability/action_program/*","/evidence_claims/*/claim"],uncertainty_policy:"not_a_scored_claim",speech_segmentation_version:"one_verified_selected_transcript_unit_per_case-v1",speech_gold_status:"context_not_gold",board_event_renderer_version:"signed-gold-final-event-semantic-projection-v1",board_event_projection:["operation","semantic_label","region","relation","modification"],eligible_evidence_policy:"verified_transcript_plus_all_signed_gold_final_events-v1",board_edit_denominator_policy:"all_signed_gold_final_events-v1",temporal_pair_policy:"all_ordered_signed_gold_final_event_pairs-v1",single_event_temporal_policy:"metric_not_applicable_not_global_block-v1",public_reblinding_scheme:"opaque-item-local-id-uniqueness-only-v1",created_at:"2026-08-12T03:56:00.000Z",api_execution_allowed:false,
+  };policy.public_evidence_derivation_policy_sha256=hashOracleGatePublicEvidenceDerivationPolicyV2(policy);
+  const statistics: OracleGateStatisticsPlanV2={schema_version:"oracle-gate-statistics-plan-v2",statistics_plan_sha256:"0".repeat(64),record_trust:"non_authoritative_preregistered_statistics_plan",public_evidence_derivation_policy_sha256:policy.public_evidence_derivation_policy_sha256,public_evidence_schema_version:"oracle-gate-public-evidence-package-v2",private_derivation_schema_version:"oracle-gate-private-evidence-derivation-receipt-v2",metric_order:["evidence_f1","temporal_fidelity","edit_coverage","unsupported_claim_rate"],strongest_non_oracle_selection_metric:"evidence_f1",strongest_non_oracle_tie_order:["static_final_board","uniform_frame","transcript_only"],item_rater_aggregation:"equal_mean_two_raters",point_aggregation:"case_seed_mean_then_case_macro_then_video_macro_then_teacher_macro",bootstrap_method:"hierarchical_teacher_video_case_seed_paired_v2",bootstrap_seed:71,bootstrap_replicates:1000,primary_ci:.8,descriptive_ci:.95,quantile_method:"sorted_linear_interpolation_r7",missing_policy:"blocked_no_partial_statistics",zero_eligible_policy:"metric_null_and_gate_blocked",single_event_temporal_policy:"exclude_temporal_item_symmetrically_within_case_seed_keep_other_metrics-v1",empty_temporal_population_policy:"blocked_no_temporal_population",minimum_teachers:2,minimum_seeds_per_case:3,created_at:"2026-08-12T03:56:30.000Z",api_execution_allowed:false};statistics.statistics_plan_sha256=hashOracleGateStatisticsPlanV2(statistics);
+  const spec: OracleGateFormalSpecV2={...structuredClone(v1.spec),schema_version:"oracle-gate-formal-spec-v2",spec_sha256:"0".repeat(64),created_at:"2026-08-12T03:57:00.000Z",evaluation:{...structuredClone(v1.spec.evaluation),rating_schema_version:"oracle-gate-rating-ledger-v2",bootstrap_seed:statistics.bootstrap_seed,public_evidence_derivation_policy_schema_version:"oracle-gate-public-evidence-derivation-policy-v2",public_evidence_derivation_policy_sha256:policy.public_evidence_derivation_policy_sha256,statistics_plan_schema_version:"oracle-gate-statistics-plan-v2",statistics_plan_sha256:statistics.statistics_plan_sha256,public_evidence_schema_version:"oracle-gate-public-evidence-package-v2",private_derivation_schema_version:"oracle-gate-private-evidence-derivation-receipt-v2"}};spec.spec_sha256=hashOracleGateFormalSpecV2(spec);
+  const rating:OracleGateRatingPlanV2={schema_version:"oracle-gate-rating-plan-v2",rating_plan_sha256:"0".repeat(64),record_trust:"non_authoritative_preregistered_rating_plan",formal_spec_sha256:spec.spec_sha256,public_evidence_derivation_policy_sha256:policy.public_evidence_derivation_policy_sha256,rubric_version:spec.evaluation.rubric_version,rubric_sha256:spec.evaluation.rubric_sha256,required_independent_raters:2,rating_schema_version:"oracle-gate-rating-ledger-v2",public_evidence_schema_version:"oracle-gate-public-evidence-package-v2",private_derivation_schema_version:"oracle-gate-private-evidence-derivation-receipt-v2",metrics:["evidence_f1","temporal_fidelity","edit_coverage","unsupported_claim_rate"],statistics_plan:structuredClone(statistics),statistics_plan_sha256:statistics.statistics_plan_sha256,created_at:"2026-08-12T03:57:30.000Z",api_execution_allowed:false};rating.rating_plan_sha256=hashOracleGateRatingPlanV2(rating);
+  const bundle:FormalOraclePreregistrationBundleV2={schema_version:"formal-oracle-preregistration-bundle-v2",preregistration_bundle_sha256:"0".repeat(64),record_trust:"non_authoritative_preregistration_bundle_external_worm_pending",policy,public_evidence_derivation_policy_sha256:policy.public_evidence_derivation_policy_sha256,statistics_plan:statistics,statistics_plan_sha256:statistics.statistics_plan_sha256,formal_spec:spec,formal_spec_sha256:spec.spec_sha256,rating_plan:rating,rating_plan_sha256:rating.rating_plan_sha256,api_execution_allowed:false};bundle.preregistration_bundle_sha256=hashFormalOraclePreregistrationBundleV2(bundle);
+  const structural=prepareOracleGateFormalStructuralPreflight({dataset:v1.dataset,manifest:v1.manifest,spec});
+  const bytes=await prepareOracleGateBytePreflight({root:v1.root,dataset:v1.dataset,manifest:v1.manifest,spec,inventory:v1.inventory,video_probe:v1.frame_deriver,trusted_speech_reviewer_keys:v1.trusted_speech_reviewer_keys});
+  const frame=await prepareOracleGateFrameDerivationPreflight({root:v1.root,dataset:v1.dataset,manifest:v1.manifest,spec,inventory:v1.inventory,frame_deriver:v1.frame_deriver,trusted_speech_reviewer_keys:v1.trusted_speech_reviewer_keys});
+  const executionPlan:FormalOracleExecutionPlanV1={schema_version:"formal-oracle-execution-plan-v2",execution_plan_sha256:"0".repeat(64),items:structural.schedule.map((scheduleItem,index)=>{const prior=v1.execution_plan.items[index];const artifact=v1.execution_artifacts[index];const verified=bytes.cases.find(item=>item.case_id===scheduleItem.case_id)!;const prompt=renderFormalOracleUserPrompt({prompt_version:spec.prompt.version,user_template_bytes:v1.user_template_bytes,expected_user_template_sha256:spec.prompt.user_template_sha256,selected_transcript_bytes:Buffer.from(verified.speech.selected_transcript,"utf8"),expected_selected_transcript_sha256:verified.speech.selected_transcript_sha256,expected_selected_transcript_byte_length:verified.speech.selected_transcript_byte_length,visual_input_available:scheduleItem.arm!=="transcript_only",output_schema_sha256:spec.prompt.output_schema_sha256});const item={...structuredClone(prior),request_id:scheduleItem.request_id,idempotency_key:scheduleItem.idempotency_key,schedule_index:index,case_id:scheduleItem.case_id,arm:scheduleItem.arm,seed:scheduleItem.seed,user_prompt_sha256:prompt.prompt_sha256,request_envelope_sha256:"0".repeat(64),provider_body_sha256:"0".repeat(64)};const envelope=buildFormalOraclePiRequestEnvelope({request_id:item.request_id,schedule_index:index,case_id:item.case_id,arm:item.arm,model:item.model,system_prompt_bytes:v1.system_prompt_bytes,expected_system_prompt_sha256:item.system_prompt_sha256,user_prompt:prompt,expected_rendered_user_prompt_sha256:item.user_prompt_sha256,expected_user_template_sha256:spec.prompt.user_template_sha256,output_schema_sha256:item.output_schema_sha256,visuals:item.visuals.map((visual,visualIndex)=>({label:visual.label,mime_type:visual.mime_type,bytes:artifact.visual_bytes[visualIndex],expected_sha256:visual.sha256,expected_byte_length:visual.byte_length})),seed:item.seed,temperature:item.temperature,max_input_tokens:item.max_input_tokens,max_output_tokens:item.max_output_tokens,timeout_ms:item.timeout_ms,max_attempts:item.max_attempts,transport:item.transport,cache_retention:item.cache_retention,tools_policy:item.tools_policy});item.request_envelope_sha256=envelope.payload_sha256;item.provider_body_sha256=buildFormalOraclePreparedProviderRequest(envelope).provider_body_sha256;artifact.request_id=item.request_id;return item;})};executionPlan.execution_plan_sha256=hashFormalOracleExecutionPlan(executionPlan);
+  const run:FormalRunContractV2={...structuredClone(v1.run),schema_version:"oracle-gate-formal-run-contract-v2",canonicalization:"oracle-gate-run-canonical-json-v2",run_sha256:"0".repeat(64),formal_spec_sha256:spec.spec_sha256,schedule_sha256:structural.schedule_sha256,execution_plan_sha256:executionPlan.execution_plan_sha256,media_attestation_sha256:frame.preflight_sha256,preregistration_bundle_sha256:bundle.preregistration_bundle_sha256,public_evidence_derivation_policy_sha256:policy.public_evidence_derivation_policy_sha256,rating_plan_sha256:rating.rating_plan_sha256,statistics_plan_sha256:statistics.statistics_plan_sha256,run_store_uri:"board2skill/formal-oracle/preregistered-run-store-v2"};run.run_sha256=hashFormalRunContractV2(run);
+  const checkpoint:RunCheckpointV1={...structuredClone(v1.initial_checkpoint),run_sha256:run.run_sha256,schedule_sha256:run.schedule_sha256,checkpoint_sha256:"0".repeat(64),created_at:"2026-08-12T04:00:00.000Z",entries:executionPlan.items.map(item=>({request_id:item.request_id,idempotency_key:item.idempotency_key,state:"PENDING",resume_action:"dispatch_new_attempt",max_attempts:item.max_attempts,attempts_used:0,active_intent_sha256:null,latest_attempt_audit_sha256:null,committed_request_sha256:null}))};checkpoint.checkpoint_sha256=hashRunCheckpoint(checkpoint);
+  const registry = { formal_spec_sha256:spec.spec_sha256,schedule_sha256:structural.schedule_sha256 };
+  const registryStore={async withPinnedLedgerRegistry<T>(pinned:string,keys:ReadonlyMap<string,unknown>,callback:(value:OracleGateLedgerRegistryV1)=>Promise<T>):Promise<T>{if(pinned!==v1.pinned_registry_sha256||!keys.size)throw new Error("registry mismatch");return callback({...((await (v1.registry_store as never as {withPinnedLedgerRegistry:<U>(p:string,k:ReadonlyMap<string,unknown>,c:(v:OracleGateLedgerRegistryV1)=>Promise<U>)=>Promise<U>}).withPinnedLedgerRegistry(v1.pinned_registry_sha256,v1.trusted_registry_public_keys,async value=>value))),...registry} as OracleGateLedgerRegistryV1);}} as unknown as FrozenOracleRegistryStore;
+  const dataDir=await mkdtemp(join(tmpdir(),"oracle-composition-v2-store-"));
+  const {spec:_legacySpec,...common}=v1;
+  return {...common,registry_store:registryStore,preregistration_bundle:bundle,run_store:new FormalOraclePreregistrationStoreV2(dataDir),run,execution_plan:executionPlan,expected_genesis_head:{schema_version:"formal-oracle-head-pin-v1",run_sha256:run.run_sha256,generation:0,checkpoint_sha256:checkpoint.checkpoint_sha256},initial_checkpoint:checkpoint};
+}
+
 describe("Formal Oracle externally-pinned composition gate", () => {
+  it("atomically composes the V2 preregistration DAG and create-once pinned genesis without opening execution", async () => {
+    const input=await buildCompositionFixtureV2();let borrowed:Parameters<typeof assertActiveFormalOracleCompositionCapabilityV2>[0]|undefined;let durable!:FormalOracleCompositionAttestationV4;
+    const result=await withComposedFormalOraclePreregisteredRunGenesisV2({...input,callback:async(capability)=>{borrowed=capability;durable=structuredClone(capability.attestation);assertActiveFormalOracleCompositionCapabilityV2(capability);expect(capability.attestation).toMatchObject({schema_version:"formal-oracle-composition-attestation-v4",preregistration_bundle_sha256:input.preregistration_bundle.preregistration_bundle_sha256,public_evidence_derivation_policy_sha256:input.preregistration_bundle.public_evidence_derivation_policy_sha256,statistics_plan_sha256:input.preregistration_bundle.statistics_plan_sha256,rating_plan_sha256:input.preregistration_bundle.rating_plan_sha256,preregistration_store_status:"create_once_genesis_reloaded_non_executable",execution_migration_status:"pending_formal_run_store_v2_execution_pipeline",api_execution_allowed:false});expect(capability.head_pin).toEqual(input.expected_genesis_head);expect(()=>JSON.stringify(capability)).toThrow("不得序列化");return capability.attestation.composition_sha256;}});
+    expect(result).toMatch(/^[a-f0-9]{64}$/);expect(()=>assertActiveFormalOracleCompositionCapabilityV2(borrowed!)).toThrow(/过期|无效/);
+    expect(validateFormalOracleCompositionAttestationV4(durable)).toEqual({valid:true,issues:[]});expect(validateFormalOracleCompositionAttestationV4AgainstRunAndPlan(durable,input.run,input.execution_plan)).toEqual({valid:true,issues:[]});const drift=structuredClone(durable);drift.statistics_plan_sha256="f".repeat(64);drift.composition_sha256=hashFormalOracleCompositionAttestationV4(drift);expect(validateFormalOracleCompositionAttestationV4(drift).valid).toBe(false);
+    for(const field of ["execution_plan_sha256","schedule_sha256","media_attestation_sha256","speech_attestation_sha256","ledger_registry_sha256","signed_gold_dataset_sha256","formal_input_manifest_sha256","code_revision","build_artifact_sha256","run_store_uri","request_count"] as const){const changedRun=structuredClone(input.run) as unknown as Record<string,unknown>;changedRun[field]=field==="request_count"?input.run.request_count+1:field==="code_revision"?"f".repeat(40):field==="run_store_uri"?"other/private/store":"f".repeat(64);changedRun.run_sha256=hashFormalRunContractV2(changedRun as unknown as FormalRunContractV2);const changedAttestation=structuredClone(durable);changedAttestation.run_sha256=changedRun.run_sha256 as string;changedAttestation.head_pin.run_sha256=changedRun.run_sha256 as string;changedAttestation.composition_sha256=hashFormalOracleCompositionAttestationV4(changedAttestation);expect(validateFormalOracleCompositionAttestationV4AgainstRunAndPlan(changedAttestation,changedRun as unknown as FormalRunContractV2,input.execution_plan).valid,field).toBe(false);}
+    let hits=0;const hostile=Object.create(Object.prototype,Object.getOwnPropertyDescriptors(durable));Object.defineProperty(hostile,"preregistration_bundle",{enumerable:true,get(){hits++;return durable.preregistration_bundle;}});expect(validateFormalOracleCompositionAttestationV4(hostile).valid).toBe(false);expect(hits).toBe(0);
+    const snapshot=await input.run_store.inspectPreregisteredGenesis(input.run.run_sha256,input.expected_genesis_head);expect(snapshot.preregistration_bundle).toEqual(input.preregistration_bundle);expect(snapshot.api_execution_allowed).toBe(false);
+    await expect(withComposedFormalOraclePreregisteredRunGenesisV2({...input,callback:async()=>"bad"})).rejects.toThrow("create-once");
+  },60_000);
+
+  it("rejects V2 composition accessors before execution and stale genesis pins before HEAD creation", async () => {
+    const input=await buildCompositionFixtureV2();let hits=0;const hostile=Object.create(Object.prototype,Object.getOwnPropertyDescriptors({...input,callback:async()=>"bad"}));Object.defineProperty(hostile,"preregistration_bundle",{enumerable:true,get(){hits++;return input.preregistration_bundle;}});
+    await expect(withComposedFormalOraclePreregisteredRunGenesisV2(hostile)).rejects.toThrow(/data property|plain/);expect(hits).toBe(0);
+    const byteHostile=await buildCompositionFixtureV2();const proxied=new Proxy(byteHostile.system_prompt_bytes,{get(target,key,receiver){hits++;return Reflect.get(target,key,receiver);},getPrototypeOf(target){hits++;return Reflect.getPrototypeOf(target);},ownKeys(target){hits++;return Reflect.ownKeys(target);}});byteHostile.system_prompt_bytes=proxied;await expect(withComposedFormalOraclePreregisteredRunGenesisV2({...byteHostile,callback:async()=>"bad"})).rejects.toThrow(/byte input|Uint8Array/);expect(hits).toBe(0);
+    class ByteSubclass extends Uint8Array{[Symbol.iterator]():ArrayIterator<number>{hits++;return super[Symbol.iterator]();}}const visualHostile=await buildCompositionFixtureV2();visualHostile.execution_artifacts[1].visual_bytes[0]=new ByteSubclass(visualHostile.execution_artifacts[1].visual_bytes[0]);await withComposedFormalOraclePreregisteredRunGenesisV2({...visualHostile,callback:async()=>undefined});expect(hits).toBe(0);
+    const stale=await buildCompositionFixtureV2();stale.expected_genesis_head.checkpoint_sha256="f".repeat(64);await expect(withComposedFormalOraclePreregisteredRunGenesisV2({...stale,callback:async()=>"bad"})).rejects.toThrow(/pin|HEAD/i);await expect(stale.run_store.inspectPreregisteredGenesis(stale.run.run_sha256,{...stale.expected_genesis_head,checkpoint_sha256:stale.initial_checkpoint.checkpoint_sha256})).rejects.toThrow();
+  },60_000);
+
   it("binds the full frozen chain to a create-once all-PENDING genesis while every downstream gate stays closed", async () => {
     const input = await buildCompositionFixture();
     let borrowed: FormalOracleCompositionCapability | undefined;

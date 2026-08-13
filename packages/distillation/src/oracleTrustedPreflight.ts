@@ -1,5 +1,5 @@
 import type { KeyLike } from "node:crypto";
-import type { OracleGateFormalInputManifest, OracleGateFormalSpec, SignedGoldDataset } from "../../contracts/src/index.js";
+import type { OracleGateFormalInputManifest, OracleGateFormalSpec, OracleGateFormalSpecV2, SignedGoldDataset } from "../../contracts/src/index.js";
 import { FrozenOracleRegistryStore, type OracleRegistrySigner } from "../../store/src/frozenOracleRegistryStore.js";
 import { GoldLedgerAttestor } from "../../store/src/goldLedgerAttestor.js";
 import { prepareOracleGateFormalStructuralPreflight } from "./oracleFormalPreflight.js";
@@ -90,7 +90,7 @@ export async function freezeCurrentOracleLedgerRegistry(input: {
   attestor: GoldLedgerAttestor;
   registryStore: FrozenOracleRegistryStore;
   manifest: OracleGateFormalInputManifest;
-  spec: OracleGateFormalSpec;
+  spec: OracleGateFormalSpec | OracleGateFormalSpecV2;
   signer: OracleRegistrySigner;
   sequence: number;
   frozen_at: string;
