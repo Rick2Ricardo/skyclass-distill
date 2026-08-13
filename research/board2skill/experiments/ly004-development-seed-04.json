@@ -1,0 +1,21 @@
+{
+  "schema_version": "oracle-gate-smoke-spec-v1",
+  "protocol_scope": "ly004_preregistered_development_value_gate_v1_replacement_block",
+  "protocol_document": "research/board2skill/experiments/LY004_DEVELOPMENT_VALUE_GATE_V1.md",
+  "prompt_version": "oracle-gate-prompt-v1",
+  "blind_seed_sha256": "3c78aab1296ba6f1f9c93f4df24df02e8982ad25fa86bcc765ef6ba6fc34bc3e",
+  "generation_seed": 20260817,
+  "seed_index": 3,
+  "cases": [
+    {
+      "case_id": "ly004-known-condition",
+      "delta_id": "B-DELTA-05",
+      "uniform_frame_id": "GOLD-UNIFORM-01"
+    },
+    {
+      "case_id": "ly004-question-pair",
+      "delta_id": "B-DELTA-06",
+      "uniform_frame_id": "GOLD-UNIFORM-02"
+    }
+  ]
+}

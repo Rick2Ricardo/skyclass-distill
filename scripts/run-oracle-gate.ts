@@ -54,7 +54,10 @@ const client = new LlmClient({
   apiKey: settings.llm_api_key,
   model: settings.llm_model,
   timeoutSeconds: settings.llm_timeout_seconds,
-  maxAttempts: settings.llm_max_attempts,
+  // Research runs own retry semantics at the experiment level. A provider
+  // retry would silently replace one randomized observation with a selected
+  // successful attempt, so this runner is deliberately single-attempt.
+  maxAttempts: 1,
 });
 assert(client.configured, "LLM API 尚未配置");
 const config: OracleGateSmokeConfig = {

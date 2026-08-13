@@ -144,8 +144,8 @@ function assertProviderAudit(input: {
   if (audit.model !== input.model || audit.transport !== "pi" || audit.stop_reason !== "stop" || audit.tools_policy !== "none") {
     throw new Error(`${input.label}: provider audit 未满足冻结协议`);
   }
-  if (!Number.isSafeInteger(audit.attempt_count) || audit.attempt_count < 1 || audit.provider_response_received !== true || !audit.usage) {
-    throw new Error(`${input.label}: provider audit 缺少有效 attempt、response 或 usage`);
+  if (audit.attempt_count !== 1 || audit.provider_response_received !== true || !audit.usage) {
+    throw new Error(`${input.label}: provider audit 必须是单次 attempt 且含 response/usage`);
   }
   const usage = audit.usage;
   const numeric = (key: string): boolean => typeof usage[key] === "number" && Number.isFinite(usage[key]) && Number(usage[key]) >= 0;

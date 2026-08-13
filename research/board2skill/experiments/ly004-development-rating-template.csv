@@ -1,0 +1,2 @@
+blind_id,rater_id,evidence_true_positive,evidence_false_positive,evidence_false_negative,evidence_precision,evidence_recall,evidence_f1,edit_content_correct,operation_add_correct,unsupported_claim_count,factual_claim_count,unsupported_claim_rate,schema_privacy_hard_failure,temporal_fidelity,notes
+TBD,TBD,TBD,TBD,TBD,TBD,TBD,TBD,TBD,TBD,TBD,TBD,TBD,false,NA,TBD
