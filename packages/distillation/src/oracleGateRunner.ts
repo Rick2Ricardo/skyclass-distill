@@ -169,7 +169,11 @@ function assertProviderAudit(input: {
   if (audit.request_sha256 !== expectedRequestSha(input)) throw new Error(`${input.label}: provider request_sha256 与实际冻结请求不一致`);
 }
 
-function userPrompt(sample: OraclePilotArmInput): string {
+function userPrompt(sample: OraclePilotArmInput, promptVersion: string): string {
+  const claimRule = promptVersion === "oracle-gate-prompt-v2-region-claim-decoupled"
+    ? "事实 claim 必须原子化：板书操作类型、板书内容、区域位置不得捆绑在同一个 claim 中。区域坐标只是定位元数据，除非任务明确要求评价空间位置，否则不要把 region 单独写入 evidence_claims；region 仅保留在 observed_board_actions.region。"
+    : "";
+  if (promptVersion !== "oracle-gate-prompt-v1" && promptVersion !== "oracle-gate-prompt-v2-region-claim-decoupled") throw new Error("Oracle Gate prompt_version 不受支持");
   return `请分析同一课堂事件。四个实验条件使用相同任务与输出结构；你只能依据本请求实际出现的证据槽。
 
 证据说明：${sample.evidence_text}
@@ -180,7 +184,7 @@ ${sample.transcript}
 输出结构：
 ${JSON.stringify(ORACLE_GATE_RESPONSE_SCHEMA)}
 
-规则：observed_board_actions 按可恢复的时间顺序排列；看不到板书变化时允许 operation=unknown。generalized_teaching_capability 必须参数化、可迁移且渲染器中立。evidence_slot 只能写 transcript、visual-1 或 uncertain。`;
+规则：observed_board_actions 按可恢复的时间顺序排列；看不到板书变化时允许 operation=unknown。generalized_teaching_capability 必须参数化、可迁移且渲染器中立。evidence_slot 只能写 transcript、visual-1 或 uncertain。${claimRule}`;
 }
 
 async function canonicalVisual(sample: OraclePilotArmInput, bundleRoot: string): Promise<{
@@ -294,7 +298,7 @@ export async function runOracleGateSmoke(input: {
         seed,
         cacheRetention: "none",
       };
-      const prompt = userPrompt(sample);
+      const prompt = userPrompt(sample, input.config.prompt_version);
       const result = await input.client.chatJsonAudited(SYSTEM, prompt, visual.input, input.config.temperature, control);
       validateOracleGateResponse(result.value, sample.arm);
       assertProviderAudit({

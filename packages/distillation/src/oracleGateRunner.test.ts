@@ -198,6 +198,12 @@ describe("Oracle Gate executable smoke", () => {
       .rejects.toThrow("必须是单次 attempt");
   });
 
+  it("freezes the FIX prompt as a single region-claim decoupling intervention", async () => {
+    const root = await mkdtemp(join(tmpdir(), "oracle-gate-fix-prompt-"));roots.push(root);await writeFile(join(root,"source.png"),PNG_1X1);await writeFile(join(root,"bundle.json"),"{}\n");const sha256=createHash("sha256").update(PNG_1X1).digest("hex");const prompts:string[]=[];
+    const client={options:{model:"vision-fixture"},async chatJsonAudited(system:string,user:string,images=[],temperature=0,control?:LlmCallControl){prompts.push(user);const submittedVisuals=images.map((image:{label:string;bytes?:Uint8Array;sha256?:string;mime_type?:"image/jpeg"})=>({label:image.label,sha256:String(image.sha256),mime_type:image.mime_type??"image/jpeg",byte_length:image.bytes?.byteLength??0}));return{value:{schema_version:"teacher-evidence-response-v1",observed_board_actions:[],generalized_teaching_capability:{name:"能力",mechanism:"机制",action_program:["动作"]},evidence_claims:[],uncertainties:[]},audit:{request_sha256:createHash("sha256").update(JSON.stringify({model:"vision-fixture",system,user,temperature,control:{transport:control?.transport??"auto",max_output_tokens:control?.maxOutputTokens??null,seed:control?.seed??null,cache_retention:control?.cacheRetention??null,tools_policy:"none"},visuals:submittedVisuals})).digest("hex"),model:"vision-fixture",attempt_count:1,submitted_visuals:submittedVisuals,provider_response_received:true,stop_reason:"stop",usage:{input:10,output:10,totalTokens:20},transport:"pi",temperature,max_output_tokens:control?.maxOutputTokens??null,seed:control?.seed??null,cache_retention:control?.cacheRetention??null,tools_policy:"none"} satisfies LlmRequestAudit};}};
+    const fixPilot=pilot(sha256);fixPilot.protocol.prompt_version="oracle-gate-prompt-v2-region-claim-decoupled";await runOracleGateSmoke({client,pilot:fixPilot,bundlePath:join(root,"bundle.json"),config:{...config,prompt_version:"oracle-gate-prompt-v2-region-claim-decoupled"}});expect(prompts).toHaveLength(8);expect(prompts.every((prompt)=>prompt.includes("操作类型、板书内容、区域位置不得捆绑")&&prompt.includes("region 仅保留在 observed_board_actions.region"))).toBe(true);
+  });
+
   it("rejects nested condition leakage and evidence slots unavailable to the text arm", () => {
     const response = {
       schema_version: "teacher-evidence-response-v1",
