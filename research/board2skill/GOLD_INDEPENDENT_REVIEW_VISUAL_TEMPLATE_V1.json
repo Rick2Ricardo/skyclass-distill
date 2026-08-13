@@ -1,0 +1,387 @@
+{
+  "schema_version": "gold-independent-assessment-v1",
+  "manifest_payload_sha256": "87a8a583a884b8a6702f5db0a8fafdf747cce79404d06232ca5a94ddd815014e",
+  "manifest_json_sha256": "1150a7a4f5283ab2e3c1688ecde1ceb5396ee4c62ccc758332880b12723af9b0",
+  "reviewer_slot": "visual_reviewer",
+  "status": "unfilled_template",
+  "reviewer_id": null,
+  "reviewer_role": null,
+  "instructions": {
+    "do_not_open_peer_assessment_before_completion": true,
+    "inspect_all_evidence_for_final_boundaries": true,
+    "speech_is_context_not_gold": true,
+    "allowed_dispositions": [
+      "accept",
+      "reject",
+      "not_an_event",
+      "unknown"
+    ],
+    "replace_each_decision_null_with_completed_decision_object": true
+  },
+  "items": [
+    {
+      "presentation_index": 1,
+      "card_sha256": "9792e1b96ef6241a6d6b27c0e1a5571d5769762bd702ca38f043e98481b9917d",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G14",
+      "decision": null
+    },
+    {
+      "presentation_index": 2,
+      "card_sha256": "1c44bcf5b6594ccd1872457f3b5a6d53046b56f320d25e0bd8729a4de9b627da",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G02",
+      "decision": null
+    },
+    {
+      "presentation_index": 3,
+      "card_sha256": "4216b8eb9a06badcb0d8d005d616eaf143e077a549e29f0ba36db4b6454fe685",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G17",
+      "decision": null
+    },
+    {
+      "presentation_index": 4,
+      "card_sha256": "46f28deec6b2da770fb55cfe943df77abf21eff2d5e04241a75154c30417e5bc",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G01",
+      "decision": null
+    },
+    {
+      "presentation_index": 5,
+      "card_sha256": "39dd148f3685256d9a7d9479f247fb50346f778d2ebfea713fe72ec73b5f3627",
+      "package_id": "kg005-erase-add-ab-1888-1905-persistence-v2",
+      "group_id": "KG005-AB-002",
+      "decision": null
+    },
+    {
+      "presentation_index": 6,
+      "card_sha256": "efcda50a0ef23ff1b4554217564eb1dd304b81dff0918d7ea0e9fc534bbf3bfc",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G13",
+      "decision": null
+    },
+    {
+      "presentation_index": 7,
+      "card_sha256": "af492c129262b30ec29d96bcd8970fefd5c1e2d06fac4f0c275b5d68f97c6155",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G08",
+      "decision": null
+    },
+    {
+      "presentation_index": 8,
+      "card_sha256": "51075a0a2be53ca5c6a39a6c76e4531ec7bd8a2a8f8576fb38761830f0db4556",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G17",
+      "decision": null
+    },
+    {
+      "presentation_index": 9,
+      "card_sha256": "5eac0cb3b716a34b4e3dae1dd17fd413e3bb0bd1625b6710995b1d8bc4c286a3",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G08",
+      "decision": null
+    },
+    {
+      "presentation_index": 10,
+      "card_sha256": "02879e324cc73b32713b93bd54d0422ed6181e44130a457a46bbd6a80a4086ac",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G03",
+      "decision": null
+    },
+    {
+      "presentation_index": 11,
+      "card_sha256": "59b4805620b21e7ed184c44b5e200013f5821777fdc592d776ec30723a36358c",
+      "package_id": "tbv2-ly-004-01-a2-b-133-240-human-intake",
+      "group_id": "G07",
+      "decision": null
+    },
+    {
+      "presentation_index": 12,
+      "card_sha256": "013f65015579cdcf522ebbfe218efb4c3f571eec83dc575d9d6922123717751a",
+      "package_id": "kg005-modify-ab-adjudication-2134-2166",
+      "group_id": "KG005-AB-G01",
+      "decision": null
+    },
+    {
+      "presentation_index": 13,
+      "card_sha256": "8c0e48965499dbf48cfb9949ec9a323b2cd43ec715de2c5ec6708ff69036e83e",
+      "package_id": "tbv2-ly-004-01-a2-b-133-240-human-intake",
+      "group_id": "G06",
+      "decision": null
+    },
+    {
+      "presentation_index": 14,
+      "card_sha256": "1f9aa36c7a7d50d37fd5a0ef2202defa081b7a716366404e76dd88d193c9df6d",
+      "package_id": "kg005-modify-ab-adjudication-2134-2166",
+      "group_id": "KG005-AB-G03",
+      "decision": null
+    },
+    {
+      "presentation_index": 15,
+      "card_sha256": "04be6e9ccca939cfa64d5111f7d60a2bc18a46a131bcc5e26f34af6eb3e61a9e",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G12",
+      "decision": null
+    },
+    {
+      "presentation_index": 16,
+      "card_sha256": "6cf1916e88a0af0688401554b1da3a3a414deb875459a144aa41c904ef702e96",
+      "package_id": "tbv2-ly-004-01-a2-b-133-240-human-intake",
+      "group_id": "G04",
+      "decision": null
+    },
+    {
+      "presentation_index": 17,
+      "card_sha256": "89c08f2f775455b6af07059dd37a6c565e2a5bc233f8ae33ff6b5f69cb49182f",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G15",
+      "decision": null
+    },
+    {
+      "presentation_index": 18,
+      "card_sha256": "6f46bb85da8afa168b03deaa3b187c23b6de8c651c6d957c12ff59678c141261",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G05",
+      "decision": null
+    },
+    {
+      "presentation_index": 19,
+      "card_sha256": "9ca1d600ebea777d79c9cd8ae9dac2fa9ad10656012d204bc8d4e501ca6ec27b",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G11",
+      "decision": null
+    },
+    {
+      "presentation_index": 20,
+      "card_sha256": "c3e4b64479695a72fe191af8ef9a94ebba85b6625302b11a68385e3621cb28ca",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G01",
+      "decision": null
+    },
+    {
+      "presentation_index": 21,
+      "card_sha256": "e75795e124b166da57905670aefe6be1d1da251c588f4ba1dfd81503b519f236",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G10",
+      "decision": null
+    },
+    {
+      "presentation_index": 22,
+      "card_sha256": "018e3c1ead8083c966043c17d7982042cb73e87b2d792a8f288166c827de2add",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G11",
+      "decision": null
+    },
+    {
+      "presentation_index": 23,
+      "card_sha256": "b47524f52eeb2f2c1210a6928d24a07dfe5f53867780d121ce6567de05d560cf",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G07",
+      "decision": null
+    },
+    {
+      "presentation_index": 24,
+      "card_sha256": "48c2b8d6794fbdf4bef04b9b4034599f47955746b7c13e45a1feb66bb266ff5a",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G12",
+      "decision": null
+    },
+    {
+      "presentation_index": 25,
+      "card_sha256": "c3ddd3d8dd69d704506a1a9c66509e5152df16df39072461a0e7e5b5946b0dce",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G05",
+      "decision": null
+    },
+    {
+      "presentation_index": 26,
+      "card_sha256": "0900a67415c1b235286a524f311fab6fb7b5f34594c992fcb2d3c3af04c953c1",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G03",
+      "decision": null
+    },
+    {
+      "presentation_index": 27,
+      "card_sha256": "7730836e6fde2978ab0db30f3650ab45c09f7bdf8b89becc7a6d62feadd7f5de",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G19",
+      "decision": null
+    },
+    {
+      "presentation_index": 28,
+      "card_sha256": "df6918ab39b68b3ba4e62339459e2b24a48f335a9d55dcbf615526816863264b",
+      "package_id": "tbv2-ly-004-01-a2-b-133-240-human-intake",
+      "group_id": "G05",
+      "decision": null
+    },
+    {
+      "presentation_index": 29,
+      "card_sha256": "aeb6810535c9523e8cbe7d00b4d7faaf952057c9f0b1a8eb408a6af9fa20d9f9",
+      "package_id": "kg005-erase-add-ab-1888-1905-persistence-v2",
+      "group_id": "KG005-AB-003",
+      "decision": null
+    },
+    {
+      "presentation_index": 30,
+      "card_sha256": "72e1d77d258a6aaa34b6ea00cd7a50a0619524c4fada53c9b3bae6ca5b7facf2",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G10",
+      "decision": null
+    },
+    {
+      "presentation_index": 31,
+      "card_sha256": "676e4dcca9c5b00e5037665831491329c5cb9a00f175463b8a7288effe5165c4",
+      "package_id": "kg005-modify-ab-adjudication-2134-2166",
+      "group_id": "KG005-AB-G04",
+      "decision": null
+    },
+    {
+      "presentation_index": 32,
+      "card_sha256": "3a003efd22330726a324f25fe37d416b42eaaca5f6ff9a7508deca40c5dd7173",
+      "package_id": "tbv2-ly-004-01-a2-b-133-240-human-intake",
+      "group_id": "G03",
+      "decision": null
+    },
+    {
+      "presentation_index": 33,
+      "card_sha256": "f644869ad1c89efe4b4cf6669a5b66ce7eb76c3a4ec15bce33c0569d7a2b7c48",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G02",
+      "decision": null
+    },
+    {
+      "presentation_index": 34,
+      "card_sha256": "437f119a75a7d89bf769da559d39b9892945dba9469064d8dacc8d86bb29403d",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G09",
+      "decision": null
+    },
+    {
+      "presentation_index": 35,
+      "card_sha256": "1ab97236b45cbb9f9c7325fb00d2a57736dc2c3fe8eb449b40cfbe3e48c44d89",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G16",
+      "decision": null
+    },
+    {
+      "presentation_index": 36,
+      "card_sha256": "006964a19d788a551800c1ae6503b88c2494c304a202849ed7ee3fc89680d5c5",
+      "package_id": "kg005-modify-ab-adjudication-2134-2166",
+      "group_id": "KG005-AB-G02",
+      "decision": null
+    },
+    {
+      "presentation_index": 37,
+      "card_sha256": "91e2d89f1dd8d144c89dda7a2cbdb6dbb89f3edeb183b91b2421d33a4c11cfed",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G14",
+      "decision": null
+    },
+    {
+      "presentation_index": 38,
+      "card_sha256": "c47372fd20824823083460068b33451e00214d1a821ed4354a67524c172a381c",
+      "package_id": "kg005-modify-ab-adjudication-2134-2166",
+      "group_id": "KG005-AB-G05",
+      "decision": null
+    },
+    {
+      "presentation_index": 39,
+      "card_sha256": "1e2af9bcc78471924c289c388e31c8d962cacad1425cfb2f3cb103d4c86d3581",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G18",
+      "decision": null
+    },
+    {
+      "presentation_index": 40,
+      "card_sha256": "c656c94a1151d8f2c2d825c7e311d9b8f5a00694c071f674e3f57873aa70357b",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G04",
+      "decision": null
+    },
+    {
+      "presentation_index": 41,
+      "card_sha256": "6e9026526d49d77d6e2e49f0ddfda590922b5436fc42e9b17f08ad603016ec48",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G07",
+      "decision": null
+    },
+    {
+      "presentation_index": 42,
+      "card_sha256": "ad6bf5b272fd760085a0d032147d6f22cefd0c6c9d03eddbc7b76ec4821dd0af",
+      "package_id": "kg003-erase-ab2-4422-4428-persistence-v2",
+      "group_id": "kg003-erase-ab2-pair-1",
+      "decision": null
+    },
+    {
+      "presentation_index": 43,
+      "card_sha256": "a366a534b26ca06f2af1cd342ce383e61b6344766af2f49bb0275b79bc5dd8c6",
+      "package_id": "kg005-erase-add-ab-1888-1905-persistence-v2",
+      "group_id": "KG005-AB-001",
+      "decision": null
+    },
+    {
+      "presentation_index": 44,
+      "card_sha256": "2b5f82143f9794e9c88c88d13fcf61a8efc694937eeea629c6ae36758585ea72",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G06",
+      "decision": null
+    },
+    {
+      "presentation_index": 45,
+      "card_sha256": "2db0d7606696409933d4e262a05c7b7499d562c3f53a574b587353186277ce11",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G16",
+      "decision": null
+    },
+    {
+      "presentation_index": 46,
+      "card_sha256": "e997a137ae00cf98e7312ec75129b0d36145f8fec828b5ad5ed1d6ce3bf5d90c",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G09",
+      "decision": null
+    },
+    {
+      "presentation_index": 47,
+      "card_sha256": "0a23c8b543b21d86eff360e53407ba20f99309e077bb20d9ae6d35398c9e7694",
+      "package_id": "tbv2-ly-004-01-a2-b-133-240-human-intake",
+      "group_id": "G02",
+      "decision": null
+    },
+    {
+      "presentation_index": 48,
+      "card_sha256": "89c04d06379ee778df4e1c5f3c82bca588edf5b94737f1516e0df1a61c408f96",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G15",
+      "decision": null
+    },
+    {
+      "presentation_index": 49,
+      "card_sha256": "6773ea05590a7b6ed2c7e28b9c42da919ee0a842d8878825c693cf565f1c9858",
+      "package_id": "tbv2-kg-003-01-a-b-2720-2880-human-intake",
+      "group_id": "G13",
+      "decision": null
+    },
+    {
+      "presentation_index": 50,
+      "card_sha256": "6f18fdcf2ca46b4cc1ec5b1f4510bb849716a6ac71f0aeb0c5af956aeb18b772",
+      "package_id": "tbv2-ly-004-01-a2-b-133-240-human-intake",
+      "group_id": "G01",
+      "decision": null
+    },
+    {
+      "presentation_index": 51,
+      "card_sha256": "ef42308c85e23c4d72f8b6bf358f83220c024536cd41ebb64b0b9d1485a2909c",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G06",
+      "decision": null
+    },
+    {
+      "presentation_index": 52,
+      "card_sha256": "ddbe52accf36bc6f5402232d18bdb8f751f2d9595933b747854af71348d41c22",
+      "package_id": "tbv2-ly-003-01-a-b-702-922-human-intake",
+      "group_id": "G04",
+      "decision": null
+    }
+  ]
+}

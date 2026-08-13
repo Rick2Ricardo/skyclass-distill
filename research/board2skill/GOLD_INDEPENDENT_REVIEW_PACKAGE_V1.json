@@ -1,0 +1,8 @@
+{
+  "schema_version": "gold-independent-review-package-v1",
+  "manifest_payload_sha256": "87a8a583a884b8a6702f5db0a8fafdf747cce79404d06232ca5a94ddd815014e",
+  "manifest_json_sha256": "1150a7a4f5283ab2e3c1688ecde1ceb5396ee4c62ccc758332880b12723af9b0",
+  "visual_template_sha256": "f61f3c0af130595e5bb5eb1c90c96895cbe7735948f50f328528b515771b770b",
+  "physics_template_sha256": "bcf6a7e81bd2a04eeac9d25f0642e0ccfbc0fb6772c1c91bdb4fd2bef1e98a52",
+  "review_package_sha256": "21de05a19d9cdccf47c4aab05562cb1463d02d0a2eb275c567fd84186b7211e7"
+}
