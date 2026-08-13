@@ -3,17 +3,22 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { validateOracleGateResponse, type OracleGateResponseArm } from "../packages/contracts/src/oracle-gate-response.js";
 
+const isFix = process.argv.includes("--fix");
 const ARMS = ["transcript_only", "static_final_board", "uniform_frame", "oracle_delta"] as const;
-const MATRIX_DOMAIN = "skyclass/ly004-development-matrix-receipt/v2\0";
+const MATRIX_DOMAIN = isFix ? "skyclass/ly004-development-fix-matrix-receipt/v1\0" : "skyclass/ly004-development-matrix-receipt/v2\0";
 const RATER_ORDER_DOMAINS = {
-  R1: "skyclass/ly004-development-rater-order/r1/v1\0",
-  R2: "skyclass/ly004-development-rater-order/r2/v1\0",
+  R1: isFix ? "skyclass/ly004-development-fix-rater-order/r1/v1\0" : "skyclass/ly004-development-rater-order/r1/v1\0",
+  R2: isFix ? "skyclass/ly004-development-fix-rater-order/r2/v1\0" : "skyclass/ly004-development-rater-order/r2/v1\0",
 } as const;
-const ACTIVE_BLOCKS = [
+const ACTIVE_BLOCKS = (isFix ? [
+  { run: "run-01", spec: "ly004-development-fix-seed-01.json", spec_seed_index: 0, generation_seed: 20260818 },
+  { run: "run-02", spec: "ly004-development-fix-seed-02.json", spec_seed_index: 1, generation_seed: 20260819 },
+  { run: "run-03", spec: "ly004-development-fix-seed-03.json", spec_seed_index: 2, generation_seed: 20260820 },
+] : [
   { run: "run-01", spec: "ly004-development-seed-01.json", spec_seed_index: 0, generation_seed: 20260814 },
   { run: "run-03", spec: "ly004-development-seed-03.json", spec_seed_index: 2, generation_seed: 20260816 },
   { run: "run-04", spec: "ly004-development-seed-04.json", spec_seed_index: 3, generation_seed: 20260817 },
-] as const;
+]) as readonly {run:string;spec:string;spec_seed_index:number;generation_seed:number}[];
 
 interface DevelopmentSpec {
   schema_version: "oracle-gate-smoke-spec-v1";
@@ -95,10 +100,12 @@ interface RaterItem {
 }
 
 const root = process.cwd();
-const sourceRoot = resolve(root, "data/board2skill/oracle-gate-development");
+const sourceRoot = resolve(root, isFix ? "data/board2skill/oracle-gate-development-fix" : "data/board2skill/oracle-gate-development");
 const outputRoot = join(sourceRoot, "blind-package");
 const privateRoot = join(sourceRoot, "private");
-const protocolDocument = "research/board2skill/experiments/LY004_DEVELOPMENT_VALUE_GATE_V1.md";
+const protocolDocument = isFix ? "research/board2skill/experiments/LY004_DEVELOPMENT_FIX_GATE_V1.md" : "research/board2skill/experiments/LY004_DEVELOPMENT_VALUE_GATE_V1.md";
+const protocolScope = isFix ? "ly004_region_claim_decoupling_fix_gate_v1" : "ly004_preregistered_development_value_gate_v1";
+const expectedPromptVersion = isFix ? "oracle-gate-prompt-v2-region-claim-decoupled" : "oracle-gate-prompt-v1";
 const expectedBlindSeedSha256 = "3c78aab1296ba6f1f9c93f4df24df02e8982ad25fa86bcc765ef6ba6fc34bc3e";
 const cases: Record<string, Omit<RaterItem["evidence_card"], "schema_version">> = {
   "ly004-known-condition": {
@@ -192,7 +199,7 @@ for (let developmentSeedIndex = 0; developmentSeedIndex < ACTIVE_BLOCKS.length; 
   exactKeys(manifest as unknown as Record<string, unknown>, ["schema_version","decision","model","protocol_fingerprint_sha256","prompt_sha256","output_schema_sha256","case_count","arm_count","seed_count","request_count","warning"], `${run} manifest`);
   assert(spec.seed_index === block.spec_seed_index && spec.generation_seed === block.generation_seed, `${run} spec seed 不匹配`);
   assert(spec.schema_version === "oracle-gate-smoke-spec-v1" && spec.protocol_document === protocolDocument && spec.blind_seed_sha256 === expectedBlindSeedSha256, `${run} spec固定字段不匹配`);
-  assert((spec.protocol_scope === "ly004_preregistered_development_value_gate_v1" || spec.protocol_scope === "ly004_preregistered_development_value_gate_v1_replacement_block") && spec.prompt_version === "oracle-gate-prompt-v1", `${run} spec protocol 不匹配`);
+  assert((spec.protocol_scope === protocolScope || (!isFix && spec.protocol_scope === "ly004_preregistered_development_value_gate_v1_replacement_block")) && spec.prompt_version === expectedPromptVersion, `${run} spec protocol 不匹配`);
   assert(JSON.stringify(spec.cases.map((item) => item.case_id).sort()) === JSON.stringify(Object.keys(cases).sort()), `${run} spec case 集合不匹配`);
   assert(manifest.case_count === 2 && manifest.arm_count === 4 && manifest.seed_count === 1 && manifest.request_count === 8, `${run} manifest 矩阵计数无效`);
   assert(manifest.schema_version === "oracle-gate-smoke-manifest-v1" && manifest.decision === "not_evaluable" && manifest.warning === "engineering_wiring_smoke_not_an_experiment_result" && /^[a-f0-9]{64}$/.test(manifest.protocol_fingerprint_sha256), `${run} manifest固定字段无效`);
@@ -267,7 +274,7 @@ const orderedViews = Object.fromEntries((["R1", "R2"] as const).map((raterId) =>
   return [raterId, { serialized, items_sha256: sha(serialized) }];
 })) as Record<"R1" | "R2", { serialized: string; items_sha256: string }>;
 const matrixPayload = {
-  protocol_scope: "ly004_preregistered_development_value_gate_v1",
+  protocol_scope: protocolScope,
   protocol_document_sha256: sha(await readFile(resolve(root, protocolDocument))),
   case_count: 2,
   arm_count: 4,
@@ -310,8 +317,8 @@ await writeFile(join(privateRoot, "rating-map-v2.json"), JSON.stringify({
   items: sortedPrivateMap,
 }, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
 await writeFile(join(outputRoot, "manifest.json"), JSON.stringify({
-  schema_version: "ly004-development-blind-package-v2",
-  protocol_document: "research/board2skill/experiments/LY004_DEVELOPMENT_VALUE_GATE_V1.md",
+  schema_version: isFix ? "ly004-development-fix-blind-package-v1" : "ly004-development-blind-package-v2",
+  protocol_document: protocolDocument,
   matrix_receipt_domain: MATRIX_DOMAIN,
   matrix_receipt_sha256: matrixReceiptSha256,
   matrix: matrixPayload,

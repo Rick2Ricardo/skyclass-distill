@@ -103,7 +103,7 @@ function assertFiniteInteger(value: number, label: string): void {
 
 export { validateOracleGateResponse } from "../../contracts/src/oracle-gate-response.js";
 
-function expectedRequestSha(input: {
+export function hashOracleGateRequest(input: {
   model: string;
   user: string;
   temperature: number;
@@ -166,10 +166,10 @@ function assertProviderAudit(input: {
   if (JSON.stringify(audit.submitted_visuals) !== JSON.stringify(expectedVisuals)) {
     throw new Error(`${input.label}: provider audit 的 submitted_visuals 与 canonical canvas 不一致`);
   }
-  if (audit.request_sha256 !== expectedRequestSha(input)) throw new Error(`${input.label}: provider request_sha256 与实际冻结请求不一致`);
+  if (audit.request_sha256 !== hashOracleGateRequest(input)) throw new Error(`${input.label}: provider request_sha256 与实际冻结请求不一致`);
 }
 
-function userPrompt(sample: OraclePilotArmInput, promptVersion: string): string {
+export function renderOracleGateUserPrompt(sample: OraclePilotArmInput, promptVersion: string): string {
   const claimRule = promptVersion === "oracle-gate-prompt-v2-region-claim-decoupled"
     ? "事实 claim 必须原子化：板书操作类型、板书内容、区域位置不得捆绑在同一个 claim 中。区域坐标只是定位元数据，除非任务明确要求评价空间位置，否则不要把 region 单独写入 evidence_claims；region 仅保留在 observed_board_actions.region。"
     : "";
@@ -298,7 +298,7 @@ export async function runOracleGateSmoke(input: {
         seed,
         cacheRetention: "none",
       };
-      const prompt = userPrompt(sample, input.config.prompt_version);
+      const prompt = renderOracleGateUserPrompt(sample, input.config.prompt_version);
       const result = await input.client.chatJsonAudited(SYSTEM, prompt, visual.input, input.config.temperature, control);
       validateOracleGateResponse(result.value, sample.arm);
       assertProviderAudit({
