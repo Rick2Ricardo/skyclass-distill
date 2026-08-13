@@ -1,0 +1,272 @@
+{
+  "schema_version": "board2skill-erase-persistence-extension-v1",
+  "artifact_id": "erase-persistence-extension-kg003-kg005-v1",
+  "created_at": "2026-08-13T21:51:15Z",
+  "status": "machine_pre_review_only",
+  "accepted": false,
+  "gold_decision_created": false,
+  "policy": {
+    "minimum_stable_before_seconds": 2,
+    "minimum_stable_after_seconds": 2,
+    "minimum_samples_per_state": 3,
+    "sampling_positions": [
+      "start",
+      "middle",
+      "end"
+    ],
+    "continuous_same_surface_required": true,
+    "event_boundary_excludes_stability_horizon": true,
+    "base_annotation_spec_uri": "research/board2skill/DATA_AND_ANNOTATION_SPEC.md",
+    "persistence_policy_uri": "research/board2skill/ERASE_PERSISTENCE_POLICY_V1.md",
+    "persistence_policy_sha256": "ed5f0135fb9ee24308417722a480fdcf7f9c8f84c262dd70c46c7e44a94ba679"
+  },
+  "cases": [
+    {
+      "case_id": "kg003-erase-ab2-pair-1-persistence-extension",
+      "source_video_id": "phy-force-kunge-003",
+      "source_video_uri": "data/raw/physics/force-pilot/phy-force-kunge-003/source.mp4",
+      "source_video_sha256": "e4409e94aab76ed26501ebd24e51b09d3454944a09d4a6b37365a75fb9d080e4",
+      "source_video_byte_length": 405446079,
+      "source_video_dimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "source_video_nominal_frame_rate": "30/1",
+      "source_intake_uri": "research/board2skill/KG003_ERASE_AB2_ADJUDICATION_INPUT_4422_4428.json",
+      "source_intake_sha256": "cff464f6e224d9edb857d0439213e86d3556ed1a3d6376f1e23a51fde86392f9",
+      "original_censoring": "left_censored_before_state",
+      "candidate_event_window_seconds": {
+        "start_min": 4423,
+        "start_max": 4423.067,
+        "end_min": 4424.933,
+        "end_max": 4425.167
+      },
+      "extended_before_interval_seconds": {
+        "start": 4420,
+        "end": 4422.5,
+        "duration": 2.5
+      },
+      "extended_after_interval_seconds": {
+        "start": 4424.933,
+        "end": 4427,
+        "duration": 2.067
+      },
+      "observed_state_change": "the same right-side red handwritten derivation is continuously visible before the erase and continuously absent afterward while the lower-left formulas remain",
+      "surface_continuity": "same digital canvas and viewport; no target-region occlusion, page transition, zoom, or pan in either frozen state interval",
+      "machine_pre_review": "the source-video extension removes the left-censor persistence blocker; exact erased glyph transcription and the final start/end frame remain human decisions",
+      "human_decision_options": [
+        "ERASE",
+        "reject",
+        "not_an_event",
+        "unknown"
+      ],
+      "frames": [
+        {
+          "time_seconds": 4420,
+          "role": "before_start",
+          "observation": "target derivation visible",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg003/source-t-4420.0.png",
+          "sha256": "16890246e7fd91af0a8a41255a8f67470afe7307805ed44614617e80cbac7fe3",
+          "byte_length": 645916
+        },
+        {
+          "time_seconds": 4421,
+          "role": "before_middle",
+          "observation": "target derivation visible",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg003/source-t-4421.0.png",
+          "sha256": "688b403d3832ac05c04569b192e776349a6699391100f9dfffef15b379b67762",
+          "byte_length": 609463
+        },
+        {
+          "time_seconds": 4422.5,
+          "role": "before_end",
+          "observation": "target derivation visible",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg003/source-t-4422.5.png",
+          "sha256": "d1ee5f356deb1e3fe37d190ee1f98147e09460168bdb261170e4d42f4a2efef3",
+          "byte_length": 611197
+        },
+        {
+          "time_seconds": 4423.067,
+          "role": "event_first_changed_candidate",
+          "observation": "first persistent deletion is visible within the target region",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg003/source-t-4423.067.png",
+          "sha256": "d7027b34c62cb848acdcd816256fd89a1fdf5920edc83210202d7635eb0bf0c3",
+          "byte_length": 614059
+        },
+        {
+          "time_seconds": 4424.9,
+          "role": "event_last_residual_candidate",
+          "observation": "a small residual target mark remains",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg003/source-t-4424.900.png",
+          "sha256": "1aca221d461e4d65eee3b24663e6f2dc55127c6bc48567f8f8608dd8c4cb80ef",
+          "byte_length": 591079
+        },
+        {
+          "time_seconds": 4424.933,
+          "role": "after_start_candidate",
+          "observation": "target derivation appears fully absent",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg003/source-t-4424.933.png",
+          "sha256": "cbebf9625fc4cc6077fbb60636d159f1468d96f1dbaffdadf14a14118e2f9ed7",
+          "byte_length": 590230
+        },
+        {
+          "time_seconds": 4426,
+          "role": "after_middle",
+          "observation": "target derivation remains absent",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg003/source-t-4426.0.png",
+          "sha256": "7f13db40df4615c6d751e177547be375fabfdfa3a2efb943516701f63eed5b73",
+          "byte_length": 488289
+        },
+        {
+          "time_seconds": 4427,
+          "role": "after_end",
+          "observation": "target derivation remains absent",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg003/source-t-4427.0.png",
+          "sha256": "39f034f1892eed0739995c535ebf09fc96817c226bff3bccc1cc3fd888bc4e85",
+          "byte_length": 498485
+        }
+      ]
+    },
+    {
+      "case_id": "KG005-AB-003-persistence-extension",
+      "source_video_id": "phy-force-kunge-005",
+      "source_video_uri": "data/raw/physics/force-pilot/phy-force-kunge-005/source.mp4",
+      "source_video_sha256": "127ed9323274d0dd00f3cc39c4a3b68f3109d74dbfd7fb2d08f87cab008f7241",
+      "source_video_byte_length": 613147736,
+      "source_video_dimensions": {
+        "width": 1280,
+        "height": 720
+      },
+      "source_video_nominal_frame_rate": "30/1",
+      "source_intake_uri": "research/board2skill/KG005_ERASE_ADD_AB_ADJUDICATION_INPUT_1888_1905.json",
+      "source_intake_sha256": "98eb5e93fde18351f02ce1de48a409a7c9b55011235062e98ebecac07c5f25f9",
+      "original_censoring": "right_censored_after_state",
+      "candidate_event_window_seconds": {
+        "start_min": 1904.666667,
+        "start_max": 1904.667,
+        "end_min": 1905,
+        "end_max": 1905
+      },
+      "extended_before_interval_seconds": {
+        "start": 1902.5,
+        "end": 1904.5,
+        "duration": 2
+      },
+      "extended_after_interval_seconds": {
+        "start": 1905,
+        "end": 1908.1,
+        "duration": 3.1
+      },
+      "observed_state_change": "the short-lived lower red fraction formula is continuously visible before the terminal erase and continuously absent after 1905.0 seconds",
+      "surface_continuity": "same question page, digital canvas, and viewport; no target-region occlusion, page transition, zoom, or pan in either frozen state interval",
+      "machine_pre_review": "the source-video extension removes the right-censor persistence blocker and supports human review of an ERASE outcome; the existing unknown candidate and original intake remain unchanged",
+      "human_decision_options": [
+        "ERASE",
+        "reject",
+        "not_an_event",
+        "unknown"
+      ],
+      "frames": [
+        {
+          "time_seconds": 1902.5,
+          "role": "before_start",
+          "observation": "target formula visible",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg005/source-t-1902.5.png",
+          "sha256": "601027c78877b5255ad02066d4a8dbbc439bd52f1d1348e5b0a0e8544547902b",
+          "byte_length": 567944
+        },
+        {
+          "time_seconds": 1903.5,
+          "role": "before_middle",
+          "observation": "target formula visible",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg005/source-t-1903.5.png",
+          "sha256": "1c0d815dd56e6334af643fa92a16b861c2c50d29e3c0a10ac235c52c870e9999",
+          "byte_length": 568399
+        },
+        {
+          "time_seconds": 1904.5,
+          "role": "before_end",
+          "observation": "target formula visible",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg005/source-t-1904.5.png",
+          "sha256": "a6cd1d5e02d63681d310b806f547296e369f756de50955f9788129a33476e2a1",
+          "byte_length": 562493
+        },
+        {
+          "time_seconds": 1904.667,
+          "role": "event_first_changed_candidate",
+          "observation": "target formula begins to be removed",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg005/source-t-1904.667.png",
+          "sha256": "6eca90f246f7a9ddc72f8de71756f542c2c93ca7c1fabadb0924360db5af1433",
+          "byte_length": 564416
+        },
+        {
+          "time_seconds": 1904.933,
+          "role": "event_last_residual_candidate",
+          "observation": "a small residual target mark remains",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg005/source-t-1904.933.png",
+          "sha256": "e0d7437aea8fb2b3d1ad27866dc1223a0d44473041ffa6cfeb7c7480d9e7b329",
+          "byte_length": 551555
+        },
+        {
+          "time_seconds": 1904.967,
+          "role": "event_last_residual_confirmation",
+          "observation": "the final red m-shaped residual remains visible; this frame is not a stable after state",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg005/source-t-1904.967.png",
+          "sha256": "2d0cbb61cafb10e8ee5aa55f230ddf2f9d95655657a4c3b3863eddc1efd73c11",
+          "byte_length": 549081
+        },
+        {
+          "time_seconds": 1905,
+          "role": "after_start_candidate",
+          "observation": "target formula is first observed fully absent",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg005/source-t-1905.0.png",
+          "sha256": "828c3001d8676edebf11e5ac2d3f434a71f4c23c17931e5b1729d2626d87611a",
+          "byte_length": 462608
+        },
+        {
+          "time_seconds": 1906,
+          "role": "after_middle",
+          "observation": "target formula remains absent",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg005/source-t-1906.0.png",
+          "sha256": "4c44080af5e554613b7db935225c7d73a4f0484c5db7d613a39986fa4db2169e",
+          "byte_length": 483417
+        },
+        {
+          "time_seconds": 1907,
+          "role": "after_middle_confirmation",
+          "observation": "target formula remains absent",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg005/source-t-1907.0.png",
+          "sha256": "40312e60f8c4f58f48f6813d5dff61ad8a424c0e11f3999cf03854383317e3c1",
+          "byte_length": 487477
+        },
+        {
+          "time_seconds": 1908,
+          "role": "after_late_confirmation",
+          "observation": "target formula remains absent",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg005/source-t-1908.0.png",
+          "sha256": "db4b5c07dddd17f82428ebdf944cc8553f84ac8fbd48c9649d9031540d8114fa",
+          "byte_length": 477620
+        },
+        {
+          "time_seconds": 1908.1,
+          "role": "after_end",
+          "observation": "target formula remains absent beyond the frozen three-second horizon",
+          "asset_uri": "data/board2skill/oracle-pilot/erase-persistence-extension-v1/kg005/source-t-1908.1.png",
+          "sha256": "3cf9e05e28ab75c7d2c0f43353bf0a70d15015f69480e3867d22a2a1be612772",
+          "byte_length": 477965
+        }
+      ]
+    }
+  ],
+  "release_gate": {
+    "machine_persistence_review_complete": true,
+    "human_adjudication_required": true,
+    "intake_replacement_required_before_gold_acceptance": true,
+    "required_action": "create versioned immutable intake/package artifacts that bind these extension frames, then complete human decisions and package signoffs",
+    "current_gold_projection": {
+      "decided_group_count": 0,
+      "accepted_event_count": 0,
+      "signed_package_count": 0
+    }
+  }
+}
