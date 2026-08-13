@@ -88,12 +88,12 @@ Required decision:
 - current operation: `unknown`
 - window: 2156.6–2160.2 s
 
-The B trace records three source events: an equals sign is added, erased, and written again. This is not a single `MODIFY` event. The current review contract requires a final event to correspond to a frozen candidate, so the reviewer must not silently split this one candidate into invented events.
+The B trace records three physical source events: an equals sign is added, erased, and written again. This is not a `MODIFY` event. Under the stable-semantic-state policy in `DATA_AND_ANNOTATION_SPEC.md §3.4.1`, the main Gold unit compares stable before/after states: no trailing equals sign becomes one trailing equals sign.
 
 Required decision:
 
-- reject or retain `unknown` in the current frozen package; if atomic events are needed, create a new versioned immutable intake/package exposing `ADD`, `ERASE`, `ADD` candidates with the original source references and times, then regenerate this workset against its new hash and review those candidates separately; or
-- reject the current compound candidate.
+- inspect for one `accept / ADD` final event at `2159.90–2160.20 s`, when the final persistent equals sign is written; retain the earlier trial `ADD → ERASE` only as source trace and do not include it in the main-event boundary; or
+- choose `unknown` / `reject` if the stable final equals sign or its persistence cannot be verified.
 
 ### C4. KG005 G05 — same-slot rewrite with no semantic delta
 
@@ -106,15 +106,15 @@ The source trace shows erase and rewrite activity, but before and after both rea
 
 Required decision:
 
-- if the Gold ontology records physical board operations, reject or retain `unknown` in the current frozen package and create a new versioned immutable intake/package containing atomic `ERASE` then `ADD` candidates; or
-- if the ontology records persistent semantic deltas, mark it `not_an_event`.
+- inspect for `not_an_event`, because the frozen main Gold ontology records persistent semantic deltas and the stable content did not change; or
+- choose `unknown` / `reject` if the two stable states cannot be compared reliably.
 
-The choice must be applied consistently to every same-content rewrite in the dataset.
+The intermediate `ERASE → ADD` remains auditable source trace but does not inflate the main experiment denominator. The same rule must be applied to every same-content rewrite in the dataset.
 
 ## 4. Human execution order
 
 1. Two reviewers independently inspect the Tier A calibration groups.
-2. Freeze one ontology rule for same-content rewrites and one persistence rule for clip boundaries.
+2. Apply the frozen stable-semantic-state ontology; independently freeze the remaining persistence rule for clip boundaries.
 3. Resolve the four Tier C groups before signing either affected KG005/KG003 component package.
 4. Review all seven LY004 groups first as the calibration lesson, but do not claim it is independently compilable under the current whole-queue compiler.
 5. Complete the remaining KG003, KG005, and LY003 groups and all six component signoffs; reach at least 30 accepted final events.
