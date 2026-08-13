@@ -33,6 +33,10 @@ import {
   consumeFormalOracleSingleConsumeDispatchLease,
   type FormalOracleSingleConsumeDispatchLease,
 } from "../../store/src/formalOracleRunStore.js";
+import {
+  consumeFormalOracleSingleConsumeDispatchLeaseV2,
+  type FormalOracleSingleConsumeDispatchLeaseV2,
+} from "../../store/src/formalOraclePreregistrationStoreV2.js";
 
 export interface FormalOracleCredentialProvider {
   withCredential<T>(binding: Readonly<FormalOracleTransportAuthorityCapability["account"]>, callback: (apiKey: string) => Promise<T>): Promise<T>;
@@ -104,6 +108,86 @@ export type FormalOracleSingleConsumeSendResultV1 = {
   error_code: "dns_resolution_failed_before_send" | "transport_response_incomplete_or_unknown" | "transport_complete_entity_invalid" | null;
   api_execution_allowed: false;
 };
+export type FormalOracleSingleConsumeSendResultV2 = FormalOracleSingleConsumeSendResultV1;
+
+type FormalOracleDispatchLeaseAny = FormalOracleSingleConsumeDispatchLease | FormalOracleSingleConsumeDispatchLeaseV2;
+type FormalOracleSingleConsumeSenderInput<TLease extends FormalOracleDispatchLeaseAny> = {
+  authority: FormalOracleTransportAuthorityCapability;
+  dispatch_lease: TLease;
+  prepared: FormalOraclePreparedProviderRequestArtifactV1;
+  credential_provider: FormalOracleCredentialProvider;
+  signal?: AbortSignal;
+  max_response_bytes?: number;
+  expected_arm: OracleGateResponseArm;
+};
+type FormalOracleConsumedLeaseView = {
+  run_sha256: string;
+  execution_plan_sha256: string;
+  request_id: string;
+  intent_sha256: string;
+  attempt_ordinal: number;
+  request_envelope_sha256: string;
+  provider_body_sha256: string;
+};
+
+function snapshotSingleConsumeSenderInput<TLease extends FormalOracleDispatchLeaseAny>(
+  input: FormalOracleSingleConsumeSenderInput<TLease>,
+): Readonly<FormalOracleSingleConsumeSenderInput<TLease>> {
+  if (!input || typeof input !== "object" || Array.isArray(input) || Object.getPrototypeOf(input) !== Object.prototype
+    || Object.getOwnPropertySymbols(input).length || Object.hasOwn(input, "toJSON")) {
+    throw new Error("Formal sender input 必须是 plain object");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const required = ["authority", "dispatch_lease", "prepared", "credential_provider", "expected_arm"];
+  const optional = ["signal", "max_response_bytes"];
+  const keys = Object.keys(descriptors);
+  if (required.some((key) => !keys.includes(key)) || keys.some((key) => !required.includes(key) && !optional.includes(key))) {
+    throw new Error("Formal sender input 字段集合无效");
+  }
+  const read = (key: string): unknown => {
+    const descriptor = descriptors[key];
+    if (!descriptor || !("value" in descriptor) || descriptor.enumerable !== true) {
+      throw new Error(`Formal sender input.${key} 含 accessor/隐藏字段`);
+    }
+    return descriptor.value;
+  };
+  const provider = read("credential_provider");
+  if (!provider || typeof provider !== "object" || Array.isArray(provider) || Object.getPrototypeOf(provider) !== Object.prototype
+    || Object.getOwnPropertySymbols(provider).length || Object.hasOwn(provider, "toJSON")) {
+    throw new Error("Formal sender credential_provider 必须是 plain object");
+  }
+  const providerDescriptors = Object.getOwnPropertyDescriptors(provider);
+  if (JSON.stringify(Object.keys(providerDescriptors).sort()) !== JSON.stringify(["withCredential"])) {
+    throw new Error("Formal sender credential_provider 字段集合无效");
+  }
+  const withCredentialDescriptor = providerDescriptors.withCredential;
+  if (!withCredentialDescriptor || !("value" in withCredentialDescriptor)
+    || withCredentialDescriptor.enumerable !== true || typeof withCredentialDescriptor.value !== "function") {
+    throw new Error("Formal sender credential_provider.withCredential 含 accessor 或无效函数");
+  }
+  const expectedArm = read("expected_arm");
+  if (!["transcript_only", "static_final_board", "uniform_frame", "oracle_delta"].includes(String(expectedArm))) {
+    throw new Error("Formal sender expected_arm 无效");
+  }
+  const maxResponseBytes = descriptors.max_response_bytes ? read("max_response_bytes") : undefined;
+  if (maxResponseBytes !== undefined && (!Number.isSafeInteger(maxResponseBytes) || Number(maxResponseBytes) <= 0)) {
+    throw new Error("Formal sender max_response_bytes 无效");
+  }
+  const signal = descriptors.signal ? read("signal") : undefined;
+  if (signal !== undefined && !(signal instanceof AbortSignal)) throw new Error("Formal sender signal 无效");
+  const credentialProvider = Object.freeze({
+    withCredential: withCredentialDescriptor.value as FormalOracleCredentialProvider["withCredential"],
+  });
+  return Object.freeze({
+    authority: read("authority") as FormalOracleTransportAuthorityCapability,
+    dispatch_lease: read("dispatch_lease") as TLease,
+    prepared: read("prepared") as FormalOraclePreparedProviderRequestArtifactV1,
+    credential_provider: credentialProvider,
+    ...(signal === undefined ? {} : { signal: signal as AbortSignal }),
+    ...(maxResponseBytes === undefined ? {} : { max_response_bytes: Number(maxResponseBytes) }),
+    expected_arm: expectedArm as OracleGateResponseArm,
+  });
+}
 
 const COMPAT = Object.freeze({
   supportsStore: true, supportsDeveloperRole: false, supportsReasoningEffort: false,
@@ -199,7 +283,7 @@ const nodeFormalOracleSenderRuntime: FormalOracleSenderRuntimeV1 = Object.freeze
 
 function makeCapture(input: {
   authority: FormalOracleTransportAuthorityCapability;
-  lease: ReturnType<typeof consumeFormalOracleSingleConsumeDispatchLease>;
+  lease: FormalOracleConsumedLeaseView;
   addresses: Array<{ address: string; family: 4 | 6 }>;
   selected: { address: string; family: 4 | 6 };
   startedAt: string;
@@ -236,7 +320,7 @@ function makeCapture(input: {
 function invalidArtifactForCompleteCapture(input: {
   capture: FormalOracleAuthoritativeTransportCaptureArtifactV1;
   authority: FormalOracleTransportAuthorityCapability;
-  lease: ReturnType<typeof consumeFormalOracleSingleConsumeDispatchLease>;
+  lease: FormalOracleConsumedLeaseView;
   prepared: FormalOraclePreparedProviderRequestArtifactV1;
   expectedArm: OracleGateResponseArm;
 }): FormalOracleInvalidResponseArtifactV1 {
@@ -262,17 +346,13 @@ function invalidArtifactForCompleteCapture(input: {
  * Runs one already-durable request. This is not a public execution API: it
  * requires two callback-scoped capabilities and returns api=false capture only.
  */
-export async function sendFormalOracleSingleConsumeRequestV1(input: {
-  authority: FormalOracleTransportAuthorityCapability;
-  dispatch_lease: FormalOracleSingleConsumeDispatchLease;
-  prepared: FormalOraclePreparedProviderRequestArtifactV1;
-  credential_provider: FormalOracleCredentialProvider;
-  signal?: AbortSignal;
-  max_response_bytes?: number;
-  expected_arm: OracleGateResponseArm;
-}): Promise<FormalOracleSingleConsumeSendResultV1> {
+async function sendFormalOracleSingleConsumeRequest(
+  input: Readonly<FormalOracleSingleConsumeSenderInput<FormalOracleDispatchLeaseAny>>,
+): Promise<FormalOracleSingleConsumeSendResultV1> {
   assertActiveFormalOracleTransportAuthorityCapability(input.authority);
-  const lease = consumeFormalOracleSingleConsumeDispatchLease(input.dispatch_lease);
+  const lease: FormalOracleConsumedLeaseView = input.dispatch_lease.stage === "durable_dispatch_intent_v2_single_consume_lease"
+    ? consumeFormalOracleSingleConsumeDispatchLeaseV2(input.dispatch_lease)
+    : consumeFormalOracleSingleConsumeDispatchLease(input.dispatch_lease);
   if (!nodeVersionCompatible()) throw new Error(`Formal sender Node ${process.version} 低于 ${FORMAL_ORACLE_REQUIRED_NODE_ENGINE}`);
   const prepared = revalidateFormalOraclePreparedProviderRequestArtifact(input.prepared);
   const authority = input.authority;
@@ -402,4 +482,29 @@ export async function sendFormalOracleSingleConsumeRequestV1(input: {
         api_execution_allowed: false };
     }
   });
+}
+
+export function sendFormalOracleSingleConsumeRequestV1(input: {
+  authority: FormalOracleTransportAuthorityCapability;
+  dispatch_lease: FormalOracleSingleConsumeDispatchLease;
+  prepared: FormalOraclePreparedProviderRequestArtifactV1;
+  credential_provider: FormalOracleCredentialProvider;
+  signal?: AbortSignal;
+  max_response_bytes?: number;
+  expected_arm: OracleGateResponseArm;
+}): Promise<FormalOracleSingleConsumeSendResultV1> {
+  return sendFormalOracleSingleConsumeRequest(snapshotSingleConsumeSenderInput(input));
+}
+
+/** Breaking V2 dispatch lease; transport capture leaves remain V1 byte evidence. */
+export function sendFormalOracleSingleConsumeRequestV2(input: {
+  authority: FormalOracleTransportAuthorityCapability;
+  dispatch_lease: FormalOracleSingleConsumeDispatchLeaseV2;
+  prepared: FormalOraclePreparedProviderRequestArtifactV1;
+  credential_provider: FormalOracleCredentialProvider;
+  signal?: AbortSignal;
+  max_response_bytes?: number;
+  expected_arm: OracleGateResponseArm;
+}): Promise<FormalOracleSingleConsumeSendResultV2> {
+  return sendFormalOracleSingleConsumeRequest(snapshotSingleConsumeSenderInput(input));
 }
