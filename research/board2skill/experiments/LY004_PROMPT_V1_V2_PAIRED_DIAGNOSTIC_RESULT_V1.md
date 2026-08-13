@@ -30,7 +30,7 @@ Oracle arm 的同seed配对 F1 差（v2 - v1）：
 
 ## 科研解释
 
-region-claim 解耦应保留：它稳定消除了 Oracle 的region unsupported，而同seed Oracle F1没有出现重要下降。此前不同seed FIX实验中观测到的F1下降，与seed波动解释一致；本诊断不能把差异严格因果归因于seed，也不能把结果升级成正式GO。
+region-claim 解耦应保留：在本次3个配对seed中，它消除了 Oracle 的region unsupported，而同seed Oracle F1没有越过预注册下降阈值。此前不同seed FIX实验中观测到的F1下降与seed波动解释相容；本诊断不能把差异严格因果归因于seed，也不能把结果升级成正式GO。
 
 值得注意的是，非Oracle arms在同seed下也有波动，尤其uniform-frame平均F1差为`-0.206`。prompt v2按设计只新增一条通用claim规则，却可能改变所有arms的输出行为；因此下一步正式价值门必须继续把四臂全部纳入，而不能只看Oracle arm。
 
