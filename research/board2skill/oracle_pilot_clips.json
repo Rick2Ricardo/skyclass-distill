@@ -480,7 +480,7 @@
         "review_status": "independent_a_b2_aligned_pending_human_signoff",
         "annotation_a_path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/annotator-a.json",
         "annotation_b_path": "data/board2skill/oracle-pilot/tbv2-kg003-erase-4422-4428/annotator-b2.json",
-        "adjudication_intake_path": "research/board2skill/KG003_ERASE_AB2_ADJUDICATION_INPUT_4422_4428.json",
+        "adjudication_intake_path": "research/board2skill/KG003_ERASE_AB2_ADJUDICATION_INPUT_4420_4428_V2.json",
         "quarantined_annotation_log_path": "research/board2skill/KG003_ERASE_ANNOTATOR_B_LOG.md"
       }
     },
@@ -527,7 +527,7 @@
         "review_status": "independent_a_b_aligned_pending_human_signoff",
         "annotation_a_path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/annotator-a.json",
         "annotation_b_path": "data/board2skill/oracle-pilot/tbv2-kg005-hardnegative-1888-1905/annotator-b.json",
-        "adjudication_intake_path": "research/board2skill/KG005_ERASE_ADD_AB_ADJUDICATION_INPUT_1888_1905.json"
+        "adjudication_intake_path": "research/board2skill/KG005_ERASE_ADD_AB_ADJUDICATION_INPUT_1888_1908_V2.json"
       }
     }
   ]

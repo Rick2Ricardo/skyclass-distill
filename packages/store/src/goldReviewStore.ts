@@ -226,7 +226,9 @@ function strictEvents(group: JsonRecord): GoldReviewSourceEvent[] {
 function unresolved(group: JsonRecord): string[] {
   const values = group.unresolved_fields;
   if (Array.isArray(values)) return values.map((item) => typeof item === "string" ? item : text(record(item).field || record(item).question)).filter(Boolean);
-  return records(group.review_disagreements).map((item) => text(item.question || item.issue_id)).filter(Boolean);
+  return records(group.review_disagreements)
+    .filter((item) => !["evidence_resolved", "resolved"].includes(text(item.status)))
+    .map((item) => text(item.question || item.issue_id)).filter(Boolean);
 }
 
 function normalizeGroup(intake: JsonRecord, intakePath: string, packageId: string, sourceVideoId: string, value: JsonRecord): Omit<GoldReviewGroup, "current_decision" | "package_locked" | "package_signed"> {
