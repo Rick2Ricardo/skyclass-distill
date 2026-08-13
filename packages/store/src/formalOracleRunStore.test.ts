@@ -61,6 +61,7 @@ import {
   assertActiveFormalOracleConsumedDispatchLease,
   consumeFormalOracleSingleConsumeDispatchLease,
   FormalOracleRunStore,
+  assertActiveFormalOracleCompletedRunCapability,
   hashFormalOracleExecutionPlan,
   hashFormalOracleStructuralSchedule,
   type CreateSealedRunInput,
@@ -1884,6 +1885,19 @@ describe("FormalOracleRunStore", () => {
     snapshot = await store.inspectRun(input.run.run_sha256, terminalPin);
     expect(snapshot.head_pin).toEqual(terminalPin);
     expect(snapshot.checkpoints).toHaveLength(terminalHistoryLength);
+
+    let borrowed: Parameters<typeof assertActiveFormalOracleCompletedRunCapability>[0] | null = null;
+    await store.withPinnedCompletedRun({ run_sha256: input.run.run_sha256, expected_head: terminalPin, callback: async (capability) => {
+      assertActiveFormalOracleCompletedRunCapability(capability); borrowed = capability;
+      expect(capability.completed_run.intents).toHaveLength(12);
+      expect(capability.completed_run.attempts).toHaveLength(12);
+      expect(capability.completed_run.committed_requests).toHaveLength(12);
+      expect(capability.completed_run.canonical_responses.map((item) => item.schedule_index)).toEqual([...Array(12).keys()]);
+      expect(Object.isFrozen(capability.completed_run.canonical_responses[0].response)).toBe(true);
+    }});
+    expect(() => assertActiveFormalOracleCompletedRunCapability(borrowed!)).toThrow(/无效|过期/);
+    const stalePin = { ...terminalPin, generation: terminalPin.generation - 1 };
+    await expect(store.withPinnedCompletedRun({ run_sha256: input.run.run_sha256, expected_head: stalePin, callback: async () => undefined })).rejects.toThrow(/pin|HEAD|generation/i);
   }, 60_000);
 
   it("fails closed on symlinks, hardlinks, and widened private directories", async () => {

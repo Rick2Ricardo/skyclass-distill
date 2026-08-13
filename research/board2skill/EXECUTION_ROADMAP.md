@@ -26,6 +26,8 @@
 
 > 2026-08-13 public-evidence v2 纠偏：v1 不再允许真实 Formal GO/STOP，只能用于 synthetic contract fixture。breaking v2 将 response-specific claim slots 与四臂共享的底层 evidence/edit/temporal denominator 分离；公开 item 使用全包唯一 opaque IDs，私有 receipt 绑定 response/source JSON pointers 与 underlying denominator commitment；单事件 temporal 为 NA 而非全局阻断。claim/evidence/pair/reblind 派生策略必须在 run 前以 policy SHA 冻结；旧 run 最多 post-hoc development。当前只完成 browser-safe v2 contracts/cross-validator，真实 post-run registry/Gold/media/run-HEAD 重验生成器、rights active head、外部签字/WORM 与 v2 rating/statistics 升级仍 pending，API=false，结果继续 TBD。
 
+> 2026-08-13 post-run evidence source gate 补充：新增 `registry → Gold ledger → byte/ASR → frame → terminal run HEAD` 固定锁序的 callback gate。RunStore 在 owner-nonce 锁内按完整 checkpoint 历史重读全部被引用 intent/attempt/commit，并从 durable A raw SSE 重新派生 B/C/D；terminal 必须为 `EXECUTION_COMPLETE` 且所有 request 均 `SCHEMA_VALIDATED_COMMITTED`。gate 使用运行时 blinding secret 验证 domain-separated commitment、逐 request 重算 HMAC blind ID，从 durable D 做固定 response JSON-pointer claim 投影，从本次重验 selected transcript 与当前 signed-gold-dataset-v1 final events 解引用/渲染 evidence，并生成 public-evidence-v2/private receipt。输出仍是 `post_hoc_development_only`、non-authoritative、rating/statistics 未生成；FormalSpec/Run/RatingPlan 尚未预锚 policy root，rights active head、内容隐私人工复核、外部签字/WORM 仍 pending，API=false、结果继续 TBD。
+
 ## 1. 项目决策
 
 本项目不把通用清板、遮挡恢复、写入/擦除检测或关键帧摘要作为论文中心贡献。论文候选主张是：

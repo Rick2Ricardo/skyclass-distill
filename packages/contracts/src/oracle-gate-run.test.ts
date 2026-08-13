@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   hashCommittedRequest,
   hashFormalRunContract,
+  hashFormalOracleBlindingSecretCommitment,
+  canonicalFormalOracleBlindIdPreimage,
   hashPrivateAnswerKey,
   hashPublicBlindPackage,
   hashPublicBlindResponse,
@@ -29,6 +31,7 @@ import {
   type RunCheckpointV1,
 } from "./oracle-gate-run.js";
 import { sha256Hex } from "./sha256.js";
+import { createHmac } from "node:crypto";
 
 const HASH = "a".repeat(64);
 const BLIND_ID = `B-${"b".repeat(64)}`;
@@ -309,6 +312,15 @@ function answerKey(published = publicPackage()): PrivateAnswerKeyV1 {
 }
 
 describe("Formal Oracle content-addressed run contracts", () => {
+  it("freezes the blind secret commitment and HMAC preimage domains", () => {
+    const secret = new TextEncoder().encode("0123456789abcdef0123456789abcdef");
+    expect(hashFormalOracleBlindingSecretCommitment(secret)).toBe(
+      sha256Hex(new Uint8Array([...new TextEncoder().encode("skyclass/formal-oracle/blinding-secret-commitment/v1\0"), ...secret])),
+    );
+    const preimage = canonicalFormalOracleBlindIdPreimage({ run_sha256: "a".repeat(64), request_id: "FREQ-fixture-001" });
+    expect(`B-${createHmac("sha256", secret).update(preimage).digest("hex")}`).toMatch(/^B-[a-f0-9]{64}$/);
+    expect(() => hashFormalOracleBlindingSecretCommitment(new Uint8Array(31))).toThrow(/至少 32/);
+  });
   it("uses the browser-safe SHA-256 implementation without changing standard digests", () => {
     expect(sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   });

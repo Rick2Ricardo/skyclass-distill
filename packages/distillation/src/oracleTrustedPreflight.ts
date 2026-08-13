@@ -1,5 +1,5 @@
 import type { KeyLike } from "node:crypto";
-import type { OracleGateFormalInputManifest, OracleGateFormalSpec } from "../../contracts/src/index.js";
+import type { OracleGateFormalInputManifest, OracleGateFormalSpec, SignedGoldDataset } from "../../contracts/src/index.js";
 import { FrozenOracleRegistryStore, type OracleRegistrySigner } from "../../store/src/frozenOracleRegistryStore.js";
 import { GoldLedgerAttestor } from "../../store/src/goldLedgerAttestor.js";
 import { prepareOracleGateFormalStructuralPreflight } from "./oracleFormalPreflight.js";
@@ -20,6 +20,7 @@ export interface OracleLedgerAttestedCapability {
   readonly case_count: number;
   readonly event_count: number;
   readonly request_count: number;
+  readonly dataset: Readonly<SignedGoldDataset>;
 }
 
 class LedgerCapability implements OracleLedgerAttestedCapability {
@@ -38,6 +39,7 @@ class LedgerCapability implements OracleLedgerAttestedCapability {
     readonly case_count: number,
     readonly event_count: number,
     readonly request_count: number,
+    readonly dataset: Readonly<SignedGoldDataset>,
   ) {
     Object.freeze(this);
   }
@@ -45,6 +47,37 @@ class LedgerCapability implements OracleLedgerAttestedCapability {
   toJSON(): never {
     throw new Error("Oracle ledger capability 是 callback 内临时能力，不得序列化或持久化");
   }
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+function clonePlainData<T>(value: T, label: string): T {
+  const clone = (input: unknown, path: string): unknown => {
+    if (input === null || typeof input === "string" || typeof input === "boolean") return input;
+    if (typeof input === "number") {
+      if (!Number.isFinite(input) || Object.is(input, -0)) throw new Error(`${label}${path} 数值无效`);
+      return input;
+    }
+    if (!input || typeof input !== "object") throw new Error(`${label}${path} 不是 plain data`);
+    const descriptors = Object.getOwnPropertyDescriptors(input);
+    if (Array.isArray(input)) {
+      if (Object.getPrototypeOf(input) !== Array.prototype || Object.getOwnPropertySymbols(input).length) throw new Error(`${label}${path} 不是 plain array`);
+      const keys = Object.keys(descriptors).filter((key) => key !== "length");
+      if (keys.length !== input.length || keys.some((key, index) => key !== String(index))) throw new Error(`${label}${path} 是稀疏数组`);
+      return keys.map((key) => { const descriptor = descriptors[key]; if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) throw new Error(`${label}${path} 含 accessor`); return clone(descriptor.value, `${path}[${key}]`); });
+    }
+    if (Object.getPrototypeOf(input) !== Object.prototype || Object.getOwnPropertySymbols(input).length || Object.hasOwn(input, "toJSON")) throw new Error(`${label}${path} 不是 plain object`);
+    const output: Record<string, unknown> = {};
+    for (const [key, descriptor] of Object.entries(descriptors)) { if (!("value" in descriptor) || !descriptor.enumerable) throw new Error(`${label}${path}.${key} 含 accessor/隐藏字段`); output[key] = clone(descriptor.value, `${path}.${key}`); }
+    return output;
+  };
+  return clone(value, "") as T;
 }
 
 export function assertActiveOracleLedgerCapability(value: OracleLedgerAttestedCapability): void {
@@ -104,7 +137,7 @@ export async function withLedgerAttestedOracleRegistry<T>(input: {
   return input.registryStore.withPinnedLedgerRegistry(
     input.pinned_registry_sha256,
     input.trusted_public_keys,
-    async (registry) => input.attestor.withCurrentSnapshot(registry.ledger_snapshot.dataset_sha256, async ({ snapshot }) => {
+    async (registry) => input.attestor.withCurrentSnapshot(registry.ledger_snapshot.dataset_sha256, async ({ snapshot, dataset }) => {
       if (snapshot.snapshot_sha256 !== registry.ledger_snapshot.snapshot_sha256
         || snapshot.ledger_tree_sha256 !== registry.ledger_snapshot.ledger_tree_sha256
         || snapshot.queue_sha256 !== registry.ledger_snapshot.queue_sha256) {
@@ -123,6 +156,7 @@ export async function withLedgerAttestedOracleRegistry<T>(input: {
         registry.case_count,
         registry.event_count,
         registry.request_count,
+        deepFreeze(clonePlainData(dataset, "signed_gold_dataset")),
       );
       activeCapabilities.add(capability);
       try {

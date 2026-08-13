@@ -10,6 +10,7 @@ import {
   validateOracleGatePrivateEvidenceDerivationReceiptV2,
   validateOracleGatePublicEvidenceDerivationPolicyV2,
   validateOracleGatePublicEvidencePackageV2,
+  renderSignedGoldFinalEventEvidenceV2,
   type OracleGatePrivateEvidenceDerivationReceiptV2,
   type OracleGatePublicEvidenceDerivationPolicyV2,
   type OracleGatePublicEvidencePackageV2,
@@ -164,6 +165,12 @@ function fixture(singleEvent = false) {
 }
 
 describe("Formal Oracle public evidence v2 contracts", () => {
+  it("renders only the frozen semantic Gold-event projection", () => {
+    expect(renderSignedGoldFinalEventEvidenceV2({ operation: "ADD", semantic_label: "draw axis", region: null,
+      relation: null, modification: null, event_id: "private-event", time: { start: 1, end: 2 } } as never)).toBe(
+      '{"modification":null,"operation":"ADD","region":null,"relation":null,"semantic_label":"draw axis"}',
+    );
+  });
   it("validates the frozen preregisterable derivation policy", () => {
     const value = policy();
     expect(validateOracleGatePublicEvidenceDerivationPolicyV2(value)).toEqual({ valid: true, issues: [] });

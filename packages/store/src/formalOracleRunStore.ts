@@ -324,6 +324,49 @@ export interface FormalOracleRunSnapshot {
   api_execution_allowed: false;
 }
 
+export interface FormalOracleCompletedTransportSchemaRunV1 {
+  readonly schema_version: "formal-oracle-completed-transport-schema-run-v1";
+  readonly status: "completed_transport_and_schema_chain_revalidated";
+  readonly run: Readonly<FormalRunContractV1>;
+  readonly formal_spec: Readonly<OracleGateFormalSpec>;
+  readonly structural_schedule: Readonly<FormalOracleStructuralScheduleV1>;
+  readonly execution_plan: Readonly<FormalOracleExecutionPlanV1>;
+  readonly head_pin: Readonly<FormalOracleHeadPinV1>;
+  readonly checkpoints: ReadonlyArray<Readonly<RunCheckpointV1>>;
+  readonly intents: ReadonlyArray<Readonly<RequestIntentV1>>;
+  readonly attempts: ReadonlyArray<Readonly<RequestAttemptAuditV3>>;
+  readonly committed_requests: ReadonlyArray<Readonly<CommittedRequestV3>>;
+  readonly canonical_responses: ReadonlyArray<Readonly<{
+    request_id: string;
+    schedule_index: number;
+    canonical_response_bytes_sha256: string;
+    canonical_response_commitment_sha256: string;
+    response: Readonly<Record<string, unknown>>;
+  }>>;
+  readonly api_execution_allowed: false;
+}
+
+export interface FormalOracleCompletedRunCapability {
+  readonly stage: "completed_transport_schema_run_locked";
+  readonly completed_run: Readonly<FormalOracleCompletedTransportSchemaRunV1>;
+  readonly api_execution_allowed: false;
+}
+
+const activeCompletedRunCapabilities = new WeakSet<object>();
+
+class CompletedRunCapability implements FormalOracleCompletedRunCapability {
+  readonly stage = "completed_transport_schema_run_locked" as const;
+  readonly api_execution_allowed = false as const;
+  constructor(readonly completed_run: Readonly<FormalOracleCompletedTransportSchemaRunV1>) { Object.freeze(this); }
+  toJSON(): never { throw new Error("Formal Oracle completed-run capability 是 callback 内临时能力，不得序列化或持久化"); }
+}
+
+export function assertActiveFormalOracleCompletedRunCapability(value: FormalOracleCompletedRunCapability): void {
+  if (!value || typeof value !== "object" || !activeCompletedRunCapabilities.has(value as object)) {
+    throw new Error("Formal Oracle completed-run capability 无效、已过期或来自 JSON 伪造");
+  }
+}
+
 export interface FormalOracleResumeRequest {
   request_id: string;
   state: OracleGateCheckpointEntryV1["state"];
@@ -403,6 +446,49 @@ function parseCanonicalDocument<T>(bytes: Buffer, label: string): T {
   catch { throw new Error(`${label} 不是 JSON`); }
   if (!privateCanonicalJsonBytes(value).equals(bytes)) throw new Error(`${label} 不是 canonical JSON 字节`);
   return value as T;
+}
+
+function clonePlainData<T>(value: T, label: string): T {
+  const clone = (input: unknown, path: string): unknown => {
+    if (input === null || typeof input === "string" || typeof input === "boolean") return input;
+    if (typeof input === "number") {
+      if (!Number.isFinite(input) || Object.is(input, -0)) throw new Error(`${label}${path} 含非 canonical 数值`);
+      return input;
+    }
+    if (!input || typeof input !== "object") throw new Error(`${label}${path} 不是 plain JSON data`);
+    const descriptors = Object.getOwnPropertyDescriptors(input);
+    if (Array.isArray(input)) {
+      if (Object.getPrototypeOf(input) !== Array.prototype || Object.getOwnPropertySymbols(input).length) {
+        throw new Error(`${label}${path} 不是 plain array`);
+      }
+      const keys = Object.keys(descriptors).filter((key) => key !== "length");
+      if (keys.length !== input.length || keys.some((key, index) => key !== String(index))) {
+        throw new Error(`${label}${path} 是稀疏或附加字段数组`);
+      }
+      return keys.map((key) => {
+        const descriptor = descriptors[key];
+        if (!descriptor || !("value" in descriptor) || descriptor.enumerable !== true) throw new Error(`${label}${path} 含 accessor`);
+        return clone(descriptor.value, `${path}[${key}]`);
+      });
+    }
+    if (Object.getPrototypeOf(input) !== Object.prototype || Object.getOwnPropertySymbols(input).length
+      || Object.hasOwn(input, "toJSON")) throw new Error(`${label}${path} 不是 plain object`);
+    const output: Record<string, unknown> = {};
+    for (const [key, descriptor] of Object.entries(descriptors)) {
+      if (!("value" in descriptor) || descriptor.enumerable !== true) throw new Error(`${label}${path}.${key} 含 accessor/隐藏字段`);
+      output[key] = clone(descriptor.value, `${path}.${key}`);
+    }
+    return output;
+  };
+  return clone(value, "") as T;
+}
+
+function deepFreezePlain<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreezePlain(child);
+    Object.freeze(value);
+  }
+  return value;
 }
 
 function checkpointCounts(entries: OracleGateCheckpointEntryV1[]): OracleGateCheckpointCountsV1 {
@@ -885,6 +971,89 @@ export class FormalOracleRunStore {
   ): Promise<T> {
     assertPrivateSha256(runSha256, "run_sha256");
     return this.withRunLock(runSha256, async () => callback(await this.loadRunUnlocked(runSha256, expectedHead)));
+  }
+
+  /**
+   * Replays every durable intent/audit/commit and A/B/C/D response object under
+   * the exact terminal HEAD lock, then lends a callback-only completed-chain
+   * capability. This is transport/schema provenance, not semantic review or
+   * permission to execute an API.
+   */
+  async withPinnedCompletedRun<T>(input: {
+    run_sha256: string;
+    expected_head: FormalOracleHeadPinV1;
+    callback: (capability: FormalOracleCompletedRunCapability) => Promise<T>;
+  }): Promise<T> {
+    assertPrivateSha256(input.run_sha256, "run_sha256");
+    if (typeof input.callback !== "function") throw new Error("completed-run callback 必须是函数");
+    return this.withRunLock(input.run_sha256, async () => {
+      const snapshot = await this.loadRunUnlocked(input.run_sha256, input.expected_head);
+      if (snapshot.checkpoint.run_state !== "EXECUTION_COMPLETE"
+        || snapshot.checkpoint.terminal_reason_sha256 !== null
+        || snapshot.checkpoint.entries.some((entry) => entry.state !== "SCHEMA_VALIDATED_COMMITTED"
+          || !entry.active_intent_sha256 || !entry.latest_attempt_audit_sha256 || !entry.committed_request_sha256)) {
+        throw new Error("completed-run gate 只接受全部 request 已 transport/schema commit 的 EXECUTION_COMPLETE HEAD");
+      }
+      const intentsBySha = new Map<string, RequestIntentV1>();
+      const attemptsBySha = new Map<string, RequestAttemptAuditV3>();
+      for (const checkpoint of snapshot.checkpoints) {
+        for (const [entryIndex, entry] of checkpoint.entries.entries()) {
+          if (entry.active_intent_sha256 && !intentsBySha.has(entry.active_intent_sha256)) {
+            const intent = await this.loadIntentUnlocked(snapshot.run, snapshot.formal_spec, snapshot.execution_plan, entryIndex, entry.active_intent_sha256);
+            intentsBySha.set(intent.intent_sha256, intent);
+          }
+          if (entry.latest_attempt_audit_sha256 && !attemptsBySha.has(entry.latest_attempt_audit_sha256)) {
+            const audit = await this.loadAttemptUnlocked(snapshot.run, snapshot.formal_spec, snapshot.execution_plan, entryIndex, entry.latest_attempt_audit_sha256);
+            attemptsBySha.set(audit.attempt_sha256, audit);
+          }
+        }
+      }
+      const intents = [...intentsBySha.values()].sort((left, right) => left.schedule_index - right.schedule_index
+        || left.attempt_ordinal - right.attempt_ordinal);
+      const attempts = intents.map((intent) => {
+        const attempt = [...attemptsBySha.values()].find((candidate) => candidate.intent_sha256 === intent.intent_sha256);
+        if (!attempt) throw new Error(`completed-run 缺少 intent ${intent.intent_sha256} 的 durable attempt`);
+        return attempt;
+      });
+      const committedRequests: CommittedRequestV3[] = [];
+      const canonicalResponses: Array<{
+        request_id: string; schedule_index: number; canonical_response_bytes_sha256: string;
+        canonical_response_commitment_sha256: string; response: Record<string, unknown>;
+      }> = [];
+      for (const [entryIndex, entry] of snapshot.checkpoint.entries.entries()) {
+        const committed = await this.loadCommittedRequestUnlocked(snapshot.run, snapshot.formal_spec, snapshot.execution_plan, entryIndex, entry.committed_request_sha256!);
+        const audit = attemptsBySha.get(committed.attempt_sha256);
+        const intent = intentsBySha.get(committed.intent_sha256);
+        if (!audit || !intent) throw new Error(`completed-run request ${entry.request_id} 的终态引用不完整`);
+        committedRequests.push(committed);
+        canonicalResponses.push({
+          request_id: entry.request_id,
+          schedule_index: entryIndex,
+          canonical_response_bytes_sha256: committed.canonical_response_bytes_sha256,
+          canonical_response_commitment_sha256: committed.canonical_response_commitment_sha256,
+          response: await this.verifyResponseObjects(snapshot.run.run_sha256, intent, audit),
+        });
+      }
+      const completedRun = deepFreezePlain({
+        schema_version: "formal-oracle-completed-transport-schema-run-v1" as const,
+        status: "completed_transport_and_schema_chain_revalidated" as const,
+        run: clonePlainData(snapshot.run, "run"),
+        formal_spec: clonePlainData(snapshot.formal_spec, "formal_spec"),
+        structural_schedule: clonePlainData(snapshot.structural_schedule, "structural_schedule"),
+        execution_plan: clonePlainData(snapshot.execution_plan, "execution_plan"),
+        head_pin: clonePlainData(snapshot.head_pin, "head_pin"),
+        checkpoints: clonePlainData(snapshot.checkpoints, "checkpoints"),
+        intents: clonePlainData(intents, "intents"),
+        attempts: clonePlainData(attempts, "attempts"),
+        committed_requests: clonePlainData(committedRequests, "committed_requests"),
+        canonical_responses: clonePlainData(canonicalResponses, "canonical_responses"),
+        api_execution_allowed: false as const,
+      }) as Readonly<FormalOracleCompletedTransportSchemaRunV1>;
+      const capability = new CompletedRunCapability(completedRun);
+      activeCompletedRunCapabilities.add(capability);
+      try { return await input.callback(capability); }
+      finally { activeCompletedRunCapabilities.delete(capability); }
+    });
   }
 
   async resumeRun(runSha256: string, expectedHead: FormalOracleHeadPinV1): Promise<FormalOracleResumePlan> {

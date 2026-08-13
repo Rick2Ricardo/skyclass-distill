@@ -153,6 +153,9 @@ describe("trusted Formal Oracle ledger registry", () => {
         expect(() => JSON.stringify(capability)).toThrow("不得序列化");
         expect(() => { (capability as { dataset_sha256: string }).dataset_sha256 = "forged"; }).toThrow();
         expect(capability.dataset_sha256).toBe(fixture.datasetSha256);
+        expect(capability.dataset.dataset_sha256).toBe(fixture.datasetSha256);
+        expect(Object.isFrozen(capability.dataset.packages)).toBe(true);
+        expect(() => { (capability.dataset.packages as unknown[]).push({}); }).toThrow();
         return capability.dataset_sha256;
       },
     });

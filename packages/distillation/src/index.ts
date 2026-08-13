@@ -11,6 +11,7 @@ export * from "./oracleBlindRatingGate.js";
 export * from "./oracleValueGateStatistics.js";
 export * from "./oracleFrameDerivationPreflight.js";
 export * from "./oracleTrustedPreflight.js";
+export * from "./oraclePostRunEvidenceGate.js";
 export * from "./groundedSkills.js";
 
 export interface LessonInput {

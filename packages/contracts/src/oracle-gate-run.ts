@@ -293,6 +293,8 @@ export const RUN_CHECKPOINT_DOMAIN = "skyclass/formal-oracle/run-checkpoint/v1\0
 export const PRIVATE_ANSWER_KEY_DOMAIN = "skyclass/formal-oracle/private-answer-key/v1\0";
 export const PUBLIC_BLIND_PACKAGE_DOMAIN = "skyclass/formal-oracle/public-blind-package/v1\0";
 export const PUBLIC_BLIND_RESPONSE_DOMAIN = "skyclass/formal-oracle/public-blind-response/v1\0";
+export const FORMAL_ORACLE_BLIND_SECRET_COMMITMENT_DOMAIN = "skyclass/formal-oracle/blinding-secret-commitment/v1\0";
+export const FORMAL_ORACLE_BLIND_ID_PREIMAGE_DOMAIN = "skyclass/formal-oracle/blind-id/v1\0";
 
 const UINT32_MAX = 0xffff_ffff;
 const ARMS = new Set<OracleGateRunArm>(["transcript_only", "static_final_board", "uniform_frame", "oracle_delta"]);
@@ -337,6 +339,19 @@ function stableJson(value: unknown, seen = new Set<object>()): string {
 
 function domainHash(domain: string, payload: string): string {
   return sha256Hex(`${domain}${payload}`);
+}
+
+export function hashFormalOracleBlindingSecretCommitment(secret: Uint8Array): string {
+  if (!(secret instanceof Uint8Array) || secret.byteLength < 32) throw new Error("blinding secret 至少 32 bytes");
+  return sha256Hex(new Uint8Array([
+    ...new TextEncoder().encode(FORMAL_ORACLE_BLIND_SECRET_COMMITMENT_DOMAIN),
+    ...Uint8Array.from(secret),
+  ]));
+}
+
+export function canonicalFormalOracleBlindIdPreimage(input: { run_sha256: string; request_id: string }): string {
+  if (!isSha(input.run_sha256) || !isId(input.request_id)) throw new Error("blind ID preimage identity 无效");
+  return `${FORMAL_ORACLE_BLIND_ID_PREIMAGE_DOMAIN}${stableJson(input)}`;
 }
 
 function withoutField(input: object, field: string): Record<string, unknown> {
