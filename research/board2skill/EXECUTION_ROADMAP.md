@@ -24,6 +24,8 @@
 
 > 2026-08-13 Formal Oracle 盲评/统计补充：新增 strict public-evidence、预注册 rating-plan、post-run rating-assignment、双 Ed25519 ledger、completed-set 与 report contracts。公共包固定匿名 claim/evidence/edit/pair denominator；私有统计恢复完整 `case × seed × 4 arms`，只按 Evidence F1 选择一次 baseline，并执行 teacher→video→case×seed paired bootstrap。所有记录均 non-authoritative/no automatic paper claim/API=false；外部评分 key registry、随机独立会话、报告签字/WORM 与任何真实评分/数值仍 pending，结果继续 TBD。
 
+> 2026-08-13 public-evidence v2 纠偏：v1 不再允许真实 Formal GO/STOP，只能用于 synthetic contract fixture。breaking v2 将 response-specific claim slots 与四臂共享的底层 evidence/edit/temporal denominator 分离；公开 item 使用全包唯一 opaque IDs，私有 receipt 绑定 response/source JSON pointers 与 underlying denominator commitment；单事件 temporal 为 NA 而非全局阻断。claim/evidence/pair/reblind 派生策略必须在 run 前以 policy SHA 冻结；旧 run 最多 post-hoc development。当前只完成 browser-safe v2 contracts/cross-validator，真实 post-run registry/Gold/media/run-HEAD 重验生成器、rights active head、外部签字/WORM 与 v2 rating/statistics 升级仍 pending，API=false，结果继续 TBD。
+
 ## 1. 项目决策
 
 本项目不把通用清板、遮挡恢复、写入/擦除检测或关键帧摘要作为论文中心贡献。论文候选主张是：

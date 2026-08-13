@@ -84,9 +84,13 @@
 
 人工评分采用 `oracle-gate-rating-ledger-v1`，恰好两名互盲评分者各对完整 blind 集合签一份 Ed25519 ledger。公共证据按 item 固定匿名 claim/evidence/edit/pair units；评分者只能提交原子判断，不能自报分母或自由 prose。合同只承诺无显式 arm/seed/case/request/教师/视频/来源/配对字段；内容仍可能提供语义线索，随机分发与独立会话须由外部流程证明。
 
+`public-evidence-v1` 只保留为 synthetic fixture 验证合同，不得对真实 Formal run 编译 GO/STOP。原因是响应派生的 claims 本来就会随 arm 改变，而共享的证据/edit/temporal 分母必须来自同一批底层 Gold/verified bytes；把二者都要求逐字相同既错误，也会迫使四臂复用公开 ID 并泄露配对。breaking `public-evidence-v2` 因此将两者分开：公开包为每个 item 使用全包唯一 opaque claim/evidence/pair IDs；私有 derivation receipt 保存 response JSON pointer、verified selected transcript / Signed Gold final-event source pointer，以及同 `case × seed` 的 underlying denominator commitment。单事件 case 的 temporal metric 明确为 `not_applicable_single_event`，不得阻断 Evidence F1、edit coverage 或 unsupported-claim 指标。
+
+v2 的 claim projection、speech segmentation、Gold-event renderer、eligible/edit denominator、all-pairs temporal rule、single-event NA 和 reblinding scheme 由独立 derivation-policy content hash 冻结。该策略根必须在正式运行前进入 FormalSpec→Run→RatingPlan；对已经完成且未预注册该根的旧 run，只能标 `post_hoc_development_only`，不能进入正式 GO 或论文证据链。当前 v2 合同及 cross-validator 仍是 non-authoritative infrastructure：post-run gate 尚须在 registry→Gold ledger→media/speech/frame→completed run HEAD 锁序内重验并产生 receipt，外部 resource active head、WORM/signature 与 randomized rating session 仍 pending，且生成器不得生成评分、分数或 GO 结论。
+
 预注册 `rating-plan` 先于 run，并由 run 的 rating/statistics 根锚定；运行完成后另建私有 `rating-assignment`，绑定 terminal checkpoint/run-completed 时间、run/public-response/public-evidence，以及两名评分者各自的完整 blind-ID 呈现排列。该对象不得公开给另一评分者。持久记录自哈希均非真实性证明；只有以进程外 trusted Ed25519 keys 重验两份 ledger 后的 callback 临时 capability 可进入私有统计。外部身份/session/随机算法确认、key registry、WORM、报告签字仍 pending，`api_execution_allowed=false`。
 
-统计要求相同 `case × seed` 四臂完整且公共 denominator 等价。只按 Evidence F1 点估计选择一次最强非 Oracle，tie 固定 Static-Final→Uniform→Transcript；同一 baseline 用于全部指标/CI。item 为两评分者等权平均，点估计严格为 seed-in-case mean→case macro→video macro→teacher macro；bootstrap 按 teacher→video→case→seed 重采样并保留四臂配对，固定 PRNG/seed/replicates 与 R7。80% 为投资门，95% 仅描述；缺失、0 eligible、少于两教师或每 case 少于三 seeds 一律 `BLOCKED`。报告普通 validator 不会重放 bootstrap；只有 deterministic compiler 重算、随后外部签名/WORM 才能证明来源。
+统计要求相同 `case × seed` 四臂完整且私有 underlying evidence/edit/temporal denominator commitment 等价；response-specific claims 不得纳入四臂分母等价比较。只按 Evidence F1 点估计选择一次最强非 Oracle，tie 固定 Static-Final→Uniform→Transcript；同一 baseline 用于全部指标/CI。item 为两评分者等权平均，点估计严格为 seed-in-case mean→case macro→video macro→teacher macro；bootstrap 按 teacher→video→case→seed 重采样并保留四臂配对，固定 PRNG/seed/replicates 与 R7。80% 为投资门，95% 仅描述；缺失、0 eligible、少于两教师或每 case 少于三 seeds 一律 `BLOCKED`，但预注册为 single-event NA 的 temporal 指标不属于缺失。报告普通 validator 不会重放 bootstrap；只有 v2 deterministic compiler 重算、随后外部签名/WORM 才能证明来源。
 
 ## 6. Go / Stop 解释
 

@@ -146,12 +146,28 @@ function bootstrapDiff(
 function denominatorShape(
   value: TrustedOracleGateRatingSetCapabilityV1["public_evidence_package"]["items"][number],
 ): string {
+  const unitOrdinal = new Map(
+    value.evidence_units.map((unit, index) => [unit.unit_id, index]),
+  );
   return JSON.stringify({
-    claim_units: value.claim_units,
-    evidence_units: value.evidence_units,
-    eligible_evidence_unit_ids: value.eligible_evidence_unit_ids,
-    board_edit_unit_ids: value.board_edit_unit_ids,
-    temporal_pairs: value.temporal_pairs,
+    // Claims are response-derived and are therefore expected to differ by arm.
+    // Public evidence identifiers are independently re-blinded per response, so
+    // compare only their ordered source content and ordinal membership shape.
+    evidence_units: value.evidence_units.map(({ kind, sequence_index, content }) => ({
+      kind,
+      sequence_index,
+      content,
+    })),
+    eligible_evidence_unit_ordinals: value.eligible_evidence_unit_ids.map(
+      (id) => unitOrdinal.get(id),
+    ),
+    board_edit_unit_ordinals: value.board_edit_unit_ids.map((id) =>
+      unitOrdinal.get(id),
+    ),
+    temporal_pair_ordinals: value.temporal_pairs.map((pair) => ({
+      before: unitOrdinal.get(pair.before_unit_id),
+      after: unitOrdinal.get(pair.after_unit_id),
+    })),
   });
 }
 function deepFreeze<T>(value: T): T {
@@ -202,6 +218,10 @@ export function compileOracleValueGateStatistics(input: {
     "synthetic_test_fixture_not_result" | "formal_development_oracle_value_gate";
 }): OracleValueGateReportV1 {
   input=snapshotCompilerInput(input);
+  if (input.evidence_scope !== "synthetic_test_fixture_not_result")
+    throw Error(
+      "public-evidence/statistics v1 不能用于真实 Formal run；等待预注册派生策略与私有底层证据分母绑定的 v2",
+    );
   assertActiveTrustedOracleGateRatingSetCapability(input.trusted_ratings);
   const chain = validateCompletedFormalRunArtifactChain(
     input.completed_run_artifact_chain,
