@@ -82,9 +82,11 @@
 3. `Edit Coverage Recall`：Gold 教学相关编辑被恢复或转化的比例。
 4. `Temporal Fidelity`：动作顺序的 pairwise accuracy / Kendall's τ。
 
-人工评分采用 `oracle-gate-rating-v1`，至少两名互盲评分者。公共包只含随机 blind ID、待评输出及必要 rubric；arm、seed、配对、教师、视频和来源都保留在权限为 `0700/0600` 的私有映射中。
+人工评分采用 `oracle-gate-rating-ledger-v1`，恰好两名互盲评分者各对完整 blind 集合签一份 Ed25519 ledger。公共证据按 item 固定匿名 claim/evidence/edit/pair units；评分者只能提交原子判断，不能自报分母或自由 prose。合同只承诺无显式 arm/seed/case/request/教师/视频/来源/配对字段；内容仍可能提供语义线索，随机分发与独立会话须由外部流程证明。
 
-统计以相同 `case × seed` 配对。主要比较为 Oracle Delta 对预注册规则选择出的最强非 Oracle 条件。内部投资门使用 80% paired hierarchical cluster bootstrap CI；95% CI 只作描述。cluster 层级至少为教师→视频/窗口；分桶样本不足时只报告 descriptive，不制造显著性。
+预注册 `rating-plan` 先于 run，并由 run 的 rating/statistics 根锚定；运行完成后另建私有 `rating-assignment`，绑定 terminal checkpoint/run-completed 时间、run/public-response/public-evidence，以及两名评分者各自的完整 blind-ID 呈现排列。该对象不得公开给另一评分者。持久记录自哈希均非真实性证明；只有以进程外 trusted Ed25519 keys 重验两份 ledger 后的 callback 临时 capability 可进入私有统计。外部身份/session/随机算法确认、key registry、WORM、报告签字仍 pending，`api_execution_allowed=false`。
+
+统计要求相同 `case × seed` 四臂完整且公共 denominator 等价。只按 Evidence F1 点估计选择一次最强非 Oracle，tie 固定 Static-Final→Uniform→Transcript；同一 baseline 用于全部指标/CI。item 为两评分者等权平均，点估计严格为 seed-in-case mean→case macro→video macro→teacher macro；bootstrap 按 teacher→video→case→seed 重采样并保留四臂配对，固定 PRNG/seed/replicates 与 R7。80% 为投资门，95% 仅描述；缺失、0 eligible、少于两教师或每 case 少于三 seeds 一律 `BLOCKED`。报告普通 validator 不会重放 bootstrap；只有 deterministic compiler 重算、随后外部签名/WORM 才能证明来源。
 
 ## 6. Go / Stop 解释
 

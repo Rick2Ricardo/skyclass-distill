@@ -154,6 +154,8 @@ SSIM/PSNR 可作为视觉诊断，但不能成为主要指标，因为空白板�
 
 Gold Skill 由学科专家在不看方法身份的条件下，依据相同课堂事件和冻结 schema 编写或裁决。自动指标不能替代专家对“教学动作是否被证据支持”的判断。
 
+Oracle Value Gate 把响应拆为固定、连续的匿名 claim units，并提供固定 eligible evidence/edit/pair units；两名独立评分者逐 claim 判断 supported 与证据子集、逐 edit 判断 coverage、逐 pair 判断顺序。四项指标均由 validator/compiler 推导，不接受评分者自报分母。公共包不含显式私有配对键，但内容仍可能使条件可推断；随机分发与互盲独立会话属于外部流程验收。
+
 | 指标 | 操作化定义 | 评测方式 |
 | --- | --- | --- |
 | Schema Validity / Field Completeness | 必填字段合法且非占位的比例 | 确定性验证器；不作为充分质量证据 |
@@ -282,6 +284,7 @@ Tutor 场景分为 `board-dependent` 和 `board-independent`，分类规则在�
 - **四个条件：**`Transcript Only / Static-Final Board / Uniform Frames / Oracle Delta`。Oracle Delta 使用 gold before/delta/after、delta 类型/区域/内容和 gold utterance span，但**不提供 gold pedagogical role**，避免把目标标签当输入。
 - **预算：**四组使用相同 distiller、完整 transcript 范围、Prompt、最大文本/视觉 token、输出 token、温度、随机种子和重试次数。Static/Final、Uniform 与 Oracle 的视觉槽位按同一上限截断；若结构化 delta 文本占用额外 token，必须从相同总上下文预算中扣除。
 - **评测：**对配对生成的 Skill 做盲评，主看 `Evidence Grounding F1 / Temporal Fidelity / Edit Coverage Recall / Unsupported Claim Rate`。评审者看不到条件名；每个条件至少使用相同的 3 个预登记随机种子。
+- **统计冻结：**按 seed-in-case mean→case macro→video macro→teacher macro 后的 Evidence F1 只选择一次最强非 oracle，tie 顺序为 Static-Final、Uniform、Transcript；同一 arm 用于全部指标和 CI。item 取两评分者等权平均；bootstrap 固定 teacher→video→case→seed、四臂配对、seed/replicates 与 R7。缺失、重复、跨教师/视频混配、少于两教师、每 case 少于三 seeds 或 0 eligible 均 `BLOCKED`，不得产生部分 Go/Stop。
 - **性质：**这是是否投入完整恢复算法的内部顺序决策，不是论文主结果，不做 benchmark 排名，不用于最终显著性主张；所有样本、Prompt 调整和阈值选择都标记为 development decisions。
 
 | Condition | Evidence Grounding F1 ↑ | Temporal Fidelity ↑ | Edit Coverage Recall ↑ | Unsupported Claim Rate ↓ | Cost | Decision note |
@@ -291,7 +294,7 @@ Tutor 场景分为 `board-dependent` 和 `board-independent`，分类规则在�
 | Uniform Frames | TBD | TBD | TBD | TBD | TBD | investment pilot only |
 | Oracle Delta | TBD | TBD | TBD | TBD | TBD | investment pilot only |
 
-**预先指定的 Go 条件：**Oracle Delta 相对前三组中的最强非 oracle 条件，在 Evidence Grounding F1、Temporal Fidelity 和 Edit Coverage Recall **三个指标上均绝对提升至少 5 个百分点**，且每个差值的配对 80% bootstrap CI 下界均 `> 0`；同时 Unsupported Claim Rate 的配对点估计不得上升。80% CI 仅用于小样本投资筛选，不替代主实验的 95% CI。
+**预先指定的 Go 条件：**Oracle Delta 相对上述 Evidence F1 规则选出的同一个最强非 oracle 条件，在 Evidence Grounding F1、Temporal Fidelity 和 Edit Coverage Recall **三个指标上均绝对提升至少 5 个百分点**，且每个差值的配对 80% bootstrap CI 下界均 `> 0`；同时 Unsupported Claim Rate 的配对点估计不得上升。80% CI 仅用于小样本投资筛选，95% CI 只作描述。
 
 **立即 Stop 条件：**上述三个正向指标中任一个未达到“`+5` 个百分点且 80% CI 下界 `>0`”，或 Oracle Delta 的 Unsupported Claim Rate 高于最强非 oracle 条件，即立即停止把时序板书作为核心贡献，不启动完整恢复算法。可保留静态/文本 Skill 路线；不能用该 pilot 反向宣称 oracle 无效的普遍科学结论。
 

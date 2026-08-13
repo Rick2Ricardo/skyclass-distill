@@ -7,6 +7,8 @@ export * from "./oracleFormalPreflight.js";
 export * from "./oracleBytePreflight.js";
 export * from "./oracleCompositionGate.js";
 export * from "./oracleInputTokenCountReceiptGate.js";
+export * from "./oracleBlindRatingGate.js";
+export * from "./oracleValueGateStatistics.js";
 export * from "./oracleFrameDerivationPreflight.js";
 export * from "./oracleTrustedPreflight.js";
 export * from "./groundedSkills.js";

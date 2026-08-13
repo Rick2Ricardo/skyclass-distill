@@ -6,6 +6,7 @@ export * from "./gold-review.js";
 export * from "./oracle-gate-bytes.js";
 export * from "./oracle-gate-composition.js";
 export * from "./oracle-gate-input-token-count.js";
+export * from "./oracle-gate-blind-rating.js";
 export * from "./oracle-gate-formal.js";
 export * from "./oracle-gate-frame-derivation.js";
 export * from "./oracle-gate-response.js";
