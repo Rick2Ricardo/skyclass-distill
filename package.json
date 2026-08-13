@@ -30,6 +30,7 @@
     "start": "npm run build && npm run server --",
     "data:fetch:physics": "tsx scripts/fetch-public-bilibili.ts",
     "board:compile-gold": "tsx scripts/compile-temporal-gold.ts",
+    "board:build-gold-review-batch": "tsx scripts/build-gold-adjudication-batch-03.ts",
     "board:run-grounded": "tsx scripts/run-grounded-gold.ts",
     "board:oracle-smoke": "tsx scripts/run-oracle-gate.ts",
     "typecheck": "tsc --noEmit",
