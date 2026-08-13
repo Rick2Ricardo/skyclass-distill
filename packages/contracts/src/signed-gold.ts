@@ -9,7 +9,10 @@ import {
 } from "./gold-review.js";
 
 export interface SignedGoldVisualEvidence {
+  /** Deterministic asset identity derived at compile time; never copied from an event id. */
   evidence_id: string;
+  /** Original intake identifier retained for audit only. */
+  source_evidence_id: string;
   side: string;
   kind: string;
   label: string;
@@ -40,6 +43,7 @@ export interface SignedGoldPackage {
   source_video_id: string;
   source_intake_uri: string;
   source_intake_sha256: string;
+  source_window: { start: number; end: number };
   reviewed_group_count: number;
   accepted_group_count: number;
   accepted_event_count: number;
@@ -49,24 +53,64 @@ export interface SignedGoldPackage {
   groups: SignedGoldGroup[];
 }
 
+export interface SignedGoldLessonComponentCommitment {
+  package_id: string;
+  source_intake_sha256: string;
+  source_window: { start: number; end: number };
+  decision_signatures: string[];
+  signoff_signatures: string[];
+}
+
+export interface SignedGoldLesson {
+  lesson_id: string;
+  lesson_sha256: string;
+  source_video_id: string;
+  component_package_ids: string[];
+  component_commitments: SignedGoldLessonComponentCommitment[];
+  reviewed_group_count: number;
+  accepted_group_count: number;
+  accepted_event_count: number;
+}
+
 export interface SignedGoldDataset {
-  schema_version: "signed-gold-dataset-v1";
+  schema_version: "signed-gold-dataset-v2";
   dataset_id: string;
   dataset_sha256: string;
   status: "paper_gold_signed";
   frozen_at: string;
   source_queue_schema_version: "gold-review-queue-v1";
   package_count: number;
+  lesson_count: number;
   reviewed_group_count: number;
   accepted_group_count: number;
   accepted_event_count: number;
   minimum_required_event_count: number;
   packages: SignedGoldPackage[];
+  lessons: SignedGoldLesson[];
 }
 
 export interface SignedGoldCompileResult {
   dataset_uri: string;
   dataset: SignedGoldDataset;
+}
+
+export interface SignedGoldCompileReadinessReport {
+  schema_version: "signed-gold-compile-readiness-v1";
+  structural_ready: boolean;
+  human_ready: boolean;
+  component_package_count: number;
+  lesson_count: number;
+  group_count: number;
+  evidence_asset_count: number;
+  derived_evidence_id_count: number;
+  canonical_comparison_count: number;
+  unique_canonical_comparison_sha256_count: number;
+  decided_group_count: number;
+  signed_component_package_count: number;
+  accepted_event_count: number;
+  minimum_required_event_count: number;
+  structural_issues: string[];
+  human_issues: string[];
 }
 
 export interface SignedGoldValidationIssue {
@@ -95,8 +139,73 @@ export function validateSignedGoldRecordSignatures(
         issues.push({ path: `packages[${packageIndex}].signoffs[${signoffIndex}].signature_sha256`, message: "签字正文哈希不匹配" });
       }
     });
+    reviewPackage.groups.forEach((group, groupIndex) => {
+      group.visual_evidence.forEach((evidence, evidenceIndex) => {
+        const expected = deriveSignedGoldVisualEvidenceIdV2({ package_id:reviewPackage.package_id,group_id:group.group_id,source_evidence_id:evidence.source_evidence_id,side:evidence.side,kind:evidence.kind,asset_uri:evidence.asset_uri,sha256:evidence.sha256 },digest);
+        if (evidence.evidence_id !== expected) issues.push({ path:`packages[${packageIndex}].groups[${groupIndex}].visual_evidence[${evidenceIndex}].evidence_id`,message:"派生资产 ID 与来源证据不闭合" });
+      });
+    });
   });
+  try {
+    const expectedLessons = deriveSignedGoldLessonsV2(dataset.packages,digest);
+    if (stableJson(expectedLessons) !== stableJson(dataset.lessons)) issues.push({path:"lessons",message:"课级聚合必须由签字组件确定性派生"});
+  } catch (error) { issues.push({path:"lessons",message:error instanceof Error?error.message:String(error)}); }
   return issues;
+}
+
+export function canonicalSignedGoldVisualEvidenceIdentityV2(input: {
+  package_id: string;
+  group_id: string;
+  source_evidence_id: string;
+  side: string;
+  kind: string;
+  asset_uri: string;
+  sha256: string;
+}): string {
+  return `skyclass/signed-gold/visual-evidence/v2\0${stableJson(input)}`;
+}
+
+export function deriveSignedGoldVisualEvidenceIdV2(
+  input: Parameters<typeof canonicalSignedGoldVisualEvidenceIdentityV2>[0],
+  digest: (payload: string) => string,
+): string {
+  return `asset-${digest(canonicalSignedGoldVisualEvidenceIdentityV2(input))}`;
+}
+
+export function canonicalSignedGoldLessonIdentityV2(input: Omit<SignedGoldLesson, "lesson_id" | "lesson_sha256">): string {
+  return `skyclass/signed-gold/lesson/v2\0${stableJson(input)}`;
+}
+
+export function deriveSignedGoldLessonsV2(
+  packages: SignedGoldPackage[],
+  digest: (payload: string) => string,
+): SignedGoldLesson[] {
+  const sourceIds = [...new Set(packages.map((item) => item.source_video_id))].sort((left, right) => left.localeCompare(right, "en"));
+  return sourceIds.map((sourceVideoId) => {
+    const components = packages.filter((item) => item.source_video_id === sourceVideoId).sort((left, right) => left.package_id.localeCompare(right.package_id, "en"));
+    const byWindow = [...components].sort((left, right) => left.source_window.start - right.source_window.start || left.package_id.localeCompare(right.package_id, "en"));
+    for (let index = 1; index < byWindow.length; index += 1) {
+      if (byWindow[index - 1].source_window.end > byWindow[index].source_window.start) {
+        throw new Error(`同课签字组件时间窗重叠：${byWindow[index - 1].package_id}/${byWindow[index].package_id}`);
+      }
+    }
+    const payload = {
+      source_video_id: sourceVideoId,
+      component_package_ids: components.map((item) => item.package_id),
+      component_commitments: components.map((item) => ({
+        package_id: item.package_id,
+        source_intake_sha256: item.source_intake_sha256,
+        source_window: item.source_window,
+        decision_signatures: item.decision_signatures,
+        signoff_signatures: item.signoffs.map((signoff) => signoff.signature_sha256).sort(),
+      })),
+      reviewed_group_count: components.reduce((sum, item) => sum + item.reviewed_group_count, 0),
+      accepted_group_count: components.reduce((sum, item) => sum + item.accepted_group_count, 0),
+      accepted_event_count: components.reduce((sum, item) => sum + item.accepted_event_count, 0),
+    };
+    const lessonSha256 = digest(canonicalSignedGoldLessonIdentityV2(payload));
+    return { lesson_id: `lesson-${lessonSha256.slice(0, 16)}`, lesson_sha256: lessonSha256, ...payload };
+  });
 }
 
 function stableJson(value: unknown): string {
@@ -208,13 +317,19 @@ export function validateSignedGoldDataset(input: unknown): SignedGoldValidationR
   const issues: SignedGoldValidationIssue[] = [];
   const issue = (path: string, message: string): void => { issues.push({ path, message }); };
   if (!isRecord(input)) return { valid: false, issues: [{ path: "$", message: "必须是对象" }] };
-  if (input.schema_version !== "signed-gold-dataset-v1") issue("schema_version", "必须是 signed-gold-dataset-v1");
+  const exactKeys = (value: Record<string, unknown>, expected: readonly string[], path: string): void => {
+    const actual = Object.keys(value).sort();
+    const frozen = [...expected].sort();
+    if (JSON.stringify(actual) !== JSON.stringify(frozen)) issue(path, `字段必须精确为 ${expected.join(",")}`);
+  };
+  exactKeys(input, ["schema_version","dataset_id","dataset_sha256","status","frozen_at","source_queue_schema_version","package_count","lesson_count","reviewed_group_count","accepted_group_count","accepted_event_count","minimum_required_event_count","packages","lessons"], "$" );
+  if (input.schema_version !== "signed-gold-dataset-v2") issue("schema_version", "必须是 signed-gold-dataset-v2");
   if (input.status !== "paper_gold_signed") issue("status", "必须是 paper_gold_signed");
   if (!isNonEmpty(input.dataset_id)) issue("dataset_id", "不能为空");
   if (!isSha256(input.dataset_sha256)) issue("dataset_sha256", "必须是小写 SHA-256");
   if (input.source_queue_schema_version !== "gold-review-queue-v1") issue("source_queue_schema_version", "来源队列版本无效");
   if (typeof input.frozen_at !== "string" || !Number.isFinite(Date.parse(input.frozen_at))) issue("frozen_at", "必须是有效时间");
-  for (const field of ["package_count", "reviewed_group_count", "accepted_group_count", "accepted_event_count", "minimum_required_event_count"] as const) {
+  for (const field of ["package_count", "lesson_count", "reviewed_group_count", "accepted_group_count", "accepted_event_count", "minimum_required_event_count"] as const) {
     if (!Number.isSafeInteger(input[field]) || Number(input[field]) < 0) issue(field, "必须是非负安全整数");
   }
   if (Number(input.minimum_required_event_count) < 30) issue("minimum_required_event_count", "Paper Gold 门槛不得低于 30 个事件");
@@ -222,7 +337,6 @@ export function validateSignedGoldDataset(input: unknown): SignedGoldValidationR
   if (!Array.isArray(input.packages)) return { valid: false, issues: [...issues, { path: "packages", message: "必须是数组" }] };
 
   const packageIds = new Set<string>();
-  const sourceVideoIds = new Set<string>();
   const globalEventKeys = new Set<string>();
   let reviewedGroupCount = 0;
   let acceptedGroupCount = 0;
@@ -230,16 +344,19 @@ export function validateSignedGoldDataset(input: unknown): SignedGoldValidationR
   input.packages.forEach((rawPackage, packageIndex) => {
     const base = `packages[${packageIndex}]`;
     if (!isRecord(rawPackage)) { issue(base, "必须是对象"); return; }
+    exactKeys(rawPackage, ["package_id","source_video_id","source_intake_uri","source_intake_sha256","source_window","reviewed_group_count","accepted_group_count","accepted_event_count","decision_signatures","decisions","signoffs","groups"], base);
     const packageId = rawPackage.package_id;
     const sourceVideoId = rawPackage.source_video_id;
     if (!isNonEmpty(packageId)) issue(`${base}.package_id`, "不能为空");
     else if (packageIds.has(packageId)) issue(`${base}.package_id`, "不得重复");
     else packageIds.add(packageId);
     if (!isNonEmpty(sourceVideoId)) issue(`${base}.source_video_id`, "不能为空");
-    else if (sourceVideoIds.has(sourceVideoId)) issue(`${base}.source_video_id`, "一个数据集内每节课只能有一个签字包");
-    else sourceVideoIds.add(sourceVideoId);
     if (!isSafeRelativeUri(rawPackage.source_intake_uri)) issue(`${base}.source_intake_uri`, "必须是受控相对路径");
     if (!isSha256(rawPackage.source_intake_sha256)) issue(`${base}.source_intake_sha256`, "必须是 SHA-256");
+    if (!isRecord(rawPackage.source_window) || !Number.isFinite(rawPackage.source_window.start) || !Number.isFinite(rawPackage.source_window.end)
+      || Number(rawPackage.source_window.start) < 0 || Number(rawPackage.source_window.start) >= Number(rawPackage.source_window.end)) {
+      issue(`${base}.source_window`, "必须是有效组件时间窗");
+    }
     for (const field of ["reviewed_group_count", "accepted_group_count", "accepted_event_count"] as const) {
       if (!Number.isSafeInteger(rawPackage[field]) || Number(rawPackage[field]) < 0) issue(`${base}.${field}`, "必须是非负安全整数");
     }
@@ -316,9 +433,10 @@ export function validateSignedGoldDataset(input: unknown): SignedGoldValidationR
       for (const [evidenceIndex, rawEvidence] of (Array.isArray(rawGroup.visual_evidence) ? rawGroup.visual_evidence : []).entries()) {
         const evidencePath = `${groupPath}.visual_evidence[${evidenceIndex}]`;
         if (!isRecord(rawEvidence)) { issue(evidencePath, "必须是对象"); continue; }
-        if (!isNonEmpty(rawEvidence.evidence_id)) issue(`${evidencePath}.evidence_id`, "不能为空");
+        if (typeof rawEvidence.evidence_id !== "string" || !/^asset-[a-f0-9]{64}$/.test(rawEvidence.evidence_id)) issue(`${evidencePath}.evidence_id`, "必须是域分隔派生资产 ID");
         else if (evidenceIds.has(rawEvidence.evidence_id)) issue(`${evidencePath}.evidence_id`, "不得重复");
         else { evidenceIds.add(rawEvidence.evidence_id); evidenceById.set(rawEvidence.evidence_id, rawEvidence); }
+        if (!isNonEmpty(rawEvidence.source_evidence_id)) issue(`${evidencePath}.source_evidence_id`, "必须保留原 intake 证据 ID");
         if (!isNonEmpty(rawEvidence.side) || !isNonEmpty(rawEvidence.kind) || !isNonEmpty(rawEvidence.label)) issue(evidencePath, "side/kind/label 不能为空");
         if (!isSafeRelativeUri(rawEvidence.asset_uri)) issue(`${evidencePath}.asset_uri`, "必须是受控相对路径");
         if (!isSha256(rawEvidence.sha256)) issue(`${evidencePath}.sha256`, "必须是 SHA-256");
@@ -377,5 +495,42 @@ export function validateSignedGoldDataset(input: unknown): SignedGoldValidationR
   if (input.reviewed_group_count !== reviewedGroupCount) issue("reviewed_group_count", "与包内 review group 总数不一致");
   if (input.accepted_group_count !== acceptedGroupCount) issue("accepted_group_count", "与接受组总数不一致");
   if (input.accepted_event_count !== acceptedEventCount) issue("accepted_event_count", "与最终事件总数不一致");
+  if (!Array.isArray(input.lessons)) issue("lessons", "必须是数组");
+  else {
+    if (input.lesson_count !== input.lessons.length) issue("lesson_count", "与 lessons 长度不一致");
+    const lessonIds = new Set<string>();
+    const lessonSources = new Set<string>();
+    const assignedPackages = new Set<string>();
+    const packageById = new Map(input.packages.filter(isRecord).map((item) => [String(item.package_id), item]));
+    input.lessons.forEach((rawLesson, lessonIndex) => {
+      const base = `lessons[${lessonIndex}]`;
+      if (!isRecord(rawLesson)) { issue(base, "必须是对象"); return; }
+      exactKeys(rawLesson, ["lesson_id","lesson_sha256","source_video_id","component_package_ids","component_commitments","reviewed_group_count","accepted_group_count","accepted_event_count"], base);
+      if (typeof rawLesson.lesson_id !== "string" || !/^lesson-[a-f0-9]{16}$/.test(rawLesson.lesson_id)) issue(`${base}.lesson_id`, "必须是内容寻址 lesson ID");
+      else if (lessonIds.has(rawLesson.lesson_id)) issue(`${base}.lesson_id`, "不得重复"); else lessonIds.add(rawLesson.lesson_id);
+      if (!isSha256(rawLesson.lesson_sha256) || rawLesson.lesson_id !== `lesson-${String(rawLesson.lesson_sha256).slice(0, 16)}`) issue(`${base}.lesson_sha256`, "必须与 lesson_id 闭合");
+      if (!isNonEmpty(rawLesson.source_video_id) || lessonSources.has(String(rawLesson.source_video_id))) issue(`${base}.source_video_id`, "每个源视频必须恰有一个 lesson"); else lessonSources.add(String(rawLesson.source_video_id));
+      const componentIds = Array.isArray(rawLesson.component_package_ids) && rawLesson.component_package_ids.every(isNonEmpty) ? rawLesson.component_package_ids as string[] : [];
+      if (!componentIds.length || new Set(componentIds).size !== componentIds.length || JSON.stringify(componentIds) !== JSON.stringify([...componentIds].sort())) issue(`${base}.component_package_ids`, "必须是非空、唯一、有序组件集合");
+      componentIds.forEach((id) => { const component = packageById.get(id); if (!component || component.source_video_id !== rawLesson.source_video_id) issue(`${base}.component_package_ids`, "必须精确引用同一源视频组件"); if (assignedPackages.has(id)) issue(`${base}.component_package_ids`, "组件不得跨 lesson 重复"); assignedPackages.add(id); });
+      if (!Array.isArray(rawLesson.component_commitments) || rawLesson.component_commitments.length !== componentIds.length) issue(`${base}.component_commitments`, "必须逐组件绑定签字根");
+      else rawLesson.component_commitments.forEach((commitment, index) => {
+        const component = packageById.get(componentIds[index]);
+        if (isRecord(commitment)) exactKeys(commitment, ["package_id","source_intake_sha256","source_window","decision_signatures","signoff_signatures"], `${base}.component_commitments[${index}]`);
+        if (!isRecord(commitment) || !component || commitment.package_id !== component.package_id || commitment.source_intake_sha256 !== component.source_intake_sha256
+          || JSON.stringify(commitment.source_window) !== JSON.stringify(component.source_window)
+          || JSON.stringify(commitment.decision_signatures) !== JSON.stringify(component.decision_signatures)
+          || JSON.stringify(commitment.signoff_signatures) !== JSON.stringify((component.signoffs as Array<Record<string, unknown>>).map((item) => item.signature_sha256).sort())) issue(`${base}.component_commitments[${index}]`, "必须与组件 intake/决策/双签根逐字闭合");
+      });
+      const components = componentIds.map((id) => packageById.get(id)).filter((item): item is Record<string, unknown> => Boolean(item));
+      const windows = components.map((item) => item.source_window).filter(isRecord).sort((a, b) => Number(a.start) - Number(b.start));
+      for (let index = 1; index < windows.length; index += 1) if (Number(windows[index - 1].end) > Number(windows[index].start)) issue(`${base}.component_commitments`, "同课组件时间窗不得重叠");
+      for (const field of ["reviewed_group_count", "accepted_group_count", "accepted_event_count"] as const) {
+        const expected = components.reduce((sum, item) => sum + Number(item[field] ?? 0), 0);
+        if (rawLesson[field] !== expected) issue(`${base}.${field}`, "必须等于组件汇总");
+      }
+    });
+    if (assignedPackages.size !== input.packages.length) issue("lessons", "必须恰好覆盖全部签字组件");
+  }
   return { valid: issues.length === 0, issues };
 }

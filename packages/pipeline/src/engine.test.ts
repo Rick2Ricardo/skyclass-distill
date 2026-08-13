@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { canonicalGoldReviewDecisionSignaturePayload, canonicalGoldReviewPackageSignoffSignaturePayload, canonicalSignedGoldDatasetPayload, type GoldReviewDecisionRecord, type SignedGoldDataset } from "../../contracts/src/index.js";
+import { canonicalGoldReviewDecisionSignaturePayload, canonicalGoldReviewPackageSignoffSignaturePayload, canonicalSignedGoldDatasetPayload, deriveSignedGoldLessonsV2, deriveSignedGoldVisualEvidenceIdV2, type GoldReviewDecisionRecord, type SignedGoldDataset } from "../../contracts/src/index.js";
 import { PipelineEngine } from "./engine.js";
 
 const created: string[] = [];
@@ -33,8 +33,18 @@ function signedDataset(): SignedGoldDataset {
     };
     return { ...base, signature_sha256: digest(canonicalGoldReviewPackageSignoffSignaturePayload(base)) };
   };
+  const evidenceId = deriveSignedGoldVisualEvidenceIdV2({ package_id: "package-1", group_id: "G01", source_evidence_id: "comparison-1", side: "shared", kind: "comparison", asset_uri: "assets/comparison.png", sha256: "e".repeat(64) }, digest);
+  const packages = [{
+      package_id: "package-1", source_video_id: "video-1", source_intake_uri: "research/intake.json",
+      source_intake_sha256: "a".repeat(64), source_window: { start: 10, end: 12 }, reviewed_group_count: 1, accepted_group_count: 1, accepted_event_count: 30,
+      decision_signatures: [decision.signature_sha256], decisions: [decision], signoffs: (["visual_adjudicator", "physics_reviewer"] as const).map((role, index) => signoff(role, index)),
+      groups: [{ group_id: "G01", alignment_class: "matched", decision_signature_sha256: decision.signature_sha256, decision_revision: 1, final_events: events,
+        canonical_visual_evidence_id: evidenceId,
+        visual_evidence: [{ evidence_id: evidenceId, source_evidence_id: "comparison-1", side: "shared", kind: "comparison", label: "before/delta/after", asset_uri: "assets/comparison.png", sha256: "e".repeat(64), mime_type: "image/png" as const, width: 1, height: 1, byte_length: 68 }],
+        speech_context: { text: "", status: "context_not_gold" as const } }],
+    }];
   const payload = {
-    schema_version: "signed-gold-dataset-v1" as const,
+    schema_version: "signed-gold-dataset-v2" as const,
     status: "paper_gold_signed" as const,
     frozen_at: "2026-08-12T00:01:00.000Z",
     source_queue_schema_version: "gold-review-queue-v1" as const,
@@ -43,20 +53,9 @@ function signedDataset(): SignedGoldDataset {
     accepted_group_count: 1,
     accepted_event_count: 30,
     minimum_required_event_count: 30,
-    packages: [{
-      package_id: "package-1", source_video_id: "video-1", source_intake_uri: "research/intake.json",
-      source_intake_sha256: "a".repeat(64), reviewed_group_count: 1, accepted_group_count: 1, accepted_event_count: 30,
-      decision_signatures: [decision.signature_sha256],
-      decisions: [decision],
-      signoffs: (["visual_adjudicator", "physics_reviewer"] as const).map((role, index) => signoff(role, index)),
-      groups: [{
-        group_id: "G01", alignment_class: "matched", decision_signature_sha256: decision.signature_sha256, decision_revision: 1,
-        final_events: events,
-        canonical_visual_evidence_id: "comparison-1",
-        visual_evidence: [{ evidence_id: "comparison-1", side: "shared", kind: "comparison", label: "before/delta/after", asset_uri: "assets/comparison.png", sha256: "e".repeat(64), mime_type: "image/png" as const, width: 1, height: 1, byte_length: 68 }],
-        speech_context: { text: "", status: "context_not_gold" as const },
-      }],
-    }],
+    lesson_count: 1,
+    packages,
+    lessons: deriveSignedGoldLessonsV2(packages, digest),
   };
   const hash = createHash("sha256").update(canonicalSignedGoldDatasetPayload(payload)).digest("hex");
   return { dataset_id: `signed-gold-${hash.slice(0, 16)}`, dataset_sha256: hash, ...payload };
@@ -133,24 +132,24 @@ describe("PipelineEngine distillation contract", () => {
   });
 
   it("fails closed for uncontrolled, forged, or manually placed Signed Gold datasets", async () => {
-    await expect(engine().createSignedGoldDistill("project", { dataset_uri: "../outside.json", source_video_id: "video-1" }))
+    await expect(engine().createSignedGoldDistill("project", { dataset_uri: "../outside.json", lesson_id: "lesson-missing" }))
       .rejects.toThrow("受控相对路径");
-    await expect(engine().createSignedGoldDistill("project", { dataset_uri: "%252e%252e%252foutside.json", source_video_id: "video-1" }))
+    await expect(engine().createSignedGoldDistill("project", { dataset_uri: "%252e%252e%252foutside.json", lesson_id: "lesson-missing" }))
       .rejects.toThrow("受控相对路径");
-    await expect(engine().createSignedGoldDistill("project", { dataset_uri: "/tmp/outside.json", source_video_id: "video-1" }))
+    await expect(engine().createSignedGoldDistill("project", { dataset_uri: "/tmp/outside.json", lesson_id: "lesson-missing" }))
       .rejects.toThrow("受控相对路径");
 
     const dataset = signedDataset();
     const manuallyPlaced = await writeSignedDataset(dataset, false);
     await expect(engine({ dataDir: manuallyPlaced.dataDir }).createSignedGoldDistill("project", {
-      dataset_uri: manuallyPlaced.uri, source_video_id: "video-1",
+      dataset_uri: manuallyPlaced.uri, lesson_id: dataset.lessons[0].lesson_id,
     })).rejects.toThrow("内容寻址编译目录");
 
     const forged = structuredClone(dataset);
     forged.packages[0].signoffs[1].adjudicator_id = forged.packages[0].signoffs[0].adjudicator_id;
     const forgedFile = await writeSignedDataset(forged);
     await expect(engine({ dataDir: forgedFile.dataDir }).createSignedGoldDistill("project", {
-      dataset_uri: forgedFile.uri, source_video_id: "video-1",
+      dataset_uri: forgedFile.uri, lesson_id: forged.lessons[0].lesson_id,
     })).rejects.toThrow("双签必须由不同人员");
   });
 
@@ -158,7 +157,7 @@ describe("PipelineEngine distillation contract", () => {
     const dataset = signedDataset();
     const file = await writeSignedDataset(dataset);
     await expect(engine({ dataDir: file.dataDir }).createSignedGoldDistill("project", {
-      dataset_uri: file.uri, source_video_id: "missing-video",
+      dataset_uri: file.uri, lesson_id: "lesson-missing",
     })).rejects.toThrow("当前人工评审账本");
   });
 

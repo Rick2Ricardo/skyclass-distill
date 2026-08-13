@@ -19,10 +19,11 @@ import type {
   GoldReviewSignoffRole,
   GoldReviewTimeRange,
   SignedGoldCompileResult,
+  SignedGoldCompileReadinessReport,
 } from "../../contracts/src/index.js";
 import { canonicalGoldReviewDecisionSignaturePayload, canonicalGoldReviewPackageSignoffSignaturePayload } from "../../contracts/src/index.js";
 import { verifyImageEvidence } from "../../media/src/imageEvidence.js";
-import { buildSignedGoldDataset } from "./signedGoldCompiler.js";
+import { buildSignedGoldDataset, inspectSignedGoldCompileReadiness } from "./signedGoldCompiler.js";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -697,6 +698,10 @@ export class GoldReviewStore {
 
   async compileDataset(): Promise<SignedGoldCompileResult> {
     return this.withLedgerSnapshot(() => this.compileDatasetUnlocked());
+  }
+
+  async compileReadiness(): Promise<SignedGoldCompileReadinessReport> {
+    return this.withLedgerSnapshot(async () => inspectSignedGoldCompileReadiness(this.root, await this.queue()));
   }
 
   private async compileDatasetUnlocked(): Promise<SignedGoldCompileResult> {

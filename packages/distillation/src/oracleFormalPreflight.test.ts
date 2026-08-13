@@ -6,6 +6,8 @@ import {
   canonicalOracleGateFormalInputPayload,
   canonicalOracleGateFormalSpecPayload,
   canonicalSignedGoldDatasetPayload,
+  deriveSignedGoldLessonsV2,
+  deriveSignedGoldVisualEvidenceIdV2,
   FORMAL_ORACLE_USER_PROMPT_TEMPLATE_SHA256,
   FORMAL_ORACLE_USER_PROMPT_VERSION,
   ORACLE_GATE_RESPONSE_SCHEMA_SHA256,
@@ -65,6 +67,7 @@ function packageFixture(index: number, eventOffset: number) {
       package_id: packageId,
       signoff_role: role,
       source_intake_sha256: decision.source_intake_sha256,
+      source_window: { start: 10 + index, end: 12 + index },
       decision_signatures: [decision.signature_sha256],
       adjudicator_id: `${suffix}-${index}`,
       adjudicator_role: role,
@@ -73,12 +76,14 @@ function packageFixture(index: number, eventOffset: number) {
     };
     return { ...base, signature_sha256: digest(canonicalGoldReviewPackageSignoffSignaturePayload(base)) };
   };
+  const evidenceId = deriveSignedGoldVisualEvidenceIdV2({ package_id: packageId, group_id: groupId, source_evidence_id: `comparison-${index}`, side: "shared", kind: "comparison", asset_uri: `assets/comparison-${index}.png`, sha256: index === 1 ? "d".repeat(64) : "e".repeat(64) }, digest);
   return {
     package: {
       package_id: packageId,
       source_video_id: sourceVideoId,
       source_intake_uri: `research/intake-${index}.json`,
       source_intake_sha256: decision.source_intake_sha256,
+      source_window: { start: 10 + index, end: 12 + index },
       reviewed_group_count: 1,
       accepted_group_count: 1,
       accepted_event_count: events.length,
@@ -91,9 +96,10 @@ function packageFixture(index: number, eventOffset: number) {
         decision_signature_sha256: decision.signature_sha256,
         decision_revision: 1,
         final_events: events,
-        canonical_visual_evidence_id: `comparison-${index}`,
+        canonical_visual_evidence_id: evidenceId,
         visual_evidence: [{
-          evidence_id: `comparison-${index}`,
+          evidence_id: evidenceId,
+          source_evidence_id: `comparison-${index}`,
           side: "shared",
           kind: "comparison",
           label: "before/delta/after",
@@ -116,17 +122,20 @@ function packageFixture(index: number, eventOffset: number) {
 function dataset(): SignedGoldDataset {
   const first = packageFixture(1, 0);
   const second = packageFixture(2, 15);
+  const packages = [first.package, second.package];
   const payload = {
-    schema_version: "signed-gold-dataset-v1" as const,
+    schema_version: "signed-gold-dataset-v2" as const,
     status: "paper_gold_signed" as const,
     frozen_at: "2026-08-12T02:00:00.000Z",
     source_queue_schema_version: "gold-review-queue-v1" as const,
     package_count: 2,
+    lesson_count: 2,
     reviewed_group_count: 2,
     accepted_group_count: 2,
     accepted_event_count: 30,
     minimum_required_event_count: 30,
-    packages: [first.package, second.package],
+    packages,
+    lessons: deriveSignedGoldLessonsV2(packages, digest),
   };
   const datasetSha256 = digest(canonicalSignedGoldDatasetPayload(payload));
   return { dataset_id: `signed-gold-${datasetSha256.slice(0, 16)}`, dataset_sha256: datasetSha256, ...payload };
@@ -260,6 +269,8 @@ function resignDataset(input: SignedGoldDataset): SignedGoldDataset {
       signoff.signature_sha256 = digest(canonicalGoldReviewPackageSignoffSignaturePayload(signoff));
     });
   }
+  signed.lessons = deriveSignedGoldLessonsV2(signed.packages, digest);
+  signed.lesson_count = signed.lessons.length;
   signed.dataset_sha256 = digest(canonicalSignedGoldDatasetPayload(signed));
   signed.dataset_id = `signed-gold-${signed.dataset_sha256.slice(0, 16)}`;
   return signed;

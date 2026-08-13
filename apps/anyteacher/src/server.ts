@@ -165,6 +165,11 @@ app.get("/api/gold-review", async (_request, reply): Promise<GoldReviewQueue | u
   catch (error) { return httpError(reply, error, 500); }
 });
 
+app.get("/api/gold-review/compile-readiness", async (_request, reply) => {
+  try { return await goldReviews.compileReadiness(); }
+  catch (error) { return httpError(reply, error); }
+});
+
 app.get("/api/gold-review/evidence", async (request, reply) => {
   try {
     const query = request.query as Record<string, unknown>;
@@ -380,7 +385,7 @@ app.post("/api/projects/:id/distill-signed-gold", async (request, reply): Promis
     const body = bodyOf(request);
     return await pipeline.createSignedGoldDistill(paramsOf<{ id: string }>(request).id, {
       dataset_uri: String(body.dataset_uri || ""),
-      source_video_id: String(body.source_video_id || ""),
+      lesson_id: String(body.lesson_id || ""),
     });
   } catch (error) { return httpError(reply, error); }
 });

@@ -24,7 +24,7 @@ interface DistillRequest {
   evidence_mode?: EvidenceMode;
   board_bundle_uri?: string;
 }
-interface SignedGoldDistillRequest { dataset_uri: string; source_video_id: string }
+interface SignedGoldDistillRequest { dataset_uri: string; lesson_id: string }
 
 function controlledRelativeUri(value: string): string | null {
   if (!value || value.trim() !== value || value.includes("\\") || value.includes("\0") || isAbsolute(value)) return null;
@@ -166,14 +166,13 @@ export class PipelineEngine {
   async createSignedGoldDistill(projectId: string, request: SignedGoldDistillRequest): Promise<JobState> {
     await this.library.getProject(projectId);
     const loaded = await this.loadSignedGoldDataset(request.dataset_uri);
-    if (loaded.dataset.packages.filter((item) => item.source_video_id === request.source_video_id).length !== 1) {
-      throw new Error("Signed Gold 数据集不包含唯一的所选单课包");
-    }
-    const normalized: SignedGoldDistillRequest = { dataset_uri: loaded.uri, source_video_id: request.source_video_id };
+    const lesson = loaded.dataset.lessons.find((item) => item.lesson_id === request.lesson_id);
+    if (!lesson) throw new Error("Signed Gold 数据集不包含所选 lesson");
+    const normalized: SignedGoldDistillRequest = { dataset_uri: loaded.uri, lesson_id: lesson.lesson_id };
     const job = await this.jobs.create({
       kind: "distill",
       project_id: projectId,
-      video_ids: [request.source_video_id],
+      video_ids: [lesson.source_video_id],
       distill_mode: "single",
       distill_modality: "multimodal",
       evidence_mode: "temporal_board",
@@ -449,6 +448,8 @@ export class PipelineEngine {
     const client = this.client(settings);
     if (!client.configured) throw new Error("LLM API 尚未配置");
     const loaded = await this.loadSignedGoldDataset(request.dataset_uri);
+    const lesson = loaded.dataset.lessons.find((item) => item.lesson_id === request.lesson_id);
+    if (!lesson) throw new Error("Signed Gold lesson 在执行前发生漂移");
     await this.jobs.stage(job, "evidence", .14, "正在复核 Signed Gold 内容地址与规范视觉证据");
     jobCancelled(job);
     await this.jobs.stage(job, "distill", .48, "正在从双签单课事件蒸馏 renderer-neutral Board Actions");
@@ -456,7 +457,7 @@ export class PipelineEngine {
       subject: project.subject,
       dataset: loaded.dataset,
       evidenceRoot: this.root,
-      sourceVideoId: request.source_video_id,
+      lessonId: request.lesson_id,
       mode: "single",
     });
     await this.jobs.stage(job, "compile", .84, "正在编译 Signed Gold Board Actions 与 Render Plans");
@@ -469,14 +470,15 @@ export class PipelineEngine {
       provenance: {
         job_id: job.id,
         project_id: project.id,
-        video_ids: [request.source_video_id],
+        video_ids: [lesson.source_video_id],
         mode: "single",
         modality: "multimodal",
         evidence_mode: "temporal_board",
         signed_gold_dataset_uri: loaded.uri,
         signed_gold_dataset_id: loaded.dataset.dataset_id,
         signed_gold_dataset_sha256: loaded.dataset.dataset_sha256,
-        signed_gold_source_video_id: request.source_video_id,
+        signed_gold_lesson_id: request.lesson_id,
+        signed_gold_source_video_id: lesson.source_video_id,
         model: settings.llm_model,
         schema_version: "grounded-skill-distillation-v2",
         visual_audit_schema_version: grounded.visual_audit.schema_version,
@@ -492,7 +494,7 @@ export class PipelineEngine {
       visual_audit: grounded.visual_audit,
       signed_gold_dataset_uri: loaded.uri,
       signed_gold_dataset_id: loaded.dataset.dataset_id,
-      signed_gold_source_video_id: request.source_video_id,
+      signed_gold_lesson_id: request.lesson_id,
     };
     job.status = "completed";
     job.stage = "completed";

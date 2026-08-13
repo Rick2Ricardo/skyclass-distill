@@ -11,6 +11,8 @@ import {
   canonicalOracleGateFormalInputPayload,
   canonicalOracleGateFormalSpecPayload,
   canonicalSignedGoldDatasetPayload,
+  deriveSignedGoldLessonsV2,
+  deriveSignedGoldVisualEvidenceIdV2,
   hashFormalRunContract,
   hashFormalRunContractV2,
   hashFormalOracleCompositionAttestationV4,
@@ -157,6 +159,7 @@ function reviewPackage(index: number, finalEvents: GoldReviewEvent[], oracle: {
     source_video_id: `video-${index}`,
     source_intake_uri: `research/intake-${index}.json`,
     source_intake_sha256: intakeSha,
+    source_window: { start: index * 10, end: index * 10 + 2 },
     reviewed_group_count: 1,
     accepted_group_count: 1,
     accepted_event_count: finalEvents.length,
@@ -169,9 +172,10 @@ function reviewPackage(index: number, finalEvents: GoldReviewEvent[], oracle: {
       decision_signature_sha256: decision.signature_sha256,
       decision_revision: 1,
       final_events: finalEvents,
-      canonical_visual_evidence_id: `oracle-${index}`,
+      canonical_visual_evidence_id: deriveSignedGoldVisualEvidenceIdV2({ package_id: packageId, group_id: groupId, source_evidence_id: `oracle-${index}`, side: "shared", kind: "comparison", asset_uri: oracle.asset_uri, sha256: oracle.sha256 }, sha),
       visual_evidence: [{
-        evidence_id: `oracle-${index}`,
+        evidence_id: deriveSignedGoldVisualEvidenceIdV2({ package_id: packageId, group_id: groupId, source_evidence_id: `oracle-${index}`, side: "shared", kind: "comparison", asset_uri: oracle.asset_uri, sha256: oracle.sha256 }, sha),
+        source_evidence_id: `oracle-${index}`,
         side: "shared",
         kind: "comparison",
         label: "before/delta/after",
@@ -256,16 +260,18 @@ async function buildFixture() {
     });
   });
   const datasetPayload = {
-    schema_version: "signed-gold-dataset-v1" as const,
+    schema_version: "signed-gold-dataset-v2" as const,
     status: "paper_gold_signed" as const,
     frozen_at: "2026-08-12T02:00:00.000Z",
     source_queue_schema_version: "gold-review-queue-v1" as const,
     package_count: 2,
+    lesson_count: 2,
     reviewed_group_count: 2,
     accepted_group_count: 2,
     accepted_event_count: 30,
     minimum_required_event_count: 30,
     packages: packageRecords,
+    lessons: deriveSignedGoldLessonsV2(packageRecords, sha),
   };
   const datasetSha = sha(canonicalSignedGoldDatasetPayload(datasetPayload));
   const dataset: SignedGoldDataset = {

@@ -360,6 +360,24 @@ describe("GoldReviewStore", () => {
     await expect(store.compileDataset()).rejects.toThrow("Paper Gold 尚未满足");
   });
 
+  it("preflights the real queue shape independently from unfinished human decisions", async () => {
+    const { store } = await fixture();
+    const report = await store.compileReadiness();
+    expect(report).toMatchObject({
+      schema_version: "signed-gold-compile-readiness-v1",
+      structural_ready: true,
+      human_ready: false,
+      component_package_count: 1,
+      lesson_count: 1,
+      group_count: 1,
+      evidence_asset_count: 1,
+      derived_evidence_id_count: 1,
+      canonical_comparison_count: 1,
+      unique_canonical_comparison_sha256_count: 1,
+    });
+    expect(report.human_issues).toContain("尚有 1 组未裁决");
+  });
+
   it("compiles a fully signed 30-event queue into one deterministic content-addressed dataset", async () => {
     const { data, store, intakePath } = await fixture();
     const intake = JSON.parse(await readFile(intakePath, "utf8"));
@@ -389,9 +407,10 @@ describe("GoldReviewStore", () => {
     const second = await store.compileDataset();
     expect(second).toEqual(first);
     expect(first.dataset).toMatchObject({
-      schema_version: "signed-gold-dataset-v1",
+      schema_version: "signed-gold-dataset-v2",
       status: "paper_gold_signed",
       package_count: 1,
+      lesson_count: 1,
       reviewed_group_count: 1,
       accepted_group_count: 1,
       accepted_event_count: 30,
@@ -400,6 +419,8 @@ describe("GoldReviewStore", () => {
       .toEqual(first.dataset.packages[0].decisions[0].final_events.map((item) => item.event_id));
     expect(first.dataset.packages[0].groups[0].speech_context.status).toBe("context_not_gold");
     expect(first.dataset.packages[0].groups[0].visual_evidence[0]).toMatchObject({ mime_type: "image/png", width: 1, height: 1 });
+    expect(first.dataset.lessons).toHaveLength(1);
+    expect(first.dataset.lessons[0].component_package_ids).toEqual(["package-1"]);
     expect(first.dataset_uri).toBe(`board2skill/signed-gold/${first.dataset.dataset_sha256}/dataset.json`);
     expect(JSON.parse(await readFile(join(data, first.dataset_uri), "utf8"))).toEqual(first.dataset);
 

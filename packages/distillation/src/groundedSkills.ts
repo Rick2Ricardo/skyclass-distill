@@ -360,25 +360,27 @@ async function generateValidatedSuite(input: {
   throw new Error(`grounded-skill-distillation-v2 连续校验失败：${priorErrors.join("；")}`);
 }
 
-function signedSourceBundleId(dataset: SignedGoldDataset, source: SignedGoldPackage): string {
+type SignedGoldLessonSource = Pick<SignedGoldPackage, "package_id" | "source_video_id" | "groups"> & { component_package_ids: string[] };
+
+function signedSourceBundleId(dataset: SignedGoldDataset, source: SignedGoldLessonSource): string {
   return `signed-gold:${dataset.dataset_id}:${source.package_id}`;
 }
 
-function signedTransitionId(source: SignedGoldPackage, groupId: string): string {
+function signedTransitionId(source: SignedGoldLessonSource, groupId: string): string {
   return `gold-transition:${source.package_id}:${groupId}`;
 }
 
-function signedDeltaId(source: SignedGoldPackage, groupId: string): string {
+function signedDeltaId(source: SignedGoldLessonSource, groupId: string): string {
   return `gold-delta:${source.package_id}:${groupId}`;
 }
 
-function signedEvidenceId(source: SignedGoldPackage, groupId: string, evidenceId: string): string {
+function signedEvidenceId(source: SignedGoldLessonSource, groupId: string, evidenceId: string): string {
   return `gold-evidence:${source.package_id}:${groupId}:${evidenceId}`;
 }
 
 function buildSignedGoldSourceCatalog(
   dataset: SignedGoldDataset,
-  source: SignedGoldPackage,
+  source: SignedGoldLessonSource,
   options: { transitionIds?: Set<string>; submittedVisualEvidenceIds?: Iterable<string> } = {},
 ): GroundedSkillSourceCatalog {
   const sourceBundleId = signedSourceBundleId(dataset, source);
@@ -404,7 +406,7 @@ function buildSignedGoldSourceCatalog(
 
 async function prepareSignedGoldVisualEvidence(
   root: string,
-  source: SignedGoldPackage,
+  source: SignedGoldLessonSource,
 ): Promise<GroundedSkillVisualEvidence[]> {
   const output: GroundedSkillVisualEvidence[] = [];
   const seenSha = new Map<string, string>();
@@ -444,7 +446,7 @@ async function prepareSignedGoldVisualEvidence(
 function promptForSignedGold(input: {
   subject: string;
   dataset: SignedGoldDataset;
-  source: SignedGoldPackage;
+  source: SignedGoldLessonSource;
   catalog: GroundedSkillSourceCatalog;
   visuals: GroundedSkillVisualEvidence[];
   priorErrors: string[];
@@ -478,7 +480,7 @@ ${suiteShape(input.subject, signedSourceBundleId(input.dataset, input.source), t
 ${JSON.stringify(visualIndex)}
 
 双签 Signed Gold 事件（speech_context.status=context_not_gold，不得冒充可见事实）：
-${JSON.stringify({ dataset_id: input.dataset.dataset_id, package_id: input.source.package_id, source_video_id: input.source.source_video_id, groups })}${repair}`;
+${JSON.stringify({ dataset_id: input.dataset.dataset_id, lesson_id: input.source.package_id, component_package_ids: input.source.component_package_ids, source_video_id: input.source.source_video_id, groups })}${repair}`;
   if (prompt.length > MAX_PROMPT_CHARS) throw new Error(`Signed Gold Skill 批提示超过 ${MAX_PROMPT_CHARS} 字符预算`);
   return prompt;
 }
@@ -489,7 +491,7 @@ export async function distillSignedGoldLesson(
     subject: string;
     dataset: SignedGoldDataset;
     evidenceRoot: string;
-    sourceVideoId: string;
+    lessonId: string;
     mode: DistillMode;
     validationAttempts?: number;
   },
@@ -504,10 +506,18 @@ export async function distillSignedGoldLesson(
   if (actualSha !== declaredSha || input.dataset.dataset_id !== `signed-gold-${declaredSha.slice(0, 16)}`) {
     throw new Error("Signed Gold 数据集内容哈希不匹配");
   }
-  const matches = input.dataset.packages.filter((item) => item.source_video_id === input.sourceVideoId);
-  if (matches.length !== 1) throw new Error(`Signed Gold 必须恰好包含一个所选单课包：${input.sourceVideoId}`);
-  const source = matches[0];
-  if (source.signoffs.length !== 2 || !source.groups.length || source.accepted_event_count < 1) throw new Error("Signed Gold 单课包缺少双签或接受事件");
+  const lesson = input.dataset.lessons.find((item) => item.lesson_id === input.lessonId);
+  if (!lesson) throw new Error(`Signed Gold 不包含所选 lesson：${input.lessonId}`);
+  const components = lesson.component_package_ids.map((id) => input.dataset.packages.find((item) => item.package_id === id));
+  if (components.some((item) => !item)) throw new Error("Signed Gold lesson 缺少签字组件");
+  const componentPackages = components as SignedGoldPackage[];
+  if (componentPackages.some((item) => item.signoffs.length !== 2) || !lesson.accepted_event_count) throw new Error("Signed Gold lesson 组件缺少双签或接受事件");
+  const source: SignedGoldLessonSource = {
+    package_id: lesson.lesson_id,
+    source_video_id: lesson.source_video_id,
+    component_package_ids: lesson.component_package_ids,
+    groups: componentPackages.flatMap((item) => item.groups.map((group) => ({ ...group, group_id: `${item.package_id}/${group.group_id}` }))),
+  };
   const attempts = Math.min(3, Math.max(1, input.validationAttempts ?? 2));
   const visuals = await prepareSignedGoldVisualEvidence(input.evidenceRoot, source);
   const batches = batchGroundedVisualEvidence(visuals);

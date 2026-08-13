@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { canonicalGoldReviewDecisionSignaturePayload, canonicalGoldReviewPackageSignoffSignaturePayload, canonicalSignedGoldDatasetPayload, type BoardEvidenceBundle, type GoldReviewDecisionRecord, type SignedGoldDataset } from "../../contracts/src/index.js";
+import { canonicalGoldReviewDecisionSignaturePayload, canonicalGoldReviewPackageSignoffSignaturePayload, canonicalSignedGoldDatasetPayload, deriveSignedGoldLessonsV2, deriveSignedGoldVisualEvidenceIdV2, type BoardEvidenceBundle, type GoldReviewDecisionRecord, type SignedGoldDataset } from "../../contracts/src/index.js";
 import { acceptedTemporalBoardFixture } from "../../contracts/src/testFixtures.js";
 import type { ImageInput, LlmRequestAudit } from "../../llm/src/client.js";
 import {
@@ -83,8 +83,28 @@ function signedGoldFixture(rootAsset = "assets/comparison.png"): SignedGoldDatas
     };
     return { ...base, signature_sha256: digest(canonicalGoldReviewPackageSignoffSignaturePayload(base)) };
   };
+  const evidenceId = deriveSignedGoldVisualEvidenceIdV2({ package_id: "package-1", group_id: "G01", source_evidence_id: "comparison-1", side: "shared", kind: "comparison", asset_uri: rootAsset, sha256: sha }, digest);
+  const packages = [{
+      package_id: "package-1",
+      source_video_id: "video-1",
+      source_intake_uri: "research/intake.json",
+      source_intake_sha256: "a".repeat(64),
+      source_window: { start: 10, end: 12 },
+      reviewed_group_count: 1,
+      accepted_group_count: 1,
+      accepted_event_count: 30,
+      decision_signatures: [decision.signature_sha256],
+      decisions: [decision],
+      signoffs: [signoff("visual_adjudicator", "expert-1"), signoff("physics_reviewer", "expert-2")],
+      groups: [{
+        group_id: "G01", alignment_class: "matched", decision_signature_sha256: decision.signature_sha256, decision_revision: 1,
+        final_events: events, canonical_visual_evidence_id: evidenceId,
+        visual_evidence: [{ evidence_id: evidenceId, source_evidence_id: "comparison-1", side: "shared", kind: "comparison", label: "before/delta/after", asset_uri: rootAsset, sha256: sha, mime_type: "image/png" as const, width: 1, height: 1, byte_length: PNG_1X1.byteLength }],
+        speech_context: { text: "老师讲解重力方向", status: "context_not_gold" as const },
+      }],
+    }];
   const payload = {
-    schema_version: "signed-gold-dataset-v1" as const,
+    schema_version: "signed-gold-dataset-v2" as const,
     status: "paper_gold_signed" as const,
     frozen_at: "2026-08-12T00:01:00.000Z",
     source_queue_schema_version: "gold-review-queue-v1" as const,
@@ -93,31 +113,9 @@ function signedGoldFixture(rootAsset = "assets/comparison.png"): SignedGoldDatas
     accepted_group_count: 1,
     accepted_event_count: 30,
     minimum_required_event_count: 30,
-    packages: [{
-      package_id: "package-1",
-      source_video_id: "video-1",
-      source_intake_uri: "research/intake.json",
-      source_intake_sha256: "a".repeat(64),
-      reviewed_group_count: 1,
-      accepted_group_count: 1,
-      accepted_event_count: 30,
-      decision_signatures: [decision.signature_sha256],
-      decisions: [decision],
-      signoffs: [signoff("visual_adjudicator", "expert-1"), signoff("physics_reviewer", "expert-2")],
-      groups: [{
-        group_id: "G01",
-        alignment_class: "matched",
-        decision_signature_sha256: decision.signature_sha256,
-        decision_revision: 1,
-        final_events: events,
-        canonical_visual_evidence_id: "comparison-1",
-        visual_evidence: [{
-          evidence_id: "comparison-1", side: "shared", kind: "comparison", label: "before/delta/after",
-          asset_uri: rootAsset, sha256: sha, mime_type: "image/png" as const, width: 1, height: 1, byte_length: PNG_1X1.byteLength,
-        }],
-        speech_context: { text: "老师讲解重力方向", status: "context_not_gold" as const },
-      }],
-    }],
+    lesson_count: 1,
+    packages,
+    lessons: deriveSignedGoldLessonsV2(packages, digest),
   };
   const datasetSha256 = createHash("sha256").update(canonicalSignedGoldDatasetPayload(payload)).digest("hex");
   return { dataset_id: `signed-gold-${datasetSha256.slice(0, 16)}`, dataset_sha256: datasetSha256, ...payload };
@@ -138,6 +136,8 @@ function resignSignedGoldFixture(input: SignedGoldDataset): SignedGoldDataset {
       signoff.signature_sha256 = digest(canonicalGoldReviewPackageSignoffSignaturePayload(signoff));
     });
   });
+  dataset.lessons = deriveSignedGoldLessonsV2(dataset.packages, digest);
+  dataset.lesson_count = dataset.lessons.length;
   dataset.dataset_sha256 = digest(canonicalSignedGoldDatasetPayload(dataset));
   dataset.dataset_id = `signed-gold-${dataset.dataset_sha256.slice(0, 16)}`;
   return dataset;
@@ -260,10 +260,11 @@ describe("grounded Skill distillation entry", () => {
     await mkdir(join(root, "assets"));
     await writeFile(join(root, "assets/comparison.png"), PNG_1X1);
     const dataset = signedGoldFixture();
-    const sourceId = `signed-gold:${dataset.dataset_id}:package-1`;
-    const transitionId = "gold-transition:package-1:G01";
-    const deltaId = "gold-delta:package-1:G01";
-    const evidenceId = "gold-evidence:package-1:G01:comparison-1";
+    const lessonId = dataset.lessons[0].lesson_id;
+    const sourceId = `signed-gold:${dataset.dataset_id}:${lessonId}`;
+    const transitionId = `gold-transition:${lessonId}:package-1/G01`;
+    const deltaId = `gold-delta:${lessonId}:package-1/G01`;
+    const evidenceId = `gold-evidence:${lessonId}:package-1/G01:${dataset.packages[0].groups[0].canonical_visual_evidence_id}`;
     const chatJsonAudited = vi.fn(async (_system: string, user: string, images: ImageInput[]) => {
       expect(images).toHaveLength(1);
       expect(images[0].label).toContain(deltaId);
@@ -272,7 +273,7 @@ describe("grounded Skill distillation entry", () => {
       return { value: validSuite(sourceId, transitionId, deltaId, [evidenceId]), audit: successfulAudit(images) };
     });
     const result = await distillSignedGoldLesson({ chatJsonAudited } as any, {
-      subject: "高中物理", dataset, evidenceRoot: root, sourceVideoId: "video-1", mode: "single",
+      subject: "高中物理", dataset, evidenceRoot: root, lessonId: dataset.lessons[0].lesson_id, mode: "single",
     });
     expect(result.source_catalog).toMatchObject({
       source_bundle_id: sourceId,
@@ -292,10 +293,10 @@ describe("grounded Skill distillation entry", () => {
     const tampered = structuredClone(dataset);
     tampered.packages[0].groups[0].final_events[0].semantic_label = "篡改后的板书事实";
     await expect(distillSignedGoldLesson({ chatJsonAudited }, {
-      subject: "高中物理", dataset: tampered, evidenceRoot: "/tmp", sourceVideoId: "video-1", mode: "single",
+      subject: "高中物理", dataset: tampered, evidenceRoot: "/tmp", lessonId: tampered.lessons[0].lesson_id, mode: "single",
     })).rejects.toThrow("签字链");
     await expect(distillSignedGoldLesson({ chatJsonAudited }, {
-      subject: "高中物理", dataset, evidenceRoot: "/tmp", sourceVideoId: "video-1", mode: "common",
+      subject: "高中物理", dataset, evidenceRoot: "/tmp", lessonId: dataset.lessons[0].lesson_id, mode: "common",
     })).rejects.toThrow("仅支持单课");
     expect(chatJsonAudited).not.toHaveBeenCalled();
   });
@@ -306,20 +307,20 @@ describe("grounded Skill distillation entry", () => {
     semantic.packages[0].groups[0].final_events[0].semantic_label = "学生已经掌握了摩擦力方向";
     semantic.packages[0].decisions[0].final_events[0].semantic_label = "学生已经掌握了摩擦力方向";
     await expect(distillSignedGoldLesson({ chatJsonAudited }, {
-      subject: "高中物理", dataset: resignSignedGoldFixture(semantic), evidenceRoot: "/tmp", sourceVideoId: "video-1", mode: "single",
+      subject: "高中物理", dataset: resignSignedGoldFixture(semantic), evidenceRoot: "/tmp", lessonId: semantic.lessons[0].lesson_id, mode: "single",
     })).rejects.toThrow("学生学习结果");
 
     const comparison = structuredClone(signedGoldFixture());
     comparison.packages[0].groups[0].visual_evidence[0].kind = "not_comparison";
     await expect(distillSignedGoldLesson({ chatJsonAudited }, {
-      subject: "高中物理", dataset: resignSignedGoldFixture(comparison), evidenceRoot: "/tmp", sourceVideoId: "video-1", mode: "single",
+      subject: "高中物理", dataset: resignSignedGoldFixture(comparison), evidenceRoot: "/tmp", lessonId: comparison.lessons[0].lesson_id, mode: "single",
     })).rejects.toThrow("规范 comparison");
 
     const region = structuredClone(signedGoldFixture());
     region.packages[0].groups[0].final_events[0].region = { x: .9, y: .9, width: .2, height: .2 };
     region.packages[0].decisions[0].final_events[0].region = { x: .9, y: .9, width: .2, height: .2 };
     await expect(distillSignedGoldLesson({ chatJsonAudited }, {
-      subject: "高中物理", dataset: resignSignedGoldFixture(region), evidenceRoot: "/tmp", sourceVideoId: "video-1", mode: "single",
+      subject: "高中物理", dataset: resignSignedGoldFixture(region), evidenceRoot: "/tmp", lessonId: region.lessons[0].lesson_id, mode: "single",
     })).rejects.toThrow("归一化区域");
 
     const relation = structuredClone(signedGoldFixture());
@@ -328,7 +329,7 @@ describe("grounded Skill distillation entry", () => {
     relation.packages[0].decisions[0].final_events[0].operation = "CONNECT";
     relation.packages[0].decisions[0].final_events[0].relation = { source_object_ids: [], target_object_ids: [], relation_type: "" };
     await expect(distillSignedGoldLesson({ chatJsonAudited }, {
-      subject: "高中物理", dataset: resignSignedGoldFixture(relation), evidenceRoot: "/tmp", sourceVideoId: "video-1", mode: "single",
+      subject: "高中物理", dataset: resignSignedGoldFixture(relation), evidenceRoot: "/tmp", lessonId: relation.lessons[0].lesson_id, mode: "single",
     })).rejects.toThrow("关系闭包");
     expect(chatJsonAudited).not.toHaveBeenCalled();
   });

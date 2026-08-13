@@ -5,8 +5,9 @@ import type {
   SignedGoldDataset,
   SignedGoldGroup,
   SignedGoldPackage,
+  SignedGoldCompileReadinessReport,
 } from "../../contracts/src/index.js";
-import { canonicalSignedGoldDatasetPayload, validateSignedGoldDataset, validateSignedGoldRecordSignatures } from "../../contracts/src/index.js";
+import { canonicalSignedGoldDatasetPayload, deriveSignedGoldLessonsV2, deriveSignedGoldVisualEvidenceIdV2, validateSignedGoldDataset, validateSignedGoldRecordSignatures } from "../../contracts/src/index.js";
 import { verifyImageEvidence } from "../../media/src/imageEvidence.js";
 
 function sha256(value: string): string {
@@ -50,7 +51,8 @@ async function compileGroup(root: string, group: GoldReviewGroup): Promise<Signe
     .map(async (item) => {
       const image = await verifyImageEvidence({ root, assetUri: item.path, expectedSha256: item.sha256 });
       return {
-        evidence_id: item.evidence_id,
+        evidence_id: deriveSignedGoldVisualEvidenceIdV2({ package_id:group.package_id,group_id:group.group_id,source_evidence_id:item.evidence_id,side:item.side,kind:item.kind,asset_uri:item.path,sha256:image.sha256 }, sha256),
+        source_evidence_id: item.evidence_id,
         side: item.side,
         kind: item.kind,
         label: item.label,
@@ -77,6 +79,50 @@ async function compileGroup(root: string, group: GoldReviewGroup): Promise<Signe
   };
 }
 
+export async function inspectSignedGoldCompileReadiness(root: string, queue: GoldReviewQueue): Promise<SignedGoldCompileReadinessReport> {
+  const structuralIssues: string[] = [];
+  const humanIssues: string[] = [];
+  if (queue.schema_version !== "gold-review-queue-v1") structuralIssues.push("Gold 队列 schema_version 无效");
+  if (queue.packages.length !== queue.summary.package_count || queue.groups.length !== queue.summary.group_count) structuralIssues.push("Gold 队列汇总计数不一致");
+  const derivedIds = new Set<string>();
+  const comparisonHashes = new Set<string>();
+  let evidenceAssetCount = 0;
+  let canonicalComparisonCount = 0;
+  for (const group of queue.groups) {
+    if (!group.time) structuralIssues.push(`${group.package_id}/${group.group_id} 缺少冻结时间窗`);
+    const canonicalSource = [...group.evidence].sort((left, right) => compareText(`${left.path}:${left.sha256}`, `${right.path}:${right.sha256}`))
+      .find((item) => item.kind.toLowerCase().includes("comparison"));
+    if (!canonicalSource) structuralIssues.push(`${group.package_id}/${group.group_id} 缺少 canonical comparison`);
+    else canonicalComparisonCount += 1;
+    for (const item of group.evidence) {
+      evidenceAssetCount += 1;
+      try {
+        const image = await verifyImageEvidence({ root, assetUri:item.path,expectedSha256:item.sha256 });
+        const id = deriveSignedGoldVisualEvidenceIdV2({ package_id:group.package_id,group_id:group.group_id,source_evidence_id:item.evidence_id,side:item.side,kind:item.kind,asset_uri:item.path,sha256:image.sha256 },sha256);
+        if (derivedIds.has(id)) structuralIssues.push(`${group.package_id}/${group.group_id} 派生资产 ID 重复`);
+        derivedIds.add(id);
+        if (canonicalSource === item) comparisonHashes.add(image.sha256);
+      } catch (error) { structuralIssues.push(`${group.package_id}/${group.group_id} 视觉证据无效：${error instanceof Error ? error.message : String(error)}`); }
+    }
+  }
+  const lessonSources = [...new Set(queue.packages.map((item) => item.source_video_id))];
+  for (const sourceVideoId of lessonSources) {
+    const components = queue.packages.filter((item) => item.source_video_id === sourceVideoId);
+    const windows = components.map((component) => {
+      const groups = queue.groups.filter((item) => item.package_id === component.package_id);
+      if (groups.some((item) => !item.time) || !groups.length) return null;
+      return { package_id:component.package_id,start:Math.min(...groups.map((item) => item.time!.start)),end:Math.max(...groups.map((item) => item.time!.end)) };
+    }).filter((item): item is {package_id:string;start:number;end:number} => Boolean(item)).sort((a,b)=>a.start-b.start||compareText(a.package_id,b.package_id));
+    for (let index=1;index<windows.length;index+=1) if (windows[index-1].end>windows[index].start) structuralIssues.push(`${sourceVideoId} 组件时间窗重叠：${windows[index-1].package_id}/${windows[index].package_id}`);
+  }
+  if (canonicalComparisonCount !== queue.groups.length) structuralIssues.push("canonical comparison 数必须与评审组数一致");
+  if (comparisonHashes.size !== canonicalComparisonCount) structuralIssues.push("不同评审组不得复用 canonical comparison 图像");
+  if (queue.summary.decided_count !== queue.groups.length) humanIssues.push(`尚有 ${queue.groups.length-queue.summary.decided_count} 组未裁决`);
+  if (queue.summary.signed_package_count !== queue.packages.length) humanIssues.push(`尚有 ${queue.packages.length-queue.summary.signed_package_count} 个组件包未完成双签`);
+  if (queue.summary.accepted_event_count < queue.summary.minimum_required_event_count) humanIssues.push(`接受事件尚差 ${queue.summary.minimum_required_event_count-queue.summary.accepted_event_count}`);
+  return { schema_version:"signed-gold-compile-readiness-v1",structural_ready:structuralIssues.length===0,human_ready:humanIssues.length===0,component_package_count:queue.packages.length,lesson_count:lessonSources.length,group_count:queue.groups.length,evidence_asset_count:evidenceAssetCount,derived_evidence_id_count:derivedIds.size,canonical_comparison_count:canonicalComparisonCount,unique_canonical_comparison_sha256_count:comparisonHashes.size,decided_group_count:queue.summary.decided_count,signed_component_package_count:queue.summary.signed_package_count,accepted_event_count:queue.summary.accepted_event_count,minimum_required_event_count:queue.summary.minimum_required_event_count,structural_issues:structuralIssues,human_issues:humanIssues };
+}
+
 export async function buildSignedGoldDataset(root: string, queue: GoldReviewQueue): Promise<SignedGoldDataset> {
   assertSignedQueue(queue);
   const packages: SignedGoldPackage[] = [];
@@ -97,11 +143,18 @@ export async function buildSignedGoldDataset(root: string, queue: GoldReviewQueu
     }
     const acceptedEventCount = groups.reduce((sum, item) => sum + item.final_events.length, 0);
     if (acceptedEventCount !== reviewPackage.accepted_event_count) throw new Error(`Gold 包接受事件计数不一致：${reviewPackage.package_id}`);
+    const windows = sourceGroups.map((item) => item.time);
+    if (windows.some((item) => !item)) throw new Error(`Gold 包存在未冻结时间窗：${reviewPackage.package_id}`);
+    const sourceWindow = {
+      start: Math.min(...windows.map((item) => item!.start)),
+      end: Math.max(...windows.map((item) => item!.end)),
+    };
     packages.push({
       package_id: reviewPackage.package_id,
       source_video_id: reviewPackage.source_video_id,
       source_intake_uri: reviewPackage.intake_path,
       source_intake_sha256: reviewPackage.intake_sha256,
+      source_window: sourceWindow,
       reviewed_group_count: sourceGroups.length,
       accepted_group_count: groups.length,
       accepted_event_count: acceptedEventCount,
@@ -114,19 +167,22 @@ export async function buildSignedGoldDataset(root: string, queue: GoldReviewQueu
   const acceptedGroupCount = packages.reduce((sum, item) => sum + item.accepted_group_count, 0);
   const acceptedEventCount = packages.reduce((sum, item) => sum + item.accepted_event_count, 0);
   if (acceptedEventCount !== queue.summary.accepted_event_count) throw new Error("Gold 数据集接受事件总数与队列不一致");
+  const lessons = deriveSignedGoldLessonsV2(packages, sha256);
   const signoffTimes = packages.flatMap((item) => item.signoffs.map((signoff) => assertFiniteIso(signoff.signed_at, signoff.package_id)));
   const frozenAt = new Date(Math.max(...signoffTimes)).toISOString();
   const payload = {
-    schema_version: "signed-gold-dataset-v1" as const,
+    schema_version: "signed-gold-dataset-v2" as const,
     status: "paper_gold_signed" as const,
     frozen_at: frozenAt,
     source_queue_schema_version: queue.schema_version,
     package_count: packages.length,
+    lesson_count: lessons.length,
     reviewed_group_count: queue.groups.length,
     accepted_group_count: acceptedGroupCount,
     accepted_event_count: acceptedEventCount,
     minimum_required_event_count: queue.summary.minimum_required_event_count,
     packages,
+    lessons,
   };
   const datasetSha256 = sha256(canonicalSignedGoldDatasetPayload(payload));
   const dataset: SignedGoldDataset = {

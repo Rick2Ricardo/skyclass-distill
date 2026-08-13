@@ -1030,7 +1030,7 @@ function GoldReviewCenter({ flash, projectId }: { flash: (message: string, error
     try {
       const job = await api<JobState>(`/api/projects/${projectId}/distill-signed-gold`, {
         method: "POST",
-        body: JSON.stringify({ dataset_uri: compiledDataset.dataset_uri, source_video_id: activePackage.source_video_id }),
+        body: JSON.stringify({ dataset_uri: compiledDataset.dataset_uri, lesson_id: compiledDataset.dataset.lessons.find((item) => item.source_video_id === activePackage.source_video_id)?.lesson_id ?? "" }),
       });
       flash(`Signed Gold 单课蒸馏已启动：${job.id}`);
     } catch (cause) { flash(cause instanceof Error ? cause.message : String(cause), true); }
@@ -1050,7 +1050,7 @@ function GoldReviewCenter({ flash, projectId }: { flash: (message: string, error
     </section>
 
     <section className={`gold-compile-bar paper-panel ${queue.summary.paper_gold_ready ? "ready" : ""}`}>
-      <div><p className="eyebrow">SIGNED GOLD DATASET</p><b>{compiledDataset ? compiledDataset.dataset.dataset_id : queue.summary.paper_gold_ready ? "双签门已通过，可以冻结数据集" : "等待 49 组裁决、5 包双签与至少 30 个接受事件"}</b>{compiledDataset && <small>{compiledDataset.dataset_uri} · {compiledDataset.dataset.dataset_sha256.slice(0, 16)}</small>}</div>
+      <div><p className="eyebrow">SIGNED GOLD DATASET</p><b>{compiledDataset ? `${compiledDataset.dataset.dataset_id} · ${compiledDataset.dataset.lesson_count} 节课` : queue.summary.paper_gold_ready ? "双签门已通过，可以冻结数据集" : `等待 ${queue.summary.group_count} 组裁决、${queue.summary.package_count} 包双签与至少 ${queue.summary.minimum_required_event_count} 个接受事件`}</b>{compiledDataset && <small>{compiledDataset.dataset_uri} · {compiledDataset.dataset.dataset_sha256.slice(0, 16)}</small>}</div>
       <div className="gold-compile-actions"><button className="primary" disabled={busy || !queue.summary.paper_gold_ready} onClick={() => void compileGold()}>{busy ? "正在处理…" : compiledDataset ? "重新验证同一内容地址" : "编译不可变 Signed Gold"}</button><button className="secondary" disabled={busy || !compiledDataset || !projectId || !activePackage.fully_signed} onClick={() => void distillSignedLesson()}>蒸馏当前双签单课</button></div>
     </section>
 
