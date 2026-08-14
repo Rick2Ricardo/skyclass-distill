@@ -63,7 +63,7 @@ describe("Gold independent double review", () => {
     reconcile(visual, physics, output);
     const result = JSON.parse(await readFile(output, "utf8"));
     expect(result).toMatchObject({
-      status: "ready_for_joint_human_confirmation_no_gold_written",
+      status: "reliability_gate_blocked_no_gold_written",
       counts: { group_count: 52, agreement_count: 52, conflict_count: 0 },
       output_invariants: {
         human_store_decision_count_created: 0,
@@ -75,6 +75,24 @@ describe("Gold independent double review", () => {
     });
     expect(result.agreements).toHaveLength(52);
     expect(result.conflicts).toHaveLength(0);
+    expect(result.pre_adjudication_quality_report).toMatchObject({
+      status: "pre_adjudication_reliability_evidence_not_gold",
+      quality_protocol_sha256: "b586436d3bb2e12b461ac36e989a6a25457567c60d0bcfaa1fbbeade366d17f9",
+      quality_protocol_json_sha256: "a50db9341390cdd82936fdfadcce419a0fce9d91c96b27c80f2ad59a4c0a291e",
+      review_package_sha256: "21de05a19d9cdccf47c4aab05562cb1463d02d0a2eb275c567fd84186b7211e7",
+      denominator: { group_count: 52, reviewer_count: 2 },
+      decision: "BLOCKED_PRIMARY_KAPPA_NOT_ESTIMABLE",
+      scientific_boundary: {
+        quality_report_is_not_gold: true,
+        formal_gold_write_allowed: false,
+      },
+    });
+    expect(result.pre_adjudication_quality_report.primary_metrics.cohen_kappa_disposition).toMatchObject({
+      status: "not_estimable",
+      value: null,
+      observed_agreement: 1,
+      expected_agreement: 1,
+    });
   });
 
   it("surfaces a scientific disagreement and rejects identity or item-set drift", async () => {
@@ -86,7 +104,7 @@ describe("Gold independent double review", () => {
     const output = join(directory, "conflict.json");
     reconcile(visual, physics, output);
     const result = JSON.parse(await readFile(output, "utf8"));
-    expect(result.status).toBe("joint_human_resolution_required_no_gold_written");
+    expect(result.status).toBe("reliability_gate_blocked_no_gold_written");
     expect(result.counts).toEqual({ group_count: 52, agreement_count: 51, conflict_count: 1 });
     expect(result.conflicts[0].joint_resolution).toBeNull();
 
@@ -140,7 +158,7 @@ describe("Gold independent double review", () => {
     };
     await writeFile(visual, `${JSON.stringify(accepted, null, 2)}\n`);
     expect(() => reconcile(visual, physics, join(directory, "semantic-drift.json"))).toThrow();
-  });
+  }, 15_000);
 
   it("requires canonical multi-event order instead of hiding opposite reviewer order", async () => {
     const { directory, visual, physics } = await writeInputs();

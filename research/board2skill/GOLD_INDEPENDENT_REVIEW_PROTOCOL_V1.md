@@ -42,7 +42,13 @@ Run:
 npm run board:reconcile-gold-double-review -- <completed-visual.json> <completed-physics.json> [output.json]
 ```
 
-The reconciler revalidates the frozen manifest, both complete item sets, candidate/event provenance and reviewer independence. It reports exact agreements and conflicts. Even a conflict-free report is only `ready_for_joint_human_confirmation_no_gold_written`: a human must still confirm the final decision before the existing append-only Store endpoint may be used.
+The reconciler revalidates the frozen manifest, both complete item sets, candidate/event provenance and reviewer independence. It reports exact agreements and conflicts. A blocked or relabel quality branch propagates to the top-level reconciliation status; it cannot appear as ready for joint confirmation. Even `ready_for_joint_human_confirmation_no_gold_written` only means that reliability passed and no scientific conflict remains: a human must still confirm every final decision before the existing append-only Store endpoint may be used.
+
+Before either assessment is filled, [the quality protocol](GOLD_DOUBLE_REVIEW_QUALITY_PROTOCOL_V1.json) freezes two primary reliability gates: Cohen's κ over the four dispositions and Cohen's κ over the canonical accepted operation sequence (all non-accepted decisions are one explicit `NO_EVENT_ACCEPTED` category). Both must be estimable and at least `0.67` before the labeling ontology may continue unchanged; `0.80` is the target. A single-category perfect match is reported as `BLOCKED_PRIMARY_KAPPA_NOT_ESTIMABLE`, never as reliable agreement. Boundary errors and exact/candidate/semantic agreement are diagnostics without an additional post-hoc threshold.
+
+The exact quality-protocol JSON bytes are pinned as SHA-256 `a50db9341390cdd82936fdfadcce419a0fce9d91c96b27c80f2ad59a4c0a291e` in the generator, reconciler and quality report. The review-package commitment is already an input to the protocol, so this one-way binding avoids a circular content-hash graph while proving which preregistered bytes were used.
+
+The reconciliation artifact embeds a domain-separated `pre_adjudication_quality_report`. It binds the frozen protocol, manifest, review package and exact bytes of both completed assessments. This report is reliability evidence only: it is not Gold and cannot create a decision, accepted event, signoff, SignedGold dataset, model score or paper claim.
 
 ## Stop conditions
 

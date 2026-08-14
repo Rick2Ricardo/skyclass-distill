@@ -1,0 +1,75 @@
+{
+  "schema_version": "gold-double-review-quality-protocol-v1",
+  "status": "preregistered_before_human_assessments",
+  "parent_repository_commit": "d90bddc35918b0a388b2fbb6a581fbe7f1bc3f1d",
+  "review_package_sha256": "21de05a19d9cdccf47c4aab05562cb1463d02d0a2eb275c567fd84186b7211e7",
+  "denominator": {
+    "group_count": 52,
+    "reviewer_count": 2,
+    "disposition_labels": [
+      "accept",
+      "reject",
+      "not_an_event",
+      "unknown"
+    ],
+    "operation_non_accept_label": "NO_EVENT_ACCEPTED"
+  },
+  "primary_metrics": [
+    {
+      "metric": "cohen_kappa_disposition",
+      "minimum_continue_threshold": 0.67,
+      "target_threshold": 0.8,
+      "degenerate_expected_agreement_one": "blocked_not_estimable"
+    },
+    {
+      "metric": "cohen_kappa_operation_sequence",
+      "minimum_continue_threshold": 0.67,
+      "target_threshold": 0.8,
+      "non_accept_encoding": "NO_EVENT_ACCEPTED",
+      "accept_encoding": "canonical_time_then_event_id_operation_sequence",
+      "degenerate_expected_agreement_one": "blocked_not_estimable"
+    }
+  ],
+  "diagnostic_metrics": [
+    "exact_scientific_decision_agreement",
+    "binary_acceptance_kappa",
+    "per_disposition_counts_by_reviewer",
+    "per_package_exact_agreement",
+    "both_accept_count",
+    "same_candidate_set_given_both_accept",
+    "same_operation_sequence_given_both_accept",
+    "same_semantic_sequence_given_both_accept",
+    "paired_event_boundary_start_absolute_seconds",
+    "paired_event_boundary_end_absolute_seconds",
+    "conflict_count_and_rate"
+  ],
+  "branch_precedence": [
+    "BLOCKED_INPUT_INVALID_NO_REPORT",
+    "BLOCKED_PRIMARY_KAPPA_NOT_ESTIMABLE",
+    "RELABEL_PILOT_REQUIRED",
+    "CONTINUE_FULL_CONFLICT_ADJUDICATION",
+    "TARGET_RELIABILITY_MET"
+  ],
+  "branch_rules": {
+    "BLOCKED_INPUT_INVALID_NO_REPORT": "reconciler rejects incomplete or drifted inputs before report publication",
+    "BLOCKED_PRIMARY_KAPPA_NOT_ESTIMABLE": "either primary kappa denominator is zero",
+    "RELABEL_PILOT_REQUIRED": "either estimable primary kappa is below 0.67",
+    "CONTINUE_FULL_CONFLICT_ADJUDICATION": "both primary kappas are at least 0.67 and either is below 0.80",
+    "TARGET_RELIABILITY_MET": "both primary kappas are at least 0.80"
+  },
+  "missing_and_uncertain_policy": {
+    "unknown_is_a_real_disposition_not_missing": true,
+    "missing_items_are_input_invalid": true,
+    "all_or_single_category_agreement_does_not_establish_reliability": true,
+    "report_each_reviewer_unknown_count": true
+  },
+  "scientific_boundary": {
+    "quality_report_is_pre_adjudication_reliability_evidence": true,
+    "quality_report_is_not_gold": true,
+    "quality_report_does_not_create_decisions": true,
+    "quality_report_does_not_create_signoffs": true,
+    "quality_report_does_not_authorize_signed_gold": true,
+    "formal_gold_write_allowed": false
+  },
+  "quality_protocol_sha256": "b586436d3bb2e12b461ac36e989a6a25457567c60d0bcfaa1fbbeade366d17f9"
+}

@@ -3,12 +3,23 @@ import { lstat, readFile, realpath, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { GoldReviewStore } from "../packages/store/src/goldReviewStore.js";
 import { containsFabricatedLearnerOutcome } from "../packages/contracts/src/signed-gold.js";
+import {
+  compileGoldDoubleReviewQualityReportV1,
+  equalGoldReviewScientificDecisionV1,
+  GOLD_DOUBLE_REVIEW_QUALITY_PROTOCOL_JSON_SHA256_V1,
+  validateGoldDoubleReviewQualityProtocolV1,
+  validateGoldDoubleReviewQualityReportV1AgainstInputs,
+  type GoldDoubleReviewPair,
+  type GoldDoubleReviewQualityProtocolV1,
+  type GoldReviewScientificDecision,
+} from "../packages/contracts/src/gold-independent-review-quality.js";
 
 const root = process.cwd();
 const manifestPath = resolve(root, "research/board2skill/GOLD_INDEPENDENT_REVIEW_MANIFEST_V1.json");
 const reviewPackagePath = resolve(root, "research/board2skill/GOLD_INDEPENDENT_REVIEW_PACKAGE_V1.json");
 const visualTemplatePath = resolve(root, "research/board2skill/GOLD_INDEPENDENT_REVIEW_VISUAL_TEMPLATE_V1.json");
 const physicsTemplatePath = resolve(root, "research/board2skill/GOLD_INDEPENDENT_REVIEW_PHYSICS_TEMPLATE_V1.json");
+const qualityProtocolPath = resolve(root, "research/board2skill/GOLD_DOUBLE_REVIEW_QUALITY_PROTOCOL_V1.json");
 const dataDir = resolve(root, "data");
 const EXPECTED_MANIFEST_PAYLOAD_SHA256 = "87a8a583a884b8a6702f5db0a8fafdf747cce79404d06232ca5a94ddd815014e";
 const EXPECTED_MANIFEST_JSON_SHA256 = "1150a7a4f5283ab2e3c1688ecde1ceb5396ee4c62ccc758332880b12723af9b0";
@@ -278,8 +289,15 @@ const visual = await validateAssessment(visualPathArg, "visual_reviewer");
 const physics = await validateAssessment(physicsPathArg, "physics_reviewer");
 if (visual.reviewer_id === physics.reviewer_id) throw new Error("visual and physics assessments require distinct reviewer identities");
 
+const qualityProtocolBytes = await readFile(qualityProtocolPath);
+if (sha256(qualityProtocolBytes) !== GOLD_DOUBLE_REVIEW_QUALITY_PROTOCOL_JSON_SHA256_V1) throw new Error("quality protocol JSON bytes drifted after preregistration");
+const qualityProtocolValue = parseJsonObject(qualityProtocolBytes, "quality protocol");
+if (!validateGoldDoubleReviewQualityProtocolV1(qualityProtocolValue)) throw new Error("quality protocol is not the frozen preregistration");
+const qualityProtocol = qualityProtocolValue as unknown as GoldDoubleReviewQualityProtocolV1;
+
 const agreements = [];
 const conflicts = [];
+const qualityPairs: GoldDoubleReviewPair[] = [];
 for (const card of cards) {
   const cardHash = String(card.card_sha256);
   const left = visual.decisions.get(cardHash)!;
@@ -287,21 +305,50 @@ for (const card of cards) {
   const leftScientific = { disposition: left.disposition, selected_candidate_ids: left.selected_candidate_ids, final_events: left.final_events };
   const rightScientific = { disposition: right.disposition, selected_candidate_ids: right.selected_candidate_ids, final_events: right.final_events };
   const common = { card_sha256: cardHash, package_id: card.package_id, group_id: card.group_id };
-  if (JSON.stringify(leftScientific) === JSON.stringify(rightScientific)) {
+  qualityPairs.push({
+    card_sha256: cardHash,
+    package_id: String(card.package_id),
+    group_id: String(card.group_id),
+    visual: leftScientific as GoldReviewScientificDecision,
+    physics: rightScientific as GoldReviewScientificDecision,
+  });
+  if (equalGoldReviewScientificDecisionV1(leftScientific as GoldReviewScientificDecision, rightScientific as GoldReviewScientificDecision)) {
     agreements.push({ ...common, agreed_decision: leftScientific, visual_rationale: left.rationale, physics_rationale: right.rationale });
   } else {
     conflicts.push({ ...common, visual_decision: leftScientific, physics_decision: rightScientific, joint_resolution: null });
   }
 }
 
+const qualityCompilerInput = {
+  protocol: qualityProtocol,
+  quality_protocol_json_sha256: sha256(qualityProtocolBytes),
+  manifest_payload_sha256: String(manifestCommitment),
+  manifest_json_sha256: manifestJsonSha256,
+  review_package_sha256: String(reviewPackageCommitment),
+  visual_assessment_sha256: visual.bytes_sha256,
+  physics_assessment_sha256: physics.bytes_sha256,
+  pairs: qualityPairs,
+};
+const qualityReport = compileGoldDoubleReviewQualityReportV1(qualityCompilerInput);
+if (!validateGoldDoubleReviewQualityReportV1AgainstInputs(qualityReport, qualityCompilerInput)) throw new Error("quality report postcondition failed");
+const qualityDecision = String(qualityReport.decision);
+const reconciliationStatus = qualityDecision === "BLOCKED_PRIMARY_KAPPA_NOT_ESTIMABLE"
+  ? "reliability_gate_blocked_no_gold_written"
+  : qualityDecision === "RELABEL_PILOT_REQUIRED"
+    ? "relabel_pilot_required_no_gold_written"
+    : conflicts.length
+      ? "joint_human_resolution_required_no_gold_written"
+      : "ready_for_joint_human_confirmation_no_gold_written";
+
 const payload = {
   schema_version: "gold-independent-reconciliation-v1",
-  status: conflicts.length ? "joint_human_resolution_required_no_gold_written" : "ready_for_joint_human_confirmation_no_gold_written",
+  status: reconciliationStatus,
   manifest_payload_sha256: manifestCommitment,
   manifest_json_sha256: manifestJsonSha256,
   visual_assessment: { bytes_sha256: visual.bytes_sha256, reviewer_id: visual.reviewer_id, reviewer_role: visual.reviewer_role },
   physics_assessment: { bytes_sha256: physics.bytes_sha256, reviewer_id: physics.reviewer_id, reviewer_role: physics.reviewer_role },
   counts: { group_count: 52, agreement_count: agreements.length, conflict_count: conflicts.length },
+  pre_adjudication_quality_report: qualityReport,
   agreements,
   conflicts,
   output_invariants: {

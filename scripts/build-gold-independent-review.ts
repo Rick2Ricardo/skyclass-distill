@@ -11,6 +11,8 @@ const manifestUri = "research/board2skill/GOLD_INDEPENDENT_REVIEW_MANIFEST_V1.js
 const visualTemplateUri = "research/board2skill/GOLD_INDEPENDENT_REVIEW_VISUAL_TEMPLATE_V1.json";
 const physicsTemplateUri = "research/board2skill/GOLD_INDEPENDENT_REVIEW_PHYSICS_TEMPLATE_V1.json";
 const protocolUri = "research/board2skill/GOLD_INDEPENDENT_REVIEW_PROTOCOL_V1.md";
+const qualityProtocolUri = "research/board2skill/GOLD_DOUBLE_REVIEW_QUALITY_PROTOCOL_V1.json";
+const QUALITY_PROTOCOL_JSON_SHA256 = "a50db9341390cdd82936fdfadcce419a0fce9d91c96b27c80f2ad59a4c0a291e";
 
 const EXPECTED = {
   parent_repository_commit: "aa3fc1425d8bea0a699503f2192e3cdeb0fbf353",
@@ -53,6 +55,7 @@ function groupKey(group: Pick<GoldReviewGroup, "package_id" | "group_id">): stri
 }
 
 await verifiedFile(EXPECTED.active_manifest_uri, EXPECTED.active_manifest_sha256);
+await verifiedFile(qualityProtocolUri, QUALITY_PROTOCOL_JSON_SHA256);
 await verifiedFile(EXPECTED.workset_uri, EXPECTED.workset_sha256);
 await verifiedFile(EXPECTED.annotation_policy_uri, EXPECTED.annotation_policy_sha256);
 await verifiedFile(EXPECTED.persistence_policy_uri, EXPECTED.persistence_policy_sha256);
@@ -279,7 +282,13 @@ Run:
 npm run board:reconcile-gold-double-review -- <completed-visual.json> <completed-physics.json> [output.json]
 \`\`\`
 
-The reconciler revalidates the frozen manifest, both complete item sets, candidate/event provenance and reviewer independence. It reports exact agreements and conflicts. Even a conflict-free report is only \`ready_for_joint_human_confirmation_no_gold_written\`: a human must still confirm the final decision before the existing append-only Store endpoint may be used.
+The reconciler revalidates the frozen manifest, both complete item sets, candidate/event provenance and reviewer independence. It reports exact agreements and conflicts. A blocked or relabel quality branch propagates to the top-level reconciliation status; it cannot appear as ready for joint confirmation. Even \`ready_for_joint_human_confirmation_no_gold_written\` only means that reliability passed and no scientific conflict remains: a human must still confirm every final decision before the existing append-only Store endpoint may be used.
+
+Before either assessment is filled, [the quality protocol](GOLD_DOUBLE_REVIEW_QUALITY_PROTOCOL_V1.json) freezes two primary reliability gates: Cohen's κ over the four dispositions and Cohen's κ over the canonical accepted operation sequence (all non-accepted decisions are one explicit \`NO_EVENT_ACCEPTED\` category). Both must be estimable and at least \`0.67\` before the labeling ontology may continue unchanged; \`0.80\` is the target. A single-category perfect match is reported as \`BLOCKED_PRIMARY_KAPPA_NOT_ESTIMABLE\`, never as reliable agreement. Boundary errors and exact/candidate/semantic agreement are diagnostics without an additional post-hoc threshold.
+
+The exact quality-protocol JSON bytes are pinned as SHA-256 \`${QUALITY_PROTOCOL_JSON_SHA256}\` in the generator, reconciler and quality report. The review-package commitment is already an input to the protocol, so this one-way binding avoids a circular content-hash graph while proving which preregistered bytes were used.
+
+The reconciliation artifact embeds a domain-separated \`pre_adjudication_quality_report\`. It binds the frozen protocol, manifest, review package and exact bytes of both completed assessments. This report is reliability evidence only: it is not Gold and cannot create a decision, accepted event, signoff, SignedGold dataset, model score or paper claim.
 
 ## Stop conditions
 
