@@ -4,6 +4,7 @@ export type JsonObject = { [key: string]: JsonValue | undefined };
 export * from "./board2skill.js";
 export * from "./gold-review.js";
 export * from "./gold-independent-review-quality.js";
+export * from "./gold-independent-review-workspace.js";
 export * from "./oracle-gate-bytes.js";
 export * from "./oracle-gate-composition.js";
 export * from "./oracle-gate-input-token-count.js";

@@ -31,6 +31,7 @@ import { splitLearningCheck, studentVisibleAnswer } from "../../../../packages/c
 import { api, streamNdjson, uploadEvidenceFile, uploadVideo } from "./api.js";
 import { formatDate, formatDuration, percent } from "./format.js";
 import { Markdown } from "./components/Markdown.js";
+import { IndependentGoldReview } from "./components/IndependentGoldReview.js";
 
 type View = "studio" | "overview" | "evidence" | "gold" | "skills" | "evaluation";
 
@@ -74,7 +75,8 @@ function stageLabel(job: JobState): string {
 }
 
 function App() {
-  const [view, setView] = useState<View>("studio");
+  const independentReviewRoute = window.location.pathname === "/gold-independent-review";
+  const [view, setView] = useState<View>(independentReviewRoute ? "gold" : "studio");
   const [health, setHealth] = useState<Health | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState("");
@@ -96,6 +98,7 @@ function App() {
   const project = useMemo(() => projects.find((item) => item.id === projectId), [projects, projectId]);
   const projectJobs = useMemo(() => jobs.filter((item) => item.project_id === projectId), [jobs, projectId]);
   const activeJobs = projectJobs.filter((item) => item.status === "queued" || item.status === "running");
+  const independentReviewerSession = view === "gold" && independentReviewRoute;
 
   const flash = useCallback((message: string, isError = false) => {
     if (isError) setError(message);
@@ -245,8 +248,8 @@ function App() {
       </header>
 
       {view !== "studio" && <section className="page-head">
-        <p className="eyebrow">{VIEW_COPY[view].eyebrow}</p>
-        <div><h1>{VIEW_COPY[view].title}</h1><p>{VIEW_COPY[view].intro}</p></div>
+        <p className="eyebrow">{independentReviewerSession ? "02 / INDEPENDENT GOLD REVIEW" : VIEW_COPY[view].eyebrow}</p>
+        <div><h1>{independentReviewerSession ? "独立双评" : VIEW_COPY[view].title}</h1><p>{independentReviewerSession ? "只读检查冻结证据，在本机完成独立判断并导出评审文件；本页面不会写入 Gold。" : VIEW_COPY[view].intro}</p></div>
       </section>}
 
       <section className={`content ${view === "studio" ? "studio-content" : ""}`}>{content}</section>
@@ -912,6 +915,13 @@ function LearningCheck({ value, compact = false }: { value?: string; compact?: b
 }
 
 function GoldReviewCenter({ flash, projectId }: { flash: (message: string, error?: boolean) => void; projectId: string }) {
+  if (window.location.pathname === "/gold-independent-review") {
+    return <IndependentGoldReview flash={flash} />;
+  }
+  return <GoldAdjudicationCenter flash={flash} projectId={projectId} />;
+}
+
+function GoldAdjudicationCenter({ flash, projectId }: { flash: (message: string, error?: boolean) => void; projectId: string }) {
   const [queue, setQueue] = useState<GoldReviewQueue | null>(null);
   const [packageId, setPackageId] = useState("");
   const [groupId, setGroupId] = useState("");

@@ -37,6 +37,7 @@ import { LibraryStore } from "../../../packages/store/src/libraryStore.js";
 import { EvaluationStore } from "../../../packages/store/src/evaluationStore.js";
 import { ConversationStore } from "../../../packages/store/src/conversationStore.js";
 import { GoldReviewStore } from "../../../packages/store/src/goldReviewStore.js";
+import { GoldIndependentReviewWorkspace } from "../../../packages/store/src/goldIndependentReviewWorkspace.js";
 import { DATA_DIR, PORT, ROOT, WEB_DIST_DIR } from "./config.js";
 import { TutorService } from "./services/tutorService.js";
 
@@ -48,6 +49,7 @@ const jobs = new JobStore(DATA_DIR);
 const evaluations = new EvaluationStore(ROOT, DATA_DIR);
 const conversations = new ConversationStore(DATA_DIR);
 const goldReviews = new GoldReviewStore(ROOT, DATA_DIR);
+const independentGoldReview = new GoldIndependentReviewWorkspace(ROOT);
 const settings = new SettingsStore(ROOT, DATA_DIR);
 const pipeline = new PipelineEngine(ROOT, DATA_DIR, library, jobs, settings);
 const tutor = new TutorService(library, jobs, settings);
@@ -168,6 +170,24 @@ app.get("/api/gold-review", async (_request, reply): Promise<GoldReviewQueue | u
 app.get("/api/gold-review/compile-readiness", async (_request, reply) => {
   try { return await goldReviews.compileReadiness(); }
   catch (error) { return httpError(reply, error); }
+});
+
+app.get("/api/gold-independent-review/:slot", async (request, reply) => {
+  try {
+    reply.header("Cache-Control", "private, no-store");
+    return await independentGoldReview.packet(paramsOf<{ slot: string }>(request).slot);
+  } catch (error) { return httpError(reply, error); }
+});
+
+app.get("/api/gold-independent-review/:slot/evidence", async (request, reply) => {
+  try {
+    const query = request.query as Record<string, unknown>;
+    const rawIndex = typeof query.index === "string" ? query.index : "";
+    const item = await independentGoldReview.evidence(paramsOf<{ slot: string }>(request).slot, String(query.card_sha256 || ""), /^(0|[1-9]\d*)$/.test(rawIndex) ? Number(rawIndex) : Number.NaN);
+    reply.header("Cache-Control", "private, no-store");
+    reply.type(item.mime);
+    return reply.send(item.bytes);
+  } catch (error) { return httpError(reply, error); }
 });
 
 app.get("/api/gold-review/evidence", async (request, reply) => {
